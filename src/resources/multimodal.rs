@@ -10,6 +10,15 @@ pub enum ImageDetail {
     Original,
 }
 
+/// Chat-completions image detail controls.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatImageDetail {
+    Auto,
+    Low,
+    High,
+}
+
 /// Supported encoded input-audio formats.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -169,7 +178,7 @@ impl ChatCompletionContentPart {
         Self::Text { text: text.into() }
     }
 
-    pub fn image_url(url: impl Into<String>, detail: Option<ImageDetail>) -> Self {
+    pub fn image_url(url: impl Into<String>, detail: Option<ChatImageDetail>) -> Self {
         Self::ImageUrl {
             image_url: ChatImageUrl {
                 url: url.into(),
@@ -188,5 +197,5 @@ impl ChatCompletionContentPart {
 pub struct ChatImageUrl {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<ImageDetail>,
+    pub detail: Option<ChatImageDetail>,
 }

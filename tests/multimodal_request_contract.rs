@@ -8,8 +8,8 @@ use openai_rust::{
     resources::{
         chat::ChatCompletionCreateParams,
         multimodal::{
-            ChatCompletionContentPart, ChatCompletionMessage, ImageDetail, InputAudioData,
-            InputAudioFormat, ResponseInputMessage, ResponseInputPart,
+            ChatCompletionContentPart, ChatCompletionMessage, ChatImageDetail, ImageDetail,
+            InputAudioData, InputAudioFormat, ResponseInputMessage, ResponseInputPart,
         },
         responses::ResponseCreateParams,
     },
@@ -80,7 +80,7 @@ fn shared_multimodal_request_builders_preserve_ordered_text_image_audio_parts() 
                 ChatCompletionContentPart::text("Describe the clip"),
                 ChatCompletionContentPart::image_url(
                     "data:image/png;base64,AAAA",
-                    Some(ImageDetail::Low),
+                    Some(ChatImageDetail::Low),
                 ),
                 ChatCompletionContentPart::input_audio(InputAudioData {
                     data: "UklGRg==".into(),
@@ -117,6 +117,24 @@ fn shared_multimodal_request_builders_preserve_ordered_text_image_audio_parts() 
     assert_eq!(chat_parts[2]["type"], "input_audio");
     assert_eq!(chat_parts[2]["input_audio"]["data"], "UklGRg==");
     assert_eq!(chat_parts[2]["input_audio"]["format"], "wav");
+}
+
+#[test]
+fn chat_image_parts_reject_original_detail_while_responses_keep_it() {
+    let response_part = ResponseInputPart::input_image_url(
+        "data:image/png;base64,BBBB",
+        Some(ImageDetail::Original),
+    );
+    let response_json =
+        serde_json::to_value(&response_part).expect("serialize response image part");
+    assert_eq!(response_json["detail"], "original");
+
+    let chat_part = ChatCompletionContentPart::image_url(
+        "data:image/png;base64,BBBB",
+        Some(ChatImageDetail::High),
+    );
+    let chat_json = serde_json::to_value(&chat_part).expect("serialize chat image part");
+    assert_eq!(chat_json["image_url"]["detail"], "high");
 }
 
 #[test]
