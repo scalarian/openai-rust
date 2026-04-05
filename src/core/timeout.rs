@@ -14,3 +14,7 @@ impl Default for TimeoutPolicy {
         }
     }
 }
+
+impl TimeoutPolicy {
+    pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(600);
+}

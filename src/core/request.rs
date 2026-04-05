@@ -5,6 +5,15 @@ use std::{collections::BTreeMap, time::Duration};
 pub struct RequestOptions {
     /// Optional per-request timeout override.
     pub timeout: Option<Duration>,
+    /// Optional per-request retry-budget override.
+    pub max_retries: Option<u32>,
+}
+
+/// Effective request options after applying client defaults and overrides.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedRequestOptions {
+    pub timeout: Duration,
+    pub max_retries: u32,
 }
 
 /// Prepared request parts emitted by the shared client core before transport.

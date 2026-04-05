@@ -1,9 +1,10 @@
 use crate::{
     config::{ClientConfig, ResolvedClientConfig},
-    core::request::PreparedRequest,
+    core::request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
     realtime::Realtime,
     resources::ResourceFamilies,
 };
+use serde::de::DeserializeOwned;
 use url::Url;
 
 /// Root async-first SDK client scaffold.
@@ -41,11 +42,10 @@ impl OpenAI {
         method: impl AsRef<str>,
         path: impl AsRef<str>,
     ) -> Result<PreparedRequest, crate::OpenAIError> {
-        let resolved = self.resolved_config()?;
         let method = method.as_ref().trim().to_ascii_uppercase();
         if method.is_empty() {
             return Err(crate::OpenAIError::new(
-                crate::ErrorKind::Configuration,
+                crate::ErrorKind::Validation,
                 "request method cannot be blank",
             ));
         }
@@ -53,16 +53,45 @@ impl OpenAI {
         let endpoint = normalize_endpoint(path.as_ref());
         if endpoint.is_empty() {
             return Err(crate::OpenAIError::new(
-                crate::ErrorKind::Configuration,
+                crate::ErrorKind::Validation,
                 "request path cannot be blank",
             ));
         }
+
+        let resolved = self.resolved_config()?;
 
         Ok(PreparedRequest {
             method,
             url: join_url(&resolved.base_url, &endpoint)?,
             headers: resolved.headers(),
         })
+    }
+
+    /// Resolves per-request execution options against client defaults.
+    pub fn resolve_request_options(
+        &self,
+        options: &RequestOptions,
+    ) -> Result<ResolvedRequestOptions, crate::OpenAIError> {
+        let resolved = self.resolved_config()?;
+        Ok(ResolvedRequestOptions {
+            timeout: options.timeout.unwrap_or(resolved.timeout),
+            max_retries: options.max_retries.unwrap_or(resolved.max_retries),
+        })
+    }
+
+    /// Executes a JSON request through the shared transport path.
+    pub fn execute_json<T>(
+        &self,
+        method: impl AsRef<str>,
+        path: impl AsRef<str>,
+        options: RequestOptions,
+    ) -> Result<crate::core::response::ApiResponse<T>, crate::OpenAIError>
+    where
+        T: DeserializeOwned,
+    {
+        let request = self.prepare_request(method, path)?;
+        let resolved_options = self.resolve_request_options(&options)?;
+        crate::core::transport::execute_json(&request, &resolved_options)
     }
 
     /// Accesses the responses family handle.
@@ -206,6 +235,18 @@ impl OpenAIBuilder {
     /// Sets a custom user-agent token or prefix.
     pub fn user_agent(mut self, user_agent: impl Into<String>) -> Self {
         self.config.user_agent = Some(user_agent.into());
+        self
+    }
+
+    /// Sets a client-level timeout budget.
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.config.timeout = Some(timeout);
+        self
+    }
+
+    /// Sets a client-level retry budget.
+    pub fn max_retries(mut self, max_retries: u32) -> Self {
+        self.config.max_retries = Some(max_retries);
         self
     }
 

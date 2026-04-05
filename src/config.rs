@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, env};
+use std::{collections::BTreeMap, env, time::Duration};
 
 use url::Url;
 
@@ -25,6 +25,10 @@ pub struct ClientConfig {
     pub project: Option<String>,
     /// Optional custom user-agent value.
     pub user_agent: Option<String>,
+    /// Optional client-level timeout override.
+    pub timeout: Option<Duration>,
+    /// Optional retry-budget override.
+    pub max_retries: Option<u32>,
 }
 
 /// Fully-resolved client configuration after environment loading and validation.
@@ -35,6 +39,8 @@ pub struct ResolvedClientConfig {
     pub organization: Option<String>,
     pub project: Option<String>,
     pub user_agent: String,
+    pub timeout: Duration,
+    pub max_retries: u32,
 }
 
 impl ClientConfig {
@@ -46,6 +52,8 @@ impl ClientConfig {
             organization: env::var(OPENAI_ORG_ID_ENV).ok(),
             project: env::var(OPENAI_PROJECT_ID_ENV).ok(),
             user_agent: None,
+            timeout: None,
+            max_retries: None,
         }
     }
 
@@ -80,6 +88,12 @@ impl ClientConfig {
         );
         let project = normalize_optional(self.project.as_deref().or(env_config.project.as_deref()));
         let user_agent = build_user_agent(self.user_agent.as_deref());
+        let timeout = self
+            .timeout
+            .unwrap_or(crate::core::timeout::TimeoutPolicy::DEFAULT_REQUEST_TIMEOUT);
+        let max_retries = self
+            .max_retries
+            .unwrap_or(crate::core::retry::RetryPolicy::DEFAULT_MAX_RETRIES);
 
         Ok(ResolvedClientConfig {
             api_key,
@@ -87,6 +101,8 @@ impl ClientConfig {
             organization,
             project,
             user_agent,
+            timeout,
+            max_retries,
         })
     }
 }

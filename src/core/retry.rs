@@ -10,3 +10,7 @@ impl Default for RetryPolicy {
         Self { max_retries: 2 }
     }
 }
+
+impl RetryPolicy {
+    pub const DEFAULT_MAX_RETRIES: u32 = 2;
+}
