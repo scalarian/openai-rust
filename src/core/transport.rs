@@ -85,6 +85,42 @@ pub(crate) fn execute_unit(
     }))
 }
 
+pub(crate) fn execute_bytes(
+    request: &PreparedRequest,
+    options: &ResolvedRequestOptions,
+) -> Result<ApiResponse<Vec<u8>>, OpenAIError> {
+    let client = build_blocking_client(options)?;
+
+    let mut last_error = None;
+    for attempt in 0..=options.max_retries {
+        match execute_once_bytes(&client, request, options) {
+            Ok(response) => {
+                return Ok(ApiResponse {
+                    output: response.body,
+                    metadata: response.metadata,
+                });
+            }
+            Err(error) => {
+                let should_retry = attempt < options.max_retries && should_retry(&error);
+                let retry_delay = retry_delay(&error, attempt);
+                last_error = Some(error);
+                if should_retry {
+                    thread::sleep(retry_delay);
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Transport,
+            "shared transport exited without a response or error",
+        )
+    }))
+}
+
 #[allow(dead_code)]
 pub(crate) fn execute_text(
     request: &PreparedRequest,

@@ -59,7 +59,7 @@ impl ResourceFamilies {
             models: models::Models::new(runtime.clone()),
             moderations: moderations::Moderations::new(runtime.clone()),
             images: images::Images::new(runtime.clone()),
-            audio: audio::Audio::default(),
+            audio: audio::Audio::new(runtime.clone()),
             files: files::Files,
             uploads: uploads::Uploads,
             vector_stores: vector_stores::VectorStores::default(),
