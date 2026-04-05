@@ -18,7 +18,7 @@ Environment variables, external dependencies, and setup notes.
 - Live-test credentials are staged in `./creds.txt` and ignored by git.
 - Never commit `creds.txt`, echo secret values into logs, or paste secret material into source files/tests.
 - When a command needs live credentials in a fresh shell, use: `set -a && . ./creds.txt && set +a && <command>`.
-- When a validation assertion specifically needs the SDK's default OpenAI host, unset `OPENAI_BASE_URL` in that same shell before running the live command so the check cannot silently hit an override host.
+- When a validation assertion specifically needs the SDK's default OpenAI host, unset `OPENAI_BASE_URL` in that same shell before running the live command (for example: `set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && cargo test --test live_core_smoke -- --ignored --nocapture`) so the check cannot silently hit an override host.
 - If live validation fails because the staged project lacks entitlement to a public surface, return to the orchestrator with the exact endpoint and error instead of mocking around it.
 
 ## External Dependencies
