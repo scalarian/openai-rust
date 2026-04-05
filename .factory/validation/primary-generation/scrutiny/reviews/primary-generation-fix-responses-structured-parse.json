@@ -1,0 +1,15 @@
+{
+  "featureId": "primary-generation-fix-responses-structured-parse",
+  "reviewedAt": "2026-04-05T18:30:26.877414+00:00",
+  "commitId": "874fa87",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly addresses the prior blocking bug: structured parsing no longer deserializes concatenated display text, but instead walks canonical output_text content parts while preserving the existing refusal and strict tool-argument failure behavior.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/reviews/responses-parse-input-items-and-token-helpers.json",
+  "summary": "Reviewed the prior failed feature, the fix handoff/transcript, and both commit diffs (3d78df0 and 874fa87). The new helper at src/resources/responses.rs:2050-2095 parses canonical output_text parts instead of response.output_text(), and the regression at tests/responses_parse_contract.rs:104-132 demonstrates the original multi-block failure is fixed without regressing refusal or strict tool parsing."
+}

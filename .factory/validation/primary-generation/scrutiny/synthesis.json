@@ -1,7 +1,7 @@
 {
   "milestone": "primary-generation",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,62 +20,21 @@
     }
   },
   "reviewsSummary": {
-    "total": 5,
-    "passed": 2,
-    "failed": 3,
-    "failedFeatures": [
-      "responses-create-retrieve-cancel-and-compaction",
-      "responses-parse-input-items-and-token-helpers",
-      "responses-streaming-state-machine-and-structured-streams"
-    ]
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "responses-create-retrieve-cancel-and-compaction",
-      "severity": "blocking",
-      "description": "`src/resources/responses.rs:219` models non-stream response output items too narrowly, dropping canonical tool/function-call fields such as `name`, `arguments`, `call_id`, and `status`, so create/retrieve/cancel do not faithfully surface tool-calling responses."
-    },
-    {
-      "featureId": "responses-create-retrieve-cancel-and-compaction",
-      "severity": "blocking",
-      "description": "`src/resources/responses.rs:234` only deserializes `text` content parts, so refusal payloads lose their `refusal` explanation when parsing canonical non-stream response content."
-    },
-    {
-      "featureId": "responses-parse-input-items-and-token-helpers",
-      "severity": "blocking",
-      "description": "`src/resources/responses.rs:786` parses structured output from `response.output_text()` after concatenating all output-text blocks, which turns valid multi-block structured responses into invalid JSON and breaks `VAL-RESP-013`."
-    },
-    {
-      "featureId": "responses-streaming-state-machine-and-structured-streams",
-      "severity": "blocking",
-      "description": "`Responses::stream` and `resume_stream` buffer the entire SSE response body via `execute_text*` before constructing `ResponseStream`, so callers cannot consume deltas incrementally and `abort()` cannot stop the underlying request."
-    },
-    {
-      "featureId": "responses-streaming-state-machine-and-structured-streams",
-      "severity": "blocking",
-      "description": "`src/resources/responses.rs:1004` re-applies `starting_after` using a local ordinal instead of the API event `sequence_number`, so resumed background streams can drop valid server events and corrupt the final snapshot."
-    }
-  ],
-  "appliedUpdates": [
-    {
-      "target": "library",
-      "description": "Added a factual note to `.factory/library/api-surface.md` that Responses background resume uses server `sequence_number` values for `starting_after`, so future workers key resume filtering off event sequence numbers rather than local ordinals.",
-      "sourceFeature": "responses-streaming-state-machine-and-structured-streams"
-    }
-  ],
+  "blockingIssues": [],
+  "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "sdk-surface-worker skill",
-      "suggestion": "Add explicit non-interactive exec-mode guidance to `sdk-surface-worker`: allow internal design analysis in place of a user-approval brainstorming gate, and clarify when representative example updates are mandatory versus out-of-scope so workers can satisfy the procedure without conflicting with mission exec instructions.",
-      "evidence": "All five primary-generation surface reviews recorded the brainstorming approval gate as a procedure mismatch in exec mode, and the review for `responses-streaming-state-machine-and-structured-streams` additionally flagged that step 6's representative-example requirement conflicts with mission instructions to do only the requested work and avoid unrelated docs/README changes.",
+      "suggestion": "Add explicit non-interactive exec-mode guidance to `sdk-surface-worker` so the brainstorming step is satisfiable without a user-approval loop during Exec Mode validations.",
+      "evidence": "The rerun review for `primary-generation-fix-responses-canonical-output-model` found the worker otherwise followed the expected surface-worker procedure (mission docs, TDD, verification) and only had to mark `followedProcedure=false` because the brainstorming step still assumes interactive approval in Exec Mode.",
       "isSystemic": true
     }
   ],
-  "rejectedObservations": [
-    {
-      "observation": "Repeated per-feature brainstorming-gate observations from the other primary-generation reviews.",
-      "reason": "duplicate"
-    }
-  ],
-  "previousRound": null
+  "rejectedObservations": [],
+  "previousRound": ".factory/validation/primary-generation/scrutiny/synthesis.round1.json"
 }

@@ -1,0 +1,21 @@
+{
+  "featureId": "primary-generation-fix-responses-canonical-output-model",
+  "reviewedAt": "2026-04-05T18:30:57Z",
+  "commitId": "c26aeaf30483088c7f3950f5a9ce0e64a3a3a91e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "This rerun adequately closes the original blocking gaps. The current fix snapshot preserves canonical non-stream Responses tool/function-call fields on output items, preserves canonical refusal text (including structured-parse refusal handling), and lifts shared Conversations item fields into typed properties instead of leaving them stranded in `extra`; the new regression tests cover Responses create/retrieve/cancel plus Conversations list/retrieve for those cases.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The brainstorming workflow is still documented as an approval-gated step even though mission workers run in non-interactive exec mode. This fix worker otherwise followed the expected surface-worker procedure (mission docs, TDD, verification) and only deviated on that impossible approval loop, so the skill text still needs an explicit exec-mode path.",
+      "evidence": "`sdk-surface-worker` requires brainstorming in step 2; the fix transcript skeleton shows the worker invoked `brainstorming`, `test-driven-development`, and `verification-before-completion`, while the handoff `skillFeedback` records `followedProcedure: false` only for `brainstorming approval gate` because user approval is impossible in Exec Mode."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/reviews/responses-create-retrieve-cancel-and-compaction.json",
+  "summary": "Review passed. I examined the prior failed review, both feature diffs, the fix transcript skeleton, and the shared-state docs; the original tool-call/refusal-model failures are resolved in the current fix snapshot, and I found no remaining blocking or non-blocking code issues for this assigned feature. Report written to `.factory/validation/primary-generation/scrutiny/reviews/primary-generation-fix-responses-canonical-output-model.json`."
+}
