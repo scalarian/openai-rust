@@ -1,0 +1,28 @@
+{
+  "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
+  "reviewedAt": "2026-04-05T19:17:25Z",
+  "commitId": "a4f88c621c8b6188749166d99b90cf5c66c3754f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The change is narrowly scoped and correctly adds two new state-machine regressions for interleaved reasoning/text/tool updates and multimodal content-part updates, but it does not fully close the proof gap it claims to address. Both new tests stop on pre-terminal snapshots and never assert the `response.completed`/`final_response()` reconciliation path, even though the stream runtime replaces the snapshot with the terminal wire response at completion.",
+    "issues": [
+      {
+        "file": "tests/streaming_state_machine_contract.rs",
+        "line": 135,
+        "severity": "blocking",
+        "description": "`interleaved_reasoning_text_and_tool_indices_stay_isolated` only asserts the accumulator state after `response.reasoning_text.done` and `response.output_text.done`, then exits without consuming the queued `response.completed` event declared earlier in the fixture (`tests/streaming_state_machine_contract.rs:96`) or checking `final_response()`. Because `response.completed` replaces the snapshot wholesale in `src/resources/responses.rs:1652-1658`, this test does not actually prove the final reconciled streamed response preserves the same reasoning/text/tool isolation that the feature description requires."
+      },
+      {
+        "file": "tests/streaming_state_machine_contract.rs",
+        "line": 228,
+        "severity": "blocking",
+        "description": "`multimodal_content_parts_remain_isolated_until_completion` likewise stops after the sibling `response.output_text.done` snapshot and never advances to the fixture's `response.completed` event (`tests/streaming_state_machine_contract.rs:177`) or asserts `final_response()`. That leaves VAL-STREAM-015 only partially proven: the test covers incremental `response.content_part.*` assembly for `output_audio`, but not the final terminal reconciliation step where the runtime swaps in the completed response object (`src/resources/responses.rs:1652-1658`)."
+      }
+    ]
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/synthesis.round1.json",
+  "summary": "Review failed. I examined the fix handoff, transcript skeleton, prior scrutiny synthesis/reviews, and commit `a4f88c621c8b6188749166d99b90cf5c66c3754f`. The new regressions do improve coverage for interleaved reasoning and multimodal content-part accumulation, but they still stop short of proving the terminal `response.completed` reconciliation path that this feature was supposed to close."
+}

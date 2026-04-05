@@ -1,0 +1,15 @@
+{
+  "featureId": "primary-generation-fix-streaming-incomplete-terminal-proof",
+  "reviewedAt": "2026-04-05T19:16:14Z",
+  "commitId": "53c7875",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the handoff, transcript skeleton, prior antecedent review, synthesis context, and commit `53c7875`. The runtime already routed `response.incomplete` into `ResponseStreamTerminal::Incomplete` and rejected it from both `final_response()` and `parse_final()` (`src/resources/responses.rs:696-750`, `src/resources/responses.rs:1668-1674`); this fix adds the missing transcript-driven regression in `tests/responses_stream_contract.rs:271-316` that explicitly emits `response.incomplete`, asserts the terminal state stays incomplete, preserves `incomplete_details`, and proves neither success helper path can synthesize a completed result. Because `parse_final()` funnels through `final_response()`, the new negative parse assertion is sufficient coverage for the parsed-final surface, and I found no remaining correctness or regression issue in the reviewed scope.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/reviews/responses-streaming-state-machine-and-structured-streams.json",
+  "summary": "Pass. This fix adequately closes the remaining VAL-STREAM-012 proof gap around the Responses streaming state machine by adding an explicit `response.incomplete` regression that verifies explicit incomplete terminal state, preserved metadata, and no false success through `final_response()` or `parse_final()`. I found no blocking or non-blocking issues in this feature's scope."
+}

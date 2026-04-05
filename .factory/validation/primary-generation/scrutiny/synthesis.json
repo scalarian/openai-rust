@@ -1,7 +1,7 @@
 {
   "milestone": "primary-generation",
-  "round": 2,
-  "status": "pass",
+  "round": 3,
+  "status": "fail",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,21 +20,27 @@
     }
   },
   "reviewsSummary": {
-    "total": 3,
-    "passed": 3,
-    "failed": 0,
-    "failedFeatures": []
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "failedFeatures": [
+      "primary-generation-fix-streaming-reasoning-and-multimodal-proof"
+    ]
   },
-  "blockingIssues": [],
-  "appliedUpdates": [],
-  "suggestedGuidanceUpdates": [
+  "blockingIssues": [
     {
-      "target": "sdk-surface-worker skill",
-      "suggestion": "Add explicit non-interactive exec-mode guidance to `sdk-surface-worker` so the brainstorming step is satisfiable without a user-approval loop during Exec Mode validations.",
-      "evidence": "The rerun review for `primary-generation-fix-responses-canonical-output-model` found the worker otherwise followed the expected surface-worker procedure (mission docs, TDD, verification) and only had to mark `followedProcedure=false` because the brainstorming step still assumes interactive approval in Exec Mode.",
-      "isSystemic": true
+      "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
+      "severity": "blocking",
+      "description": "`tests/streaming_state_machine_contract.rs:135` only checks the pre-terminal accumulator state in `interleaved_reasoning_text_and_tool_indices_stay_isolated` and never consumes the queued `response.completed` event or asserts `final_response()`, so it does not prove terminal reconciliation preserves reasoning/text/tool isolation."
+    },
+    {
+      "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
+      "severity": "blocking",
+      "description": "`tests/streaming_state_machine_contract.rs:228` only checks pre-terminal multimodal assembly in `multimodal_content_parts_remain_isolated_until_completion` and never advances through `response.completed` or asserts `final_response()`, so VAL-STREAM-015 remains only partially proven."
     }
   ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": ".factory/validation/primary-generation/scrutiny/synthesis.round1.json"
+  "previousRound": ".factory/validation/primary-generation/scrutiny/synthesis.round2.json"
 }
