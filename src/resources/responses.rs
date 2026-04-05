@@ -504,6 +504,10 @@ pub struct ResponseOutputItem {
     #[serde(default)]
     pub arguments: Option<String>,
     #[serde(default)]
+    pub input: Option<String>,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
     pub call_id: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
@@ -971,6 +975,50 @@ struct StreamTextDonePayload {
     text: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct StreamOutputItemPayload {
+    output_index: usize,
+    item: ResponseOutputItem,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamContentPartPayload {
+    output_index: usize,
+    content_index: usize,
+    part: ResponseContentPart,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamFunctionArgumentsDonePayload {
+    output_index: usize,
+    name: String,
+    arguments: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamToolTextDeltaPayload {
+    output_index: usize,
+    delta: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamToolTextDonePayload {
+    output_index: usize,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    input: Option<String>,
+    #[serde(default)]
+    arguments: Option<String>,
+    #[serde(default)]
+    code: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamToolStatusPayload {
+    output_index: usize,
+}
+
 #[derive(Clone, Debug)]
 struct StreamAccumulator {
     visible_events: VecDeque<RecordedResponseEvent>,
@@ -1053,6 +1101,54 @@ impl StreamAccumulator {
                 self.snapshot = Some(response.clone());
                 Ok(Some(ResponseStreamEvent::Created { response }))
             }
+            "response.output_item.added" => {
+                let payload: StreamOutputItemPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.insert_output_item(payload.output_index, payload.item)?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.output_item.done" => {
+                let payload: StreamOutputItemPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_output_item(payload.output_index, payload.item)?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.content_part.added" => {
+                let payload: StreamContentPartPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.insert_content_part(
+                    payload.output_index,
+                    payload.content_index,
+                    payload.part,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.content_part.done" => {
+                let payload: StreamContentPartPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_content_part(
+                    payload.output_index,
+                    payload.content_index,
+                    payload.part,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
             "response.output_text.delta" => {
                 let payload: StreamTextDeltaPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
@@ -1081,6 +1177,146 @@ impl StreamAccumulator {
                     output_index: payload.output_index,
                     content_index: payload.content_index,
                     text: payload.text,
+                }))
+            }
+            "response.function_call_arguments.delta" => {
+                let payload: StreamToolTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_output_text_field(
+                    payload.output_index,
+                    &["function_call"],
+                    "arguments",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.function_call_arguments.done" => {
+                let payload: StreamFunctionArgumentsDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_output_text_field(
+                    payload.output_index,
+                    &["function_call"],
+                    "arguments",
+                    &payload.arguments,
+                )?;
+                self.get_output_mut(payload.output_index, &["function_call"])?
+                    .name = Some(payload.name);
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.custom_tool_call_input.delta" => {
+                let payload: StreamToolTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_output_text_field(
+                    payload.output_index,
+                    &["custom_tool_call"],
+                    "input",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.custom_tool_call_input.done" => {
+                let payload: StreamToolTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                let input = payload.input.or(payload.text).ok_or_else(|| {
+                    OpenAIError::new(
+                        ErrorKind::Parse,
+                        "response.custom_tool_call_input.done payload missing input",
+                    )
+                })?;
+                self.replace_output_text_field(
+                    payload.output_index,
+                    &["custom_tool_call"],
+                    "input",
+                    &input,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.code_interpreter_call_code.delta" => {
+                let payload: StreamToolTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_output_text_field(
+                    payload.output_index,
+                    &["code_interpreter_call"],
+                    "code",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.code_interpreter_call_code.done" => {
+                let payload: StreamToolTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                let code = payload.code.or(payload.text).ok_or_else(|| {
+                    OpenAIError::new(
+                        ErrorKind::Parse,
+                        "response.code_interpreter_call_code.done payload missing code",
+                    )
+                })?;
+                self.replace_output_text_field(
+                    payload.output_index,
+                    &["code_interpreter_call"],
+                    "code",
+                    &code,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.mcp_call_arguments.delta" => {
+                let payload: StreamToolTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_output_text_field(
+                    payload.output_index,
+                    &["mcp_call"],
+                    "arguments",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
+            "response.mcp_call_arguments.done" => {
+                let payload: StreamToolTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                let arguments = payload.arguments.ok_or_else(|| {
+                    OpenAIError::new(
+                        ErrorKind::Parse,
+                        "response.mcp_call_arguments.done payload missing arguments",
+                    )
+                })?;
+                self.replace_output_text_field(
+                    payload.output_index,
+                    &["mcp_call"],
+                    "arguments",
+                    &arguments,
+                )?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
                 }))
             }
             "response.reasoning_text.delta" => {
@@ -1167,6 +1403,32 @@ impl StreamAccumulator {
                 self.terminal = Some(ResponseStreamTerminal::Incomplete(response.clone()));
                 Ok(Some(ResponseStreamEvent::Incomplete { response }))
             }
+            "response.file_search_call.in_progress"
+            | "response.file_search_call.searching"
+            | "response.file_search_call.completed"
+            | "response.web_search_call.in_progress"
+            | "response.web_search_call.searching"
+            | "response.web_search_call.completed"
+            | "response.code_interpreter_call.in_progress"
+            | "response.code_interpreter_call.interpreting"
+            | "response.code_interpreter_call.completed"
+            | "response.code_interpreter_call.failed"
+            | "response.mcp_call.in_progress"
+            | "response.mcp_call.completed"
+            | "response.mcp_call.failed"
+            | "response.mcp_list_tools.in_progress"
+            | "response.mcp_list_tools.completed"
+            | "response.mcp_list_tools.failed" => {
+                let payload: StreamToolStatusPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                let status = event_name.rsplit('.').next().unwrap_or_default();
+                self.set_output_status(payload.output_index, status)?;
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: event_name.to_string(),
+                    data: serde_json::from_str(data)
+                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                }))
+            }
             other => {
                 let data =
                     serde_json::from_str(data).unwrap_or_else(|_| Value::String(data.to_string()));
@@ -1215,6 +1477,200 @@ impl StreamAccumulator {
         content.text = Some(text.to_string());
         snapshot.output_text = aggregate_output_text(&snapshot.output);
         Ok(())
+    }
+
+    fn insert_output_item(
+        &mut self,
+        output_index: usize,
+        item: ResponseOutputItem,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received output item before response.created",
+            )
+        })?;
+        if output_index > snapshot.output.len() {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing output_index {output_index}"),
+            ));
+        }
+        snapshot.output.insert(output_index, item);
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+
+    fn replace_output_item(
+        &mut self,
+        output_index: usize,
+        item: ResponseOutputItem,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received output item completion before response.created",
+            )
+        })?;
+        let output = snapshot.output.get_mut(output_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing output_index {output_index}"),
+            )
+        })?;
+        *output = item;
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+
+    fn insert_content_part(
+        &mut self,
+        output_index: usize,
+        content_index: usize,
+        part: ResponseContentPart,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received content part before response.created",
+            )
+        })?;
+        let item = snapshot.output.get_mut(output_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing output_index {output_index}"),
+            )
+        })?;
+        if item.item_type != "message" {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced non-message output item at index {output_index}"),
+            ));
+        }
+        if content_index > item.content.len() {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing content_index {content_index}"),
+            ));
+        }
+        item.content.insert(content_index, part);
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+
+    fn replace_content_part(
+        &mut self,
+        output_index: usize,
+        content_index: usize,
+        part: ResponseContentPart,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received content part completion before response.created",
+            )
+        })?;
+        let item = snapshot.output.get_mut(output_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing output_index {output_index}"),
+            )
+        })?;
+        if item.item_type != "message" {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced non-message output item at index {output_index}"),
+            ));
+        }
+        let content = item.content.get_mut(content_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing content_index {content_index}"),
+            )
+        })?;
+        *content = part;
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+
+    fn append_output_text_field(
+        &mut self,
+        output_index: usize,
+        expected_types: &[&str],
+        field: &str,
+        delta: &str,
+    ) -> Result<(), OpenAIError> {
+        let output = self.get_output_mut(output_index, expected_types)?;
+        let target = match field {
+            "arguments" => output.arguments.get_or_insert_with(String::new),
+            "input" => output.input.get_or_insert_with(String::new),
+            "code" => output.code.get_or_insert_with(String::new),
+            _ => {
+                return Err(OpenAIError::new(
+                    ErrorKind::Validation,
+                    format!("unsupported streamed output field `{field}`"),
+                ));
+            }
+        };
+        target.push_str(delta);
+        Ok(())
+    }
+
+    fn replace_output_text_field(
+        &mut self,
+        output_index: usize,
+        expected_types: &[&str],
+        field: &str,
+        value: &str,
+    ) -> Result<(), OpenAIError> {
+        let output = self.get_output_mut(output_index, expected_types)?;
+        match field {
+            "arguments" => output.arguments = Some(value.to_string()),
+            "input" => output.input = Some(value.to_string()),
+            "code" => output.code = Some(value.to_string()),
+            _ => {
+                return Err(OpenAIError::new(
+                    ErrorKind::Validation,
+                    format!("unsupported streamed output field `{field}`"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn set_output_status(&mut self, output_index: usize, status: &str) -> Result<(), OpenAIError> {
+        let output = self.get_output_mut(output_index, &[])?;
+        output.status = Some(status.to_string());
+        Ok(())
+    }
+
+    fn get_output_mut<'a>(
+        &'a mut self,
+        output_index: usize,
+        expected_types: &[&str],
+    ) -> Result<&'a mut ResponseOutputItem, OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received output mutation before response.created",
+            )
+        })?;
+        let output = snapshot.output.get_mut(output_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing output_index {output_index}"),
+            )
+        })?;
+        if !expected_types.is_empty() && !expected_types.contains(&output.item_type.as_str()) {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!(
+                    "stream addressed output item type `{}` but expected one of {:?}",
+                    output.item_type, expected_types
+                ),
+            ));
+        }
+        Ok(output)
     }
 }
 
