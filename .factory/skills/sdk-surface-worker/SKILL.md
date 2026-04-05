@@ -13,7 +13,7 @@ Use this skill for resource-family features: Responses, Conversations, Chat/Comp
 
 ## Required Skills
 
-- `brainstorming` — invoke before introducing or reshaping public resource-family APIs, builders, or helpers. In mission Exec Mode, this requirement is satisfied by an in-session design comparison recorded in the worker notes/handoff; no interactive user approval loop is required.
+- `brainstorming` — invoke before introducing or reshaping public resource-family APIs, builders, or helpers. In mission Exec Mode, this requirement is satisfied by an in-session design comparison recorded in the worker notes/handoff; no interactive user approval loop is required. If the feature introduces or reshapes a public family and neither a `brainstorming` invocation nor a chosen-vs-rejected design note is present, procedure compliance is not satisfied.
 - `test-driven-development` — invoke before editing code; add failing family tests first for behavior-changing work. For proof-only or validation-gap features, strengthen the narrowest assertion/fixture first and record the result even if the stronger proof passes immediately and exposes no runtime defect.
 - `verification-before-completion` — invoke before handoff so the family contract is verified with evidence.
 - `systematic-debugging` — invoke if family tests, multipart handling, pagination, or live-smoke behavior fails unexpectedly.
@@ -21,7 +21,7 @@ Use this skill for resource-family features: Responses, Conversations, Chat/Comp
 ## Work Procedure
 
 1. Read `mission.md`, `AGENTS.md`, `.factory/library/architecture.md`, `.factory/library/api-surface.md`, `.factory/library/environment.md`, `.factory/library/user-testing.md`, and `.factory/services.yaml`.
-2. Invoke `brainstorming` when the feature affects public family ergonomics, helper naming, builder flows, or compatibility labeling. In mission Exec Mode, treat this as a non-interactive internal design step: compare plausible API/design directions in-session, record the chosen direction plus a rejected alternative in your notes/handoff, and proceed without waiting for user approval or a separate interactive checkpoint.
+2. Invoke `brainstorming` when the feature affects public family ergonomics, helper naming, builder flows, or compatibility labeling. In mission Exec Mode, treat this as a non-interactive internal design step: compare plausible API/design directions in-session, record the chosen direction plus a rejected alternative in your notes/handoff, and proceed without waiting for user approval or a separate interactive checkpoint. If you skip both the skill invocation and the chosen-vs-rejected note for a new or reshaped public family, set `skillFeedback.followedProcedure` to `false` and record the missing design-review step in `deviations`.
 3. Invoke `test-driven-development`. For behavior-changing work, add failing tests before implementation. For proof-only or validation-gap features, first strengthen the narrowest missing assertion or transcript/fixture coverage; if the stronger proof passes immediately, record that evidence and only change runtime code if the new proof exposes a real defect. Choose the right validation seam:
    - request-shaping/multipart tests
    - mocked family integration tests
