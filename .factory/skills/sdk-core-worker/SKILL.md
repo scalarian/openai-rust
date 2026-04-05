@@ -21,7 +21,7 @@ Use this skill for features that change the shared runtime: client construction,
 ## Work Procedure
 
 1. Read `mission.md`, `AGENTS.md`, `.factory/library/architecture.md`, `.factory/library/environment.md`, `.factory/library/user-testing.md`, and `.factory/services.yaml` before editing.
-2. Invoke `brainstorming` if the feature changes shared public API shape, metadata wrappers, blocking behavior, or transport layering. If the skill requests an approval loop that is unavailable in mission exec mode, record the design tradeoffs and chosen direction in your working notes/handoff, then proceed once the options are explicitly compared.
+2. Invoke `brainstorming` if the feature changes shared public API shape, metadata wrappers, blocking behavior, or transport layering. In mission Exec Mode, the requirement is satisfied by invoking the skill, comparing at least two plausible design directions, and recording the chosen direction plus rejected alternative in your notes/handoff; do not wait for a user approval loop that is unavailable in non-interactive execution.
 3. Invoke `test-driven-development` and add failing tests first. Prefer core-focused tests in the smallest seam that proves the contract:
    - config/env/auth tests
    - header/URL construction tests
