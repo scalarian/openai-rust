@@ -263,6 +263,16 @@ impl TranslationParams {
         self.response_format.unwrap_or(AudioResponseFormat::Json)
     }
 
+    fn validate(&self) -> Result<(), OpenAIError> {
+        if self.response_format() == AudioResponseFormat::DiarizedJson {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                "audio.translations does not support `diarized_json` response format",
+            ));
+        }
+        Ok(())
+    }
+
     fn into_multipart(self) -> MultipartPayload {
         let response_format = self.response_format();
         let mut builder = MultipartBuilder::new();
@@ -452,6 +462,7 @@ impl Translations {
         &self,
         params: TranslationParams,
     ) -> Result<crate::ApiResponse<TranslationResponse>, OpenAIError> {
+        params.validate()?;
         let response_format = params.response_format();
         let multipart = params.into_multipart();
         let content_type = multipart.content_type();
@@ -812,13 +823,11 @@ struct TranscriptionAccumulator {
     final_text: Option<String>,
     final_usage: Option<AudioUsage>,
     segments: Vec<TranscriptionTextSegmentEvent>,
-    saw_done: bool,
 }
 
 impl TranscriptionAccumulator {
     fn ingest_frame(&mut self, frame: SseFrame) -> Result<(), OpenAIError> {
         if frame.data == "[DONE]" {
-            self.saw_done = true;
             return Ok(());
         }
 
@@ -856,7 +865,7 @@ impl TranscriptionAccumulator {
     }
 
     fn finish(self, metadata: ResponseMetadata) -> Result<TranscriptionStream, OpenAIError> {
-        if self.saw_done && self.final_text.is_none() {
+        if self.final_text.is_none() {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
                 "transcription stream ended without a terminal transcript.text.done event",

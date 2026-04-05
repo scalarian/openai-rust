@@ -147,6 +147,44 @@ fn translation_preserves_file_semantics_and_typed_bodies() {
     assert_text_part(&third_body, "response_format", "srt");
 }
 
+#[test]
+fn translation_rejects_diarized_json_before_hitting_the_wire() {
+    let server =
+        mock_http::MockHttpServer::spawn(json_response(json!({"text": "unused"}).to_string()))
+            .unwrap();
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let error = client
+        .audio()
+        .translations
+        .create(openai_rust::resources::audio::TranslationParams {
+            file: openai_rust::resources::audio::AudioInput::new(
+                "speech.mp3",
+                "audio/mpeg",
+                vec![1, 2, 3, 4, 5],
+            ),
+            model: String::from("whisper-1"),
+            response_format: Some(openai_rust::resources::audio::AudioResponseFormat::DiarizedJson),
+            ..Default::default()
+        })
+        .expect_err("diarized_json translations should fail locally");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not support `diarized_json`"),
+        "unexpected error: {error}"
+    );
+    assert!(
+        server.captured_request().is_none(),
+        "unsupported translation format should not issue any HTTP request"
+    );
+}
+
 fn json_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![

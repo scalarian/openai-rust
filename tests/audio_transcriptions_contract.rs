@@ -262,6 +262,85 @@ fn streaming_transcription_assembles_deltas_segments_and_usage() {
     assert_eq!(stream.segments()[0].speaker, "agent");
 }
 
+#[test]
+fn streaming_transcription_rejects_eof_truncated_transcripts_without_done_event() {
+    let body = concat!(
+        "event: transcript.text.delta\n",
+        "data: {\"type\":\"transcript.text.delta\",\"delta\":\"hello \",\"segment_id\":\"seg_1\"}\n\n",
+        "event: transcript.text.segment\n",
+        "data: {\"type\":\"transcript.text.segment\",\"id\":\"seg_1\",\"speaker\":\"agent\",\"start\":0.0,\"end\":0.6,\"text\":\"hello\"}\n\n",
+        "data: [DONE]\n\n"
+    );
+
+    let server = mock_http::MockHttpServer::spawn(sse_response(body)).unwrap();
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let error = client
+        .audio()
+        .transcriptions
+        .stream(openai_rust::resources::audio::TranscriptionParams {
+            file: openai_rust::resources::audio::AudioInput::new(
+                "clip.wav",
+                "audio/wav",
+                tiny_wav_bytes(),
+            ),
+            model: String::from("gpt-4o-transcribe-diarize"),
+            response_format: Some(openai_rust::resources::audio::AudioResponseFormat::DiarizedJson),
+            ..Default::default()
+        })
+        .expect_err("truncated streams should fail before surfacing success");
+
+    assert!(
+        error
+            .to_string()
+            .contains("terminal transcript.text.done event"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn streaming_transcription_rejects_eof_truncated_transcripts_without_done_or_done_marker() {
+    let body = concat!(
+        "event: transcript.text.delta\n",
+        "data: {\"type\":\"transcript.text.delta\",\"delta\":\"hello \",\"segment_id\":\"seg_1\"}\n\n",
+        "event: transcript.text.segment\n",
+        "data: {\"type\":\"transcript.text.segment\",\"id\":\"seg_1\",\"speaker\":\"agent\",\"start\":0.0,\"end\":0.6,\"text\":\"hello\"}\n\n"
+    );
+
+    let server = mock_http::MockHttpServer::spawn(sse_response(body)).unwrap();
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let error = client
+        .audio()
+        .transcriptions
+        .stream(openai_rust::resources::audio::TranscriptionParams {
+            file: openai_rust::resources::audio::AudioInput::new(
+                "clip.wav",
+                "audio/wav",
+                tiny_wav_bytes(),
+            ),
+            model: String::from("gpt-4o-transcribe-diarize"),
+            response_format: Some(openai_rust::resources::audio::AudioResponseFormat::DiarizedJson),
+            ..Default::default()
+        })
+        .expect_err("EOF-truncated streams should fail even without [DONE]");
+
+    assert!(
+        error
+            .to_string()
+            .contains("terminal transcript.text.done event"),
+        "unexpected error: {error}"
+    );
+}
+
 fn json_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![
