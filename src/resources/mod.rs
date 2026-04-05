@@ -58,7 +58,7 @@ impl ResourceFamilies {
             embeddings: embeddings::Embeddings::new(runtime.clone()),
             models: models::Models::new(runtime.clone()),
             moderations: moderations::Moderations::new(runtime.clone()),
-            images: images::Images,
+            images: images::Images::new(runtime.clone()),
             audio: audio::Audio::default(),
             files: files::Files,
             uploads: uploads::Uploads,
