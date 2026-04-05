@@ -10,6 +10,9 @@ High-level scope map for the crate. This file is for workers choosing where new 
 - Tool calling
 - Streaming helpers
 
+### Responses streaming invariant
+- Background resume uses the server event `sequence_number` contract for `starting_after`; resume helpers and client-side stream filters must key off each event's `sequence_number`, not a local ordinal counter.
+
 ## Compatibility Surfaces
 - Chat Completions
 - Stored chat completions and stored message listing

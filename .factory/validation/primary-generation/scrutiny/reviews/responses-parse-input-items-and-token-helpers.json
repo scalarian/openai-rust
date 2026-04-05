@@ -1,0 +1,28 @@
+{
+  "featureId": "responses-parse-input-items-and-token-helpers",
+  "reviewedAt": "2026-04-05T17:39:34.525856+00:00",
+  "commitId": "3d78df0",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the requested parse, input_tokens, and input_items surfaces, but the parse helper miscomputes structured output for valid responses that contain more than one output-text message/content block.",
+    "issues": [
+      {
+        "file": "src/resources/responses.rs",
+        "line": 786,
+        "severity": "blocking",
+        "description": "`Responses::parse` deserializes `response.output_text()` instead of parsing individual `output_text` content parts. Because `output_text()` concatenates every message's text, a valid structured response with multiple assistant messages/output_text blocks is turned into invalid JSON and returned as a parse error. The upstream parser walks message/content items separately and returns the first parsed structured output, so this implementation can fail VAL-RESP-013 on multi-message structured responses."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`sdk-surface-worker` still hard-requires the brainstorming approval flow for public API changes, but mission workers run in non-interactive exec mode. The worker had to bypass that gate even though the rest of the procedure fit the task, so the skill does not currently match mission reality.",
+      "evidence": "`/Users/staticpayload/Mainframe/openai-rust/.factory/skills/sdk-surface-worker/SKILL.md` requires brainstorming in its Required Skills and work procedure, while `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-05T16-59-50-468Z__responses-parse-input-items-and-token-helpers__7b4e3eed-e34d-4629-a59d-9563d938eb41.json` records `skillFeedback.followedProcedure=false` because exec mode could not pause for the brainstorming hard-gate."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed the handoff, transcript skeleton, and commit 3d78df0. The input-token and input-item helpers satisfy the contract, but the non-stream parse helper has a correctness bug in how it derives `output_parsed`, so this review fails."
+}

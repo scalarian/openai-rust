@@ -1,0 +1,39 @@
+{
+  "featureId": "responses-streaming-state-machine-and-structured-streams",
+  "reviewedAt": "2026-04-05T18:00:00Z",
+  "commitId": "062fa10",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature lands the SSE parser and a deterministic transcript accumulator, but two blocking correctness issues remain in the shipping stream surface: the public API buffers the entire SSE body before returning, and resume handling re-skips events using a synthetic local ordinal instead of the API's sequence numbers.",
+    "issues": [
+      {
+        "file": "src/core/transport.rs",
+        "line": 227,
+        "severity": "blocking",
+        "description": "`Responses::stream`/`resume_stream` are not actually streaming over the network. They call `execute_text*`, which reads the whole HTTP response with `response.bytes()` before `ResponseStream` is constructed (see `src/resources/responses.rs:78-86` and `:119-126`). That means callers cannot observe deltas until the server closes the SSE response, and `abort()` only clears already-buffered events instead of stopping the underlying request. This violates the feature's streamed-consumption contract and will break long-running/live streams." 
+      },
+      {
+        "file": "src/resources/responses.rs",
+        "line": 1004,
+        "severity": "blocking",
+        "description": "Background resume applies `starting_after` twice and uses the wrong cursor source. `resume_stream()` already sends `starting_after` to `/responses/{id}` (`src/resources/responses.rs:113-125`), but `ingest_frame()` then hides the first locally counted events with `self.ordinal <= starting_after`. Upstream semantics define `starting_after` as the server event `sequence_number`, and the official SDKs filter on each event's `sequence_number` rather than a local counter. On a real resumed stream that already starts after sequence 10, this code will still drop the first 11 returned events and corrupt the reconstructed snapshot." 
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`sdk-surface-worker` still requires example updates for public surface changes, but exec-mode mission instructions say to do exactly the requested work and avoid unrelated docs/readme work. The worker explicitly deviated here and suggested the skill needs an exec-mode exception or clearer example-update rule.",
+      "evidence": "`.factory/skills/sdk-surface-worker/SKILL.md` step 6 says to add/update representative examples; the handoff `handoff.skillFeedback.deviations` records that no examples were added because the exec-mode mission scope did not request them."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Mission shared-state docs do not capture that Responses background resume is keyed off server `sequence_number` values, which likely contributed to the local-ordinal implementation bug above. Recording that invariant in shared library docs would make future workers less likely to reimplement resume filtering incorrectly.",
+      "evidence": "Upstream docs say `starting_after` is 'The sequence number of the event after which to start streaming' (`references/openai-python/src/openai/resources/responses/responses.py:1338-1344`), and the upstream stream managers filter with `event.sequence_number > starting_after` (`references/openai-python/src/openai/lib/streaming/responses/_responses.py:55-60`, `references/openai-node/src/lib/responses/ResponseStream.ts:97-102`). No corresponding note appears in `.factory/library/api-surface.md` or `.factory/library/architecture.md`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed the feature handoff, transcript skeleton, skill file, validation contract, and commit `062fa10`. The SSE parser/state accumulator is substantial, but the feature should not pass scrutiny because the public stream API fully buffers SSE bodies and background resume re-skips events using a local ordinal instead of server sequence numbers."
+}
