@@ -1,0 +1,118 @@
+{
+  "groupId": "rerun_stream_reasoning_multimodal",
+  "testedAt": "2026-04-05T19:41:56Z",
+  "isolation": {
+    "surface": "mocked cargo validation",
+    "guidanceSection": "Flow Validator Guidance: Mocked cargo validation",
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "milestone": "primary-generation",
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/rerun_stream_reasoning_multimodal"
+  },
+  "toolsUsed": [
+    "cargo test",
+    "Read"
+  ],
+  "commands": [
+    {
+      "assertionId": "VAL-STREAM-007",
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/rerun_stream_reasoning_multimodal cargo test --test streaming_state_machine_contract interleaved_reasoning_text_and_tool_indices_stay_isolated -- --exact --nocapture",
+      "exitCode": 0,
+      "evidence": "primary-generation/rerun_stream_reasoning_multimodal/VAL-STREAM-007-cargo.txt"
+    },
+    {
+      "assertionId": "VAL-STREAM-015",
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/rerun_stream_reasoning_multimodal cargo test --test streaming_state_machine_contract multimodal_content_parts_remain_isolated_until_completion -- --exact --nocapture",
+      "exitCode": 0,
+      "evidence": "primary-generation/rerun_stream_reasoning_multimodal/VAL-STREAM-015-cargo.txt"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-STREAM-007",
+      "title": "Interleaved Indices Do Not Cross-Contaminate Text, Reasoning, or Tool State",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned exact cargo test for interleaved reasoning/tool isolation.",
+          "expected": "The targeted state-machine contract test passes.",
+          "observed": "`interleaved_reasoning_text_and_tool_indices_stay_isolated` passed (`ok`) with exit code 0."
+        },
+        {
+          "action": "Inspect `tests/streaming_state_machine_contract.rs` for the proving fixture and assertions.",
+          "expected": "The transcript interleaves `response.reasoning_text.delta`, `response.output_text.delta`, and `response.function_call_arguments.delta` across distinct `output_index`/`content_index` values and reconciles via `response.reasoning_text.done`, `response.output_text.done`, and `response.completed`.",
+          "observed": "The fixture at `tests/streaming_state_machine_contract.rs:58` interleaves reasoning text for output 0, tool arguments for output 1, and reasoning/output text for output 2, then finishes with `response.completed`; later assertions call `final_response()` at line 150."
+        },
+        {
+          "action": "Map the source assertions to the contract behavior.",
+          "expected": "Intermediate snapshots and the final reconciled response keep reasoning text, output text, and tool arguments isolated by index without sibling contamination.",
+          "observed": "Source assertions prove snapshot isolation (`Think`/empty/empty, then `Answer` + `{\"x\":1}` + `Plan` + `Beta`) and final reconciliation after `response.completed`, with `final_response.status == completed`, final tool arguments `{\"x\":1}`, reasoning texts `Thinking` and `Plan`, and final `output_text()` of `AnswerBeta!`."
+        }
+      ],
+      "evidence": {
+        "terminalOutputs": [
+          "primary-generation/rerun_stream_reasoning_multimodal/VAL-STREAM-007-cargo.txt"
+        ],
+        "sourceInspection": [
+          "tests/streaming_state_machine_contract.rs:58",
+          "tests/streaming_state_machine_contract.rs:92",
+          "tests/streaming_state_machine_contract.rs:94",
+          "tests/streaming_state_machine_contract.rs:96",
+          "tests/streaming_state_machine_contract.rs:150"
+        ],
+        "terminalBehavior": "Cargo output shows the targeted test passed. Source assertions explicitly reconcile the stream through `response.completed` and `final_response()`, proving completed terminal behavior rather than partial snapshot success.",
+        "contractNotes": "This covers interleaved reasoning_text, output_text, and function_call_arguments updates and proves per-index isolation through both in-progress snapshots and the completed response."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-STREAM-015",
+      "title": "Structural Output-Item and Content-Part Events Preserve Multimodal Assembly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the assigned exact cargo test for multimodal structural assembly.",
+          "expected": "The targeted structural streaming test passes.",
+          "observed": "`multimodal_content_parts_remain_isolated_until_completion` passed (`ok`) with exit code 0."
+        },
+        {
+          "action": "Inspect `tests/streaming_state_machine_contract.rs` for multimodal structural events.",
+          "expected": "The transcript uses `response.output_item.added`, `response.content_part.added`, `response.content_part.done`, `response.output_text.done`, and `response.completed` to assemble text and non-text parts without cross-contamination.",
+          "observed": "The fixture at `tests/streaming_state_machine_contract.rs:180` creates a message with `output_text` plus `output_audio`, a sibling text-only message, finalizes the audio part via `response.content_part.done`, finalizes sibling text via `response.output_text.done`, and then reconciles with `response.completed`; `final_response()` is asserted at line 276."
+        },
+        {
+          "action": "Map the source assertions to the contract behavior.",
+          "expected": "Before completion, text and audio remain isolated by content part; after completion, final assembly preserves both the finished audio payload and the sibling text output.",
+          "observed": "Source assertions prove pre-completion isolation (`AlphaBeta` text while audio stays in `output_audio` with interim `pcm-chunk-1`/`Hello`), post-`content_part.done` audio reconciliation to `pcm-final`/`Hello there` with `sequence: 2`, post-`output_text.done` sibling text reconciliation to `Beta!`, and final completed response with `status == completed`, `output_text() == AlphaBeta!`, and the preserved `output_audio` part."
+        }
+      ],
+      "evidence": {
+        "terminalOutputs": [
+          "primary-generation/rerun_stream_reasoning_multimodal/VAL-STREAM-015-cargo.txt"
+        ],
+        "sourceInspection": [
+          "tests/streaming_state_machine_contract.rs:180",
+          "tests/streaming_state_machine_contract.rs:202",
+          "tests/streaming_state_machine_contract.rs:204",
+          "tests/streaming_state_machine_contract.rs:206",
+          "tests/streaming_state_machine_contract.rs:276"
+        ],
+        "terminalBehavior": "Cargo output shows the targeted test passed. Source assertions explicitly require `response.completed` followed by `final_response()`, proving final-response reconciliation for multimodal assembly.",
+        "contractNotes": "This covers structural output-item/content-part events plus non-text multimodal content (`output_audio`) and proves text/audio isolation until the final completed response is assembled."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The second cargo invocation briefly waited on the shared package cache before running.",
+      "resolved": true,
+      "resolution": "Waited for Cargo's package-cache lock; the test then completed successfully without changing the isolated target directory or shared infrastructure.",
+      "affectedAssertions": [
+        "VAL-STREAM-015"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Retested 2 assigned assertions with isolated cargo commands. Both passed: VAL-STREAM-007 is now proven by the interleaved reasoning/tool isolation fixture and final `response.completed` reconciliation, and VAL-STREAM-015 is now proven by the multimodal output-item/content-part fixture including `output_audio` final assembly."
+}

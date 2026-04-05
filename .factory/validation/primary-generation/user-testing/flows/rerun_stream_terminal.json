@@ -1,0 +1,76 @@
+{
+  "groupId": "rerun_stream_terminal",
+  "surface": "mocked cargo validation",
+  "testedAt": "2026-04-05T19:41:40Z",
+  "isolation": {
+    "milestone": "primary-generation",
+    "assertions": ["VAL-STREAM-012"],
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/rerun_stream_terminal",
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "surface": "mocked cargo validation"
+  },
+  "assertions": [
+    {
+      "id": "VAL-STREAM-012",
+      "title": "Terminal Failure, Incomplete, and Refusal States Stay Explicit",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `cargo test --test responses_stream_contract terminal_ -- --nocapture` with the assigned isolated CARGO_TARGET_DIR",
+          "expected": "Mocked streaming terminal-state tests execute successfully for refusal, failed, and incomplete fixtures",
+          "observed": "Cargo ran 2 filtered tests and both passed: `terminal_failure_and_refusal_states_remain_explicit` and `terminal_incomplete_state_remains_explicit`."
+        },
+        {
+          "action": "Inspect `tests/responses_stream_contract.rs` for `terminal_failure_and_refusal_states_remain_explicit`",
+          "expected": "Refusal and failed streams remain explicit and do not masquerade as ordinary success",
+          "observed": "The refusal fixture emits `response.refusal.delta`/`response.refusal.done` and `response.completed`; assertions require `output_text()` to stay empty and `refusal_text()` to equal `Some(\"I can't comply\")`. The failed fixture emits `response.failed`; `terminal_state()` must be `ResponseStreamTerminal::Failed(...)`, and `final_response()` must error with `ErrorKind::Api(Server)` instead of returning success."
+        },
+        {
+          "action": "Inspect `tests/responses_stream_contract.rs` for `terminal_incomplete_state_remains_explicit`",
+          "expected": "A `response.incomplete` terminal fixture is exercised and success helpers reject partial output",
+          "observed": "The fixture emits `response.output_text.delta` followed by `response.incomplete` carrying `incomplete_details.reason = max_output_tokens`. Assertions require `terminal_state()` to be `ResponseStreamTerminal::Incomplete(...)`, `final_response()` to fail with `ErrorKind::Parse`, and `parse_final::<serde_json::Value>(...)` to fail with `ErrorKind::Parse`, proving no synthesized successful response or typed parse is exposed from partial text."
+        }
+      ],
+      "evidence": {
+        "contract": "VAL-STREAM-012 requires explicit `response.failed`, `response.incomplete`, and refusal outcomes with preserved metadata and no false success helper result.",
+        "commandOutput": {
+          "stdout": "primary-generation/rerun_stream_terminal/cargo-test.stdout.txt",
+          "stderr": "primary-generation/rerun_stream_terminal/cargo-test.stderr.txt",
+          "exitCodeFile": "primary-generation/rerun_stream_terminal/cargo-test.exit.txt"
+        },
+        "responseIncompleteExercised": true,
+        "successHelpersAvoidFalseSuccess": true,
+        "network": "n/a (mocked cargo validation)",
+        "consoleErrors": "n/a (non-UI cargo surface)"
+      },
+      "issues": null
+    }
+  ],
+  "commands": [
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/rerun_stream_terminal\" cargo test --test responses_stream_contract terminal_ -- --nocapture",
+      "exitCode": 0,
+      "observation": "The filtered `responses_stream_contract` run finished successfully with 2 passing tests: `terminal_failure_and_refusal_states_remain_explicit` and `terminal_incomplete_state_remains_explicit`.",
+      "evidence": [
+        "primary-generation/rerun_stream_terminal/cargo-test.stdout.txt",
+        "primary-generation/rerun_stream_terminal/cargo-test.stderr.txt",
+        "primary-generation/rerun_stream_terminal/cargo-test.exit.txt"
+      ]
+    }
+  ],
+  "toolsUsed": [
+    "cargo test",
+    "source inspection"
+  ],
+  "frictions": [
+    {
+      "description": "The passing cargo output only names the filtered test functions, so source inspection was required to confirm that `response.incomplete` is now exercised and that `final_response()` / `parse_final()` explicitly reject false success on partial output.",
+      "resolved": true,
+      "resolution": "Mapped the two passing test names back to their exact fixtures and assertions in `tests/responses_stream_contract.rs`.",
+      "affectedAssertions": ["VAL-STREAM-012"]
+    }
+  ],
+  "blockers": [],
+  "summary": "VAL-STREAM-012 is now proven by the mocked cargo surface: refusal, failed, and incomplete terminal fixtures are exercised, and the stream helpers keep those terminal states explicit instead of synthesizing successful output or typed parsed results."
+}
