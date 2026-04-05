@@ -190,6 +190,72 @@ fn routes_and_pagination() {
     }
 }
 
+#[test]
+fn typed_known_fields_are_not_lost() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(items_envelope(vec![
+            function_call_item("fc_1"),
+            refusal_message_item("msg_refusal"),
+        ])),
+        json_response(function_call_item("fc_1").to_string()),
+    ])
+    .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let listed = client
+        .conversations()
+        .items()
+        .list("conv_123", Default::default())
+        .unwrap();
+    let retrieved = client
+        .conversations()
+        .items()
+        .retrieve("conv_123", "fc_1", Default::default())
+        .unwrap();
+
+    let function_call = &listed.output().data[0];
+    assert_eq!(function_call.item_type, "function_call");
+    assert_eq!(function_call.name.as_deref(), Some("lookup_weather"));
+    assert_eq!(
+        function_call.arguments.as_deref(),
+        Some(r#"{"city":"Paris"}"#)
+    );
+    assert_eq!(function_call.call_id.as_deref(), Some("call_123"));
+    assert_eq!(function_call.status.as_deref(), Some("completed"));
+    assert!(!function_call.extra.contains_key("name"));
+    assert!(!function_call.extra.contains_key("arguments"));
+    assert!(!function_call.extra.contains_key("call_id"));
+
+    let refusal_message = &listed.output().data[1];
+    let refusal_part = refusal_message
+        .content
+        .iter()
+        .find(|part| part.content_type == "refusal")
+        .expect("refusal content");
+    assert_eq!(
+        refusal_part.refusal.as_deref(),
+        Some("I can't help with that")
+    );
+    assert!(!refusal_part.extra.contains_key("refusal"));
+
+    let retrieved_function_call = retrieved.output();
+    assert_eq!(
+        retrieved_function_call.name.as_deref(),
+        Some("lookup_weather")
+    );
+    assert_eq!(
+        retrieved_function_call.arguments.as_deref(),
+        Some(r#"{"city":"Paris"}"#)
+    );
+    assert_eq!(retrieved_function_call.call_id.as_deref(), Some("call_123"));
+    assert_eq!(retrieved_function_call.status.as_deref(), Some("completed"));
+}
+
 fn json_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![
@@ -241,6 +307,27 @@ fn reasoning_item(id: &str) -> Value {
         "type": "reasoning",
         "status": "completed",
         "summary": []
+    })
+}
+
+fn function_call_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "function_call",
+        "name": "lookup_weather",
+        "arguments": "{\"city\":\"Paris\"}",
+        "call_id": "call_123",
+        "status": "completed"
+    })
+}
+
+fn refusal_message_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{"type": "refusal", "refusal": "I can't help with that"}]
     })
 }
 

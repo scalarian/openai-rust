@@ -159,6 +159,68 @@ fn cancel_posts_to_background_endpoint() {
 }
 
 #[test]
+fn tool_and_refusal_fields_round_trip() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(response_payload_with_tool_and_refusal("resp_create")),
+        json_response(response_payload_with_tool_and_refusal("resp_retrieve")),
+        json_response(response_payload_with_tool_and_refusal("resp_cancel")),
+    ])
+    .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let created = client
+        .responses()
+        .create(openai_rust::resources::responses::ResponseCreateParams {
+            model: "gpt-4.1-nano".into(),
+            input: Some(json!("hello")),
+            ..Default::default()
+        })
+        .unwrap();
+    let retrieved = client
+        .responses()
+        .retrieve("resp_retrieve", Default::default())
+        .unwrap();
+    let cancelled = client.responses().cancel("resp_cancel").unwrap();
+
+    for response in [created.output(), retrieved.output(), cancelled.output()] {
+        let function_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "function_call")
+            .expect("function_call item");
+        assert_eq!(function_call.name.as_deref(), Some("lookup_weather"));
+        assert_eq!(
+            function_call.arguments.as_deref(),
+            Some(r#"{"city":"Paris"}"#)
+        );
+        assert_eq!(function_call.call_id.as_deref(), Some("call_123"));
+        assert_eq!(function_call.status.as_deref(), Some("completed"));
+
+        let refusal_message = response
+            .output
+            .iter()
+            .find(|item| item.id.as_deref() == Some("msg_refusal"))
+            .expect("refusal message");
+        let refusal_part = refusal_message
+            .content
+            .iter()
+            .find(|part| part.content_type == "refusal")
+            .expect("refusal content");
+        assert_eq!(
+            refusal_part.refusal.as_deref(),
+            Some("I can't help with that")
+        );
+        assert_eq!(response.refusal_text(), Some("I can't help with that"));
+        assert_eq!(response.output_text(), "Hello world!");
+    }
+}
+
+#[test]
 fn compact_returns_compaction_object() {
     let body = json!({
         "id": "cmp_123",
@@ -398,6 +460,48 @@ fn response_payload(
         "store": store,
         "tool_choice": "auto",
         "tools": [],
+        "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}
+    })
+    .to_string()
+}
+
+fn response_payload_with_tool_and_refusal(id: &str) -> String {
+    json!({
+        "id": id,
+        "object": "response",
+        "created_at": 1,
+        "status": "completed",
+        "background": false,
+        "error": null,
+        "incomplete_details": null,
+        "model": "gpt-4.1-nano",
+        "output": [
+            {
+                "id": "msg_text",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": "Hello "},
+                    {"type": "output_text", "text": "world!"}
+                ]
+            },
+            {
+                "id": "fc_123",
+                "type": "function_call",
+                "name": "lookup_weather",
+                "arguments": "{\"city\":\"Paris\"}",
+                "call_id": "call_123",
+                "status": "completed"
+            },
+            {
+                "id": "msg_refusal",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {"type": "refusal", "refusal": "I can't help with that"}
+                ]
+            }
+        ],
         "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}
     })
     .to_string()

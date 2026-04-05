@@ -472,7 +472,7 @@ impl Response {
             .filter(|item| item.item_type == "message")
             .flat_map(|item| item.content.iter())
             .find(|content| content.content_type == "refusal")
-            .and_then(|content| content.text.as_deref())
+            .and_then(ResponseContentPart::refusal_text)
     }
 }
 
@@ -526,8 +526,16 @@ pub struct ResponseContentPart {
     pub content_type: String,
     #[serde(default)]
     pub text: Option<String>,
+    #[serde(default)]
+    pub refusal: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseContentPart {
+    fn refusal_text(&self) -> Option<&str> {
+        self.refusal.as_deref().or(self.text.as_deref())
+    }
 }
 
 /// Parsed non-stream response with structured output helper access.
@@ -1696,8 +1704,9 @@ where
         for content in &item.content {
             if content.content_type == "refusal" {
                 let refusal = content
-                    .text
+                    .refusal
                     .clone()
+                    .or_else(|| content.text.clone())
                     .unwrap_or_else(|| String::from("model refusal"));
                 return Err(OpenAIError::new(
                     ErrorKind::Parse,

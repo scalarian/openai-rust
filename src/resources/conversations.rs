@@ -312,6 +312,16 @@ pub struct ConversationItem {
     #[serde(default)]
     pub role: Option<String>,
     #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub arguments: Option<String>,
+    #[serde(default)]
+    pub input: Option<String>,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub call_id: Option<String>,
+    #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]
     pub content: Vec<ConversationItemContent>,
@@ -326,6 +336,8 @@ pub struct ConversationItemContent {
     pub content_type: String,
     #[serde(default)]
     pub text: Option<String>,
+    #[serde(default)]
+    pub refusal: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
