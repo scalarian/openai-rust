@@ -1,0 +1,94 @@
+{
+  "milestone": "core-foundation",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cargo test --all-features -- --test-threads=5",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cargo check --all-targets --all-features",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 0,
+    "failed": 4,
+    "failedFeatures": [
+      "crate-scaffold-and-validator-harness",
+      "client-config-auth-and-headers",
+      "transport-retry-timeout-and-error-taxonomy",
+      "response-metadata-raw-responses-and-live-core-smoke"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "crate-scaffold-and-validator-harness",
+      "severity": "blocking",
+      "description": "`tests/support/multipart.rs` parses multipart bodies through UTF-8 text, so binary upload fixtures can fail or lose byte fidelity in the shared harness."
+    },
+    {
+      "featureId": "client-config-auth-and-headers",
+      "severity": "blocking",
+      "description": "`ClientConfig::resolve()` re-reads environment variables on every request, so an env-backed `OpenAI` client does not keep immutable deterministic config after construction."
+    },
+    {
+      "featureId": "transport-retry-timeout-and-error-taxonomy",
+      "severity": "blocking",
+      "description": "The custom `http://` loopback transport rebuilds requests with `url.path()` only, dropping query strings for localhost/mock HTTP requests."
+    },
+    {
+      "featureId": "transport-retry-timeout-and-error-taxonomy",
+      "severity": "blocking",
+      "description": "The custom `http://` loopback transport does not decode `Transfer-Encoding: chunked`, so valid chunked localhost/mock responses can fail as parse errors."
+    },
+    {
+      "featureId": "response-metadata-raw-responses-and-live-core-smoke",
+      "severity": "blocking",
+      "description": "`tests/live_core_smoke.rs` does not clear or assert `OPENAI_BASE_URL`, so the live smoke can pass against an override host and does not prove required default-host behavior."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added `.factory/library/environment.md` guidance that default-host live proofs must unset `OPENAI_BASE_URL` in the same shell before execution.",
+      "sourceFeature": "response-metadata-raw-responses-and-live-core-smoke"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "sdk-core-worker skill",
+      "suggestion": "Add an explicit Exec Mode fallback for the required `brainstorming` step on shared-core changes so workers can satisfy the procedure without an approval loop when the mission is non-interactive.",
+      "evidence": "All four core-foundation review reports recorded the same deviation: the worker invoked the required skill stack, but the `sdk-core-worker` procedure still assumes a brainstorming approval gate that cannot be completed in non-interactive mission exec mode.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Repeated shared-state observation that `sdk-core-worker` lacks an Exec Mode fallback for the required brainstorming step.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Repeated shared-state observation that `sdk-core-worker` lacks an Exec Mode fallback for the required brainstorming step.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Repeated shared-state observation that `sdk-core-worker` lacks an Exec Mode fallback for the required brainstorming step.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Review claim that exposing `skills()` from the scaffold is necessarily out of contract because `architecture.md` does not name Skills.",
+      "reason": "ambiguous: `.factory/library/api-surface.md` and the mission feature plan both include a future Skills surface, so this is not a clear contract violation for the scaffold."
+    }
+  ],
+  "previousRound": null
+}

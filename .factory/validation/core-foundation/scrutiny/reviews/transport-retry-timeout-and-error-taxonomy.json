@@ -1,0 +1,40 @@
+{
+  "featureId": "transport-retry-timeout-and-error-taxonomy",
+  "reviewedAt": "2026-04-05T15:40:21.929737Z",
+  "commitId": "a5fed771c976c9f7b06a26d372080e9aac1ce33f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Timeout precedence, retry classification, and typed error mapping are mostly in place, but the custom HTTP loopback path is not wire-compatible enough to serve as the shared transport for valid http-based integrations.",
+    "issues": [
+      {
+        "file": "src/core/transport.rs",
+        "line": 154,
+        "severity": "blocking",
+        "description": "The HTTP loopback path rebuilds the request line with `url.path()` only, so any query string on the prepared URL is dropped before the request is sent. Because `execute_once` routes every `http://...` base URL through this path, mocked/local HTTP integrations will exercise the wrong request for endpoints that depend on query params (`after`, `limit`, `include`, etc.), which breaks the shared REST execution contract."
+      },
+      {
+        "file": "src/core/transport.rs",
+        "line": 227,
+        "severity": "blocking",
+        "description": "`parse_raw_http_response` treats everything after the header terminator as the final body and immediately feeds it to `serde_json::from_slice`, but the custom `http` transport never decodes `Transfer-Encoding: chunked`. Since `execute_once` bypasses reqwest for all HTTP URLs, any standard chunked localhost/mock response will become a false parse error even when the JSON payload is valid."
+      },
+      {
+        "file": "src/core/transport.rs",
+        "line": 343,
+        "severity": "non_blocking",
+        "description": "`retry_delay` only honors numeric `Retry-After` values and ignores the HTTP-date form allowed by the header, so some valid server-directed retry guidance would incorrectly fall back to generic backoff."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`sdk-core-worker` requires the `brainstorming` skill before shared-core transport changes, but the documented procedure assumes an approval loop that is not executable in non-interactive mission exec mode.",
+      "evidence": "`.factory/skills/sdk-core-worker/SKILL.md:16-25` requires `brainstorming` before transport-layer changes. The handoff for worker session `1e1569ba-b7ae-4d3b-81b8-644259bb177d` records `skillFeedback.followedProcedure=false` and a `brainstorming approval gate` deviation because the mission environment forbids asking for approvals."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the feature broadly implements timeout/retry/error-taxonomy behavior, but its custom HTTP loopback transport drops query strings and cannot decode chunked response bodies, so valid http-based mock/local integrations can be executed incorrectly. The transcript/handoff review also shows a small skill-doc mismatch around brainstorming approvals in non-interactive exec mode."
+}

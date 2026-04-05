@@ -1,0 +1,28 @@
+{
+  "featureId": "client-config-auth-and-headers",
+  "reviewedAt": "2026-04-05T15:45:30Z",
+  "commitId": "59f0a246cebda172ac24dd428f25923f6bf1db27",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature covers the requested auth/header/base-URL shaping, but it resolves environment-backed config lazily on every request instead of freezing it into the client, so a supposedly immutable `OpenAI` handle can silently change credentials, routing headers, and base URL after construction.",
+    "issues": [
+      {
+        "file": "src/config.rs",
+        "line": 62,
+        "severity": "blocking",
+        "description": "`ClientConfig::resolve()` re-reads `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_ORG_ID`, and `OPENAI_PROJECT_ID` from process environment every time it runs, and `OpenAI::prepare_request()` / `resolve_request_options()` call it on each request. That means an `OpenAI::new()` or env-backed client does not actually capture deterministic config at construction: later `std::env` changes can flip auth, org/project routing, or base URL underneath an existing client, which violates the feature contract for deterministic env loading and the architecture rule that the root client owns immutable shared state." 
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`sdk-core-worker` still assumes a brainstorming approval flow that does not map cleanly onto mission exec mode, so workers keep recording a procedural deviation even when they invoke the required skill stack.",
+      "evidence": "`.factory/skills/sdk-core-worker/SKILL.md:16-18,24-25` makes `brainstorming` and strict TDD mandatory for shared-core client changes; the handoff at `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-05T14-40-02-816Z__client-config-auth-and-headers__b82b99ba-9535-4340-9963-a148b3e703ff.json` records `skillFeedback.followedProcedure = false` and explicitly asks to clarify the brainstorming approval gate for non-interactive exec mode."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the feature implements the visible config/header behavior, but env-backed clients are not actually immutable because configuration is reloaded from process environment on every request. I also noted the existing sdk-core-worker skill-doc mismatch around brainstorming/TDD procedure in non-interactive exec mode."
+}
