@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use futures_util::{SinkExt, StreamExt};
 use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
 use tokio_tungstenite::{accept_async, connect_async, tungstenite::Message};

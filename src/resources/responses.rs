@@ -1,12 +1,19 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::{
     OpenAIError,
-    core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
-    error::ErrorKind,
+    core::{
+        metadata::ResponseMetadata, request::RequestOptions, response::ApiResponse,
+        runtime::ClientRuntime,
+    },
+    error::{ApiErrorKind, ErrorKind},
+    helpers::sse::{SseFrame, SseParser},
 };
 
 /// Primary Responses API family.
@@ -67,6 +74,18 @@ impl Responses {
         })
     }
 
+    /// Creates a streamed response transcript and exposes a deterministic state machine.
+    pub fn stream(&self, params: ResponseCreateParams) -> Result<ResponseStream, OpenAIError> {
+        let body = params.into_stream_request_body();
+        let response = self.runtime.execute_text_with_body(
+            "POST",
+            "/responses",
+            &body,
+            RequestOptions::default(),
+        )?;
+        ResponseStream::from_sse_chunks_with_resume(response.metadata, [response.output], None)
+    }
+
     /// Retrieves a stored response and recomputes the `output_text` helper.
     pub fn retrieve(
         &self,
@@ -82,6 +101,29 @@ impl Responses {
             self.runtime
                 .execute_json::<WireResponse>("GET", &path, RequestOptions::default())?;
         Ok(map_response(response))
+    }
+
+    /// Resumes a background stream using `starting_after` and stream retrieval semantics.
+    pub fn resume_stream(
+        &self,
+        response_id: &str,
+        mut params: ResponseRetrieveParams,
+    ) -> Result<ResponseStream, OpenAIError> {
+        let response_id = validate_path_id("response_id", response_id)?;
+        params.stream = Some(true);
+        let resume_after = params.starting_after;
+        let path = append_query(
+            &format!("/responses/{response_id}"),
+            params.to_query_pairs(),
+        );
+        let response = self
+            .runtime
+            .execute_text("GET", &path, RequestOptions::default())?;
+        ResponseStream::from_sse_chunks_with_resume(
+            response.metadata,
+            [response.output],
+            resume_after,
+        )
     }
 
     /// Deletes a stored response and returns unit on success.
@@ -166,6 +208,15 @@ impl ResponseCreateParams {
             serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
         if let Value::Object(ref mut object) = value {
             object.insert(String::from("stream"), Value::Bool(false));
+        }
+        value
+    }
+
+    fn into_stream_request_body(self) -> Value {
+        let mut value =
+            serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
+        if let Value::Object(ref mut object) = value {
+            object.insert(String::from("stream"), Value::Bool(true));
         }
         value
     }
@@ -414,6 +465,15 @@ impl Response {
     pub fn output_text(&self) -> &str {
         &self.output_text
     }
+
+    pub fn refusal_text(&self) -> Option<&str> {
+        self.output
+            .iter()
+            .filter(|item| item.item_type == "message")
+            .flat_map(|item| item.content.iter())
+            .find(|content| content.content_type == "refusal")
+            .and_then(|content| content.text.as_deref())
+    }
 }
 
 /// Public parsed response compaction object.
@@ -494,6 +554,180 @@ impl<T> ParsedResponse<T> {
 
     pub fn output_parsed(&self) -> Option<&T> {
         self.output_parsed.as_ref()
+    }
+}
+
+/// User-visible streamed Responses events.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseStreamEvent {
+    Created {
+        response: Response,
+    },
+    OutputTextDelta {
+        output_index: usize,
+        content_index: usize,
+        delta: String,
+    },
+    OutputTextDone {
+        output_index: usize,
+        content_index: usize,
+        text: String,
+    },
+    ReasoningTextDelta {
+        output_index: usize,
+        content_index: usize,
+        delta: String,
+    },
+    ReasoningTextDone {
+        output_index: usize,
+        content_index: usize,
+        text: String,
+    },
+    RefusalDelta {
+        output_index: usize,
+        content_index: usize,
+        delta: String,
+    },
+    RefusalDone {
+        output_index: usize,
+        content_index: usize,
+        text: String,
+    },
+    Completed {
+        response: Response,
+    },
+    Failed {
+        response: Response,
+    },
+    Incomplete {
+        response: Response,
+    },
+    Unknown {
+        event: String,
+        data: Value,
+    },
+}
+
+/// Terminal streamed Responses state.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseStreamTerminal {
+    Completed(Response),
+    Failed(Response),
+    Incomplete(Response),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct RecordedResponseEvent {
+    event: ResponseStreamEvent,
+    snapshot_after_event: Option<Response>,
+}
+
+/// Eagerly parsed streamed Responses transcript with sync/async consumption helpers.
+#[derive(Clone, Debug)]
+pub struct ResponseStream {
+    metadata: ResponseMetadata,
+    events: VecDeque<RecordedResponseEvent>,
+    current_snapshot: Option<Response>,
+    final_terminal: Option<ResponseStreamTerminal>,
+    aborted: bool,
+}
+
+impl ResponseStream {
+    pub fn from_sse_chunks<I, B>(metadata: ResponseMetadata, chunks: I) -> Result<Self, OpenAIError>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        Self::from_sse_chunks_with_resume(metadata, chunks, None)
+    }
+
+    pub fn current_response(&self) -> Option<&Response> {
+        self.current_snapshot.as_ref()
+    }
+
+    pub fn next_event(&mut self) -> Option<ResponseStreamEvent> {
+        if self.aborted {
+            return None;
+        }
+        let recorded = self.events.pop_front()?;
+        self.current_snapshot = recorded.snapshot_after_event;
+        Some(recorded.event)
+    }
+
+    pub async fn next_event_async(&mut self) -> Option<ResponseStreamEvent> {
+        self.next_event()
+    }
+
+    pub fn abort(&mut self) {
+        self.aborted = true;
+        self.events.clear();
+    }
+
+    pub fn terminal_state(&self) -> Option<&ResponseStreamTerminal> {
+        self.final_terminal.as_ref()
+    }
+
+    pub fn metadata(&self) -> &ResponseMetadata {
+        &self.metadata
+    }
+
+    pub fn final_response(&self) -> Result<&Response, OpenAIError> {
+        if self.aborted {
+            return Err(OpenAIError::new(
+                ErrorKind::Transport,
+                "response stream was aborted before completion",
+            ));
+        }
+
+        match self.final_terminal.as_ref() {
+            Some(ResponseStreamTerminal::Completed(response)) => Ok(response),
+            Some(ResponseStreamTerminal::Failed(_)) => Err(OpenAIError::new(
+                ErrorKind::Api(ApiErrorKind::Server),
+                "response stream ended in a failed terminal state",
+            )),
+            Some(ResponseStreamTerminal::Incomplete(_)) => Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "response stream ended in an incomplete terminal state",
+            )),
+            None => Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "response stream ended without a terminal state",
+            )),
+        }
+    }
+
+    pub fn parse_final<T>(
+        &self,
+        text: Option<ResponseTextConfig>,
+        tools: &[FunctionTool],
+    ) -> Result<ParsedResponse<T>, OpenAIError>
+    where
+        T: DeserializeOwned,
+    {
+        let response = self.final_response()?.clone();
+        parse_response_output(response, text.and_then(|text| text.format), tools)
+    }
+
+    pub(crate) fn from_sse_chunks_with_resume<I, B>(
+        metadata: ResponseMetadata,
+        chunks: I,
+        starting_after: Option<u64>,
+    ) -> Result<Self, OpenAIError>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut parser = SseParser::default();
+        let mut state = StreamAccumulator::new(starting_after);
+        for chunk in chunks {
+            for frame in parser.push(chunk.as_ref().as_bytes())? {
+                state.ingest_frame(frame)?;
+            }
+        }
+        for frame in parser.finish()? {
+            state.ingest_frame(frame)?;
+        }
+        state.finish(metadata)
     }
 }
 
@@ -723,6 +957,267 @@ impl From<WireCompactedResponse> for CompactedResponse {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct StreamTextDeltaPayload {
+    output_index: usize,
+    content_index: usize,
+    delta: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamTextDonePayload {
+    output_index: usize,
+    content_index: usize,
+    text: String,
+}
+
+#[derive(Clone, Debug)]
+struct StreamAccumulator {
+    visible_events: VecDeque<RecordedResponseEvent>,
+    snapshot: Option<Response>,
+    terminal: Option<ResponseStreamTerminal>,
+    seen_done: bool,
+    ordinal: u64,
+    starting_after: Option<u64>,
+}
+
+impl StreamAccumulator {
+    fn new(starting_after: Option<u64>) -> Self {
+        Self {
+            visible_events: VecDeque::new(),
+            snapshot: None,
+            terminal: None,
+            seen_done: false,
+            ordinal: 0,
+            starting_after,
+        }
+    }
+
+    fn ingest_frame(&mut self, frame: SseFrame) -> Result<(), OpenAIError> {
+        if frame.data.trim() == "[DONE]" {
+            self.seen_done = true;
+            return Ok(());
+        }
+
+        let event_name = frame.event.unwrap_or_default();
+        let surfaced = self.apply_event(&event_name, &frame.data)?;
+        let hidden = self
+            .starting_after
+            .is_some_and(|starting_after| self.ordinal <= starting_after);
+        self.ordinal += 1;
+        if hidden {
+            return Ok(());
+        }
+        if let Some(event) = surfaced {
+            self.visible_events.push_back(RecordedResponseEvent {
+                event,
+                snapshot_after_event: self.snapshot.clone(),
+            });
+        }
+        Ok(())
+    }
+
+    fn finish(self, metadata: ResponseMetadata) -> Result<ResponseStream, OpenAIError> {
+        if self.seen_done && self.terminal.is_none() {
+            return Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "response stream received [DONE] before any terminal response event",
+            ));
+        }
+        if !self.seen_done && self.terminal.is_none() {
+            return Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "response stream ended without a terminal response event",
+            ));
+        }
+
+        Ok(ResponseStream {
+            metadata,
+            events: self.visible_events,
+            current_snapshot: None,
+            final_terminal: self.terminal,
+            aborted: false,
+        })
+    }
+
+    fn apply_event(
+        &mut self,
+        event_name: &str,
+        data: &str,
+    ) -> Result<Option<ResponseStreamEvent>, OpenAIError> {
+        match event_name {
+            "response.created" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                Ok(Some(ResponseStreamEvent::Created { response }))
+            }
+            "response.output_text.delta" => {
+                let payload: StreamTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "output_text",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::OutputTextDelta {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    delta: payload.delta,
+                }))
+            }
+            "response.output_text.done" => {
+                let payload: StreamTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "output_text",
+                    &payload.text,
+                )?;
+                Ok(Some(ResponseStreamEvent::OutputTextDone {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    text: payload.text,
+                }))
+            }
+            "response.reasoning_text.delta" => {
+                let payload: StreamTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "reasoning_text",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningTextDelta {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    delta: payload.delta,
+                }))
+            }
+            "response.reasoning_text.done" => {
+                let payload: StreamTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "reasoning_text",
+                    &payload.text,
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningTextDone {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    text: payload.text,
+                }))
+            }
+            "response.refusal.delta" => {
+                let payload: StreamTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "refusal",
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::RefusalDelta {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    delta: payload.delta,
+                }))
+            }
+            "response.refusal.done" => {
+                let payload: StreamTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_content_text(
+                    payload.output_index,
+                    payload.content_index,
+                    "refusal",
+                    &payload.text,
+                )?;
+                Ok(Some(ResponseStreamEvent::RefusalDone {
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    text: payload.text,
+                }))
+            }
+            "response.completed" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                self.terminal = Some(ResponseStreamTerminal::Completed(response.clone()));
+                Ok(Some(ResponseStreamEvent::Completed { response }))
+            }
+            "response.failed" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                self.terminal = Some(ResponseStreamTerminal::Failed(response.clone()));
+                Ok(Some(ResponseStreamEvent::Failed { response }))
+            }
+            "response.incomplete" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                self.terminal = Some(ResponseStreamTerminal::Incomplete(response.clone()));
+                Ok(Some(ResponseStreamEvent::Incomplete { response }))
+            }
+            other => {
+                let data =
+                    serde_json::from_str(data).unwrap_or_else(|_| Value::String(data.to_string()));
+                Ok(Some(ResponseStreamEvent::Unknown {
+                    event: other.to_string(),
+                    data,
+                }))
+            }
+        }
+    }
+
+    fn append_content_text(
+        &mut self,
+        output_index: usize,
+        content_index: usize,
+        expected_type: &str,
+        delta: &str,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received stream delta before response.created",
+            )
+        })?;
+        let content = get_content_mut(snapshot, output_index, content_index, expected_type)?;
+        let current = content.text.get_or_insert_with(String::new);
+        current.push_str(delta);
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+
+    fn replace_content_text(
+        &mut self,
+        output_index: usize,
+        content_index: usize,
+        expected_type: &str,
+        text: &str,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received stream completion before response.created",
+            )
+        })?;
+        let content = get_content_mut(snapshot, output_index, content_index, expected_type)?;
+        content.text = Some(text.to_string());
+        snapshot.output_text = aggregate_output_text(&snapshot.output);
+        Ok(())
+    }
+}
+
 fn map_response(response: ApiResponse<WireResponse>) -> ApiResponse<Response> {
     ApiResponse {
         output: response.output.into(),
@@ -834,6 +1329,50 @@ fn aggregate_output_text(output: &[ResponseOutputItem]) -> String {
         }
     }
     text
+}
+
+fn get_content_mut<'a>(
+    response: &'a mut Response,
+    output_index: usize,
+    content_index: usize,
+    expected_type: &str,
+) -> Result<&'a mut ResponseContentPart, OpenAIError> {
+    let item = response.output.get_mut(output_index).ok_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Validation,
+            format!("stream referenced missing output_index {output_index}"),
+        )
+    })?;
+    if item.item_type != "message" {
+        return Err(OpenAIError::new(
+            ErrorKind::Validation,
+            format!("stream referenced non-message output item at index {output_index}"),
+        ));
+    }
+    let content = item.content.get_mut(content_index).ok_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Validation,
+            format!("stream referenced missing content_index {content_index}"),
+        )
+    })?;
+    if content.content_type != expected_type {
+        return Err(OpenAIError::new(
+            ErrorKind::Validation,
+            format!(
+                "stream addressed content type `{}` but expected `{expected_type}`",
+                content.content_type
+            ),
+        ));
+    }
+    Ok(content)
+}
+
+fn stream_parse_error(error_event: &str, error: serde_json::Error) -> OpenAIError {
+    OpenAIError::new(
+        ErrorKind::Parse,
+        format!("failed to parse streamed `{error_event}` payload: {error}"),
+    )
+    .with_source(error)
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {

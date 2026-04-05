@@ -147,6 +147,32 @@ impl ClientRuntime {
         let resolved_options = self.resolve_request_options(&options)?;
         crate::core::transport::execute_unit(&request, &resolved_options)
     }
+
+    pub(crate) fn execute_text(
+        &self,
+        method: impl AsRef<str>,
+        path: impl AsRef<str>,
+        options: RequestOptions,
+    ) -> Result<crate::core::response::ApiResponse<String>, OpenAIError> {
+        let request = self.prepare_request(method, path)?;
+        let resolved_options = self.resolve_request_options(&options)?;
+        crate::core::transport::execute_text(&request, &resolved_options)
+    }
+
+    pub(crate) fn execute_text_with_body<B>(
+        &self,
+        method: impl AsRef<str>,
+        path: impl AsRef<str>,
+        body: &B,
+        options: RequestOptions,
+    ) -> Result<crate::core::response::ApiResponse<String>, OpenAIError>
+    where
+        B: Serialize,
+    {
+        let request = self.prepare_json_request(method, path, body)?;
+        let resolved_options = self.resolve_request_options(&options)?;
+        crate::core::transport::execute_text(&request, &resolved_options)
+    }
 }
 
 fn normalize_endpoint(path: &str) -> String {

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// One SSE event in a transcript.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SseEvent {
