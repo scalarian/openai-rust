@@ -1,0 +1,15 @@
+{
+  "featureId": "media-fix-audio-transcription-terminal-guard-and-translation-validation",
+  "reviewedAt": "2026-04-05T23:28:52Z",
+  "commitId": "f04836a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix fully addresses the prior audio blocking issues. `TranscriptionAccumulator::finish()` now rejects any transcription stream that ends before a terminal `transcript.text.done` event, whether the stream stops at raw EOF or after `[DONE]`, and `Translations::create()` now performs a deterministic local `diarized_json` validation before request preparation. The updated contract tests cover both truncation shapes plus the no-wire translation case, and I did not find any remaining blocking or non-blocking defects in the combined original+fix audio implementation.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/scrutiny/reviews/audio-transcription-translation-and-speech.json",
+  "summary": "Review passed. The rerun fixes the prior EOF-truncation bug in `audio.transcriptions.stream()` and correctly moves unsupported translation `diarized_json` validation ahead of any HTTP work, with focused regressions covering both behaviors."
+}

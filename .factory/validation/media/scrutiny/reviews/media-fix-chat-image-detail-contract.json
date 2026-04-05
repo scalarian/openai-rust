@@ -1,0 +1,15 @@
+{
+  "featureId": "media-fix-chat-image-detail-contract",
+  "reviewedAt": "2026-04-05T23:28:12.445513Z",
+  "commitId": "7118772baec9c4ad51700c9e6bd81be8ff58cb6f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix cleanly resolves the prior blocking issue: chat multimodal image-part builders now use a chat-only detail enum restricted to `auto`, `low`, and `high`, while Responses image inputs retain the broader `ImageDetail` contract with `original`. I found no remaining blocking or non-blocking issues in the combined original-plus-fix implementation within this reviewed scope.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/scrutiny/reviews/multimodal-input-types-and-media-parser.json",
+  "summary": "Pass: I reviewed the prior failed multimodal feature, the fix handoff/transcript, and commits `8941ac5b019f414aad2bb62fc47958c97b40c8a6` plus `7118772baec9c4ad51700c9e6bd81be8ff58cb6f`. The original over-broad chat image-detail typing is fixed at `src/resources/multimodal.rs:16`, `src/resources/multimodal.rs:181`, and `src/resources/multimodal.rs:197`, and the regression at `tests/multimodal_request_contract.rs:123` confirms Responses still serialize `detail=\"original\"` while chat builders cannot represent that unsupported value."
+}

@@ -1,7 +1,7 @@
 {
   "milestone": "media",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -21,42 +21,17 @@
   },
   "reviewsSummary": {
     "total": 3,
-    "passed": 0,
-    "failed": 3,
-    "failedFeatures": [
-      "images-surface",
-      "audio-transcription-translation-and-speech",
-      "multimodal-input-types-and-media-parser"
-    ]
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "images-surface",
-      "severity": "blocking",
-      "description": "`images.generate_stream()` / `images.edit_stream()` buffer the full SSE body before returning, so partial image events are replayed only after the request finishes instead of streaming incrementally to callers."
-    },
-    {
-      "featureId": "images-surface",
-      "severity": "blocking",
-      "description": "`ImageGenerationAccumulator::finish` and `ImageEditAccumulator::finish` accept EOF-truncated streams as successful unless `[DONE]` was seen, so missing terminal `image_generation.completed` / `image_edit.completed` events can slip through as clean completion."
-    },
-    {
-      "featureId": "audio-transcription-translation-and-speech",
-      "severity": "blocking",
-      "description": "`audio.transcriptions.stream()` returns success for EOF-truncated transcription streams even when no terminal `transcript.text.done` event was observed, violating the repository's terminal-event streaming rule."
-    },
-    {
-      "featureId": "multimodal-input-types-and-media-parser",
-      "severity": "blocking",
-      "description": "`ChatCompletionContentPart::image_url(..., detail)` reuses an `ImageDetail` enum that includes `Original`, allowing `/chat/completions` requests to serialize unsupported `detail=\"original\"` values."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": "sdk-surface-worker skill",
       "suggestion": "Clarify the brainstorming/design-comparison requirement for new public resource families in Exec Mode: either require an explicit `brainstorming` invocation or require a handoff section naming the chosen and rejected API design options, and ensure `followedProcedure` is false when neither happens.",
-      "evidence": "Both `images-surface` and `audio-transcription-translation-and-speech` introduced public media families, but their transcript skeletons lacked a `brainstorming` step and their handoffs did not record chosen-vs-rejected design alternatives, while `skillFeedback.followedProcedure` still reported true. Review reports: `.factory/validation/media/scrutiny/reviews/images-surface.json` and `.factory/validation/media/scrutiny/reviews/audio-transcription-translation-and-speech.json`.",
+      "evidence": "This recommendation still stands from the prior media scrutiny round. Both `images-surface` and `audio-transcription-translation-and-speech` introduced public media families, but their transcript skeletons lacked a `brainstorming` step and their handoffs did not record chosen-vs-rejected design alternatives, while `skillFeedback.followedProcedure` still reported true. Review reports: `.factory/validation/media/scrutiny/reviews/images-surface.json` and `.factory/validation/media/scrutiny/reviews/audio-transcription-translation-and-speech.json`.",
       "isSystemic": true
     }
   ],
@@ -70,5 +45,5 @@
       "reason": "already-documented in mission `AGENTS.md` and `.factory/library/architecture.md`, which already say shared types should only be used when truly shared."
     }
   ],
-  "previousRound": null
+  "previousRound": ".factory/validation/media/scrutiny/synthesis.round1.json"
 }

@@ -1,0 +1,74 @@
+{
+  "milestone": "media",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cargo test --all-features -- --test-threads=5",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cargo check --all-targets --all-features",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 0,
+    "failed": 3,
+    "failedFeatures": [
+      "images-surface",
+      "audio-transcription-translation-and-speech",
+      "multimodal-input-types-and-media-parser"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "images-surface",
+      "severity": "blocking",
+      "description": "`images.generate_stream()` / `images.edit_stream()` buffer the full SSE body before returning, so partial image events are replayed only after the request finishes instead of streaming incrementally to callers."
+    },
+    {
+      "featureId": "images-surface",
+      "severity": "blocking",
+      "description": "`ImageGenerationAccumulator::finish` and `ImageEditAccumulator::finish` accept EOF-truncated streams as successful unless `[DONE]` was seen, so missing terminal `image_generation.completed` / `image_edit.completed` events can slip through as clean completion."
+    },
+    {
+      "featureId": "audio-transcription-translation-and-speech",
+      "severity": "blocking",
+      "description": "`audio.transcriptions.stream()` returns success for EOF-truncated transcription streams even when no terminal `transcript.text.done` event was observed, violating the repository's terminal-event streaming rule."
+    },
+    {
+      "featureId": "multimodal-input-types-and-media-parser",
+      "severity": "blocking",
+      "description": "`ChatCompletionContentPart::image_url(..., detail)` reuses an `ImageDetail` enum that includes `Original`, allowing `/chat/completions` requests to serialize unsupported `detail=\"original\"` values."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "sdk-surface-worker skill",
+      "suggestion": "Clarify the brainstorming/design-comparison requirement for new public resource families in Exec Mode: either require an explicit `brainstorming` invocation or require a handoff section naming the chosen and rejected API design options, and ensure `followedProcedure` is false when neither happens.",
+      "evidence": "Both `images-surface` and `audio-transcription-translation-and-speech` introduced public media families, but their transcript skeletons lacked a `brainstorming` step and their handoffs did not record chosen-vs-rejected design alternatives, while `skillFeedback.followedProcedure` still reported true. Review reports: `.factory/validation/media/scrutiny/reviews/images-surface.json` and `.factory/validation/media/scrutiny/reviews/audio-transcription-translation-and-speech.json`.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "The audio review repeated the same `sdk-surface-worker` brainstorming ambiguity observation already captured from the images review.",
+      "reason": "duplicate"
+    },
+    {
+      "observation": "Add another shared-type convention note warning against reusing partially overlapping enums across families.",
+      "reason": "already-documented in mission `AGENTS.md` and `.factory/library/architecture.md`, which already say shared types should only be used when truly shared."
+    }
+  ],
+  "previousRound": null
+}
