@@ -1,0 +1,40 @@
+{
+  "featureId": "chat-completions-compatibility-surface",
+  "reviewedAt": "2026-04-05T20:42:17Z",
+  "commitId": "61e6ef6fb4b7e2066733b258595c565c81e7ae5f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the expected chat compatibility namespace, stored-completion CRUD, stored-message pagination helpers, and transcript-based stream accumulation tests, but the live streaming path is not actually incremental and its completion semantics are too weak for the architecture's stream guarantees.",
+    "issues": [
+      {
+        "file": "src/resources/chat.rs",
+        "line": 91,
+        "severity": "blocking",
+        "description": "`ChatCompletions::stream` buffers the entire SSE response into `chunks` before constructing `ChatCompletionStream`, so callers cannot observe chunks incrementally while the request is in flight. That means `stream=true` does not actually return a live streamed chunk sequence as required by VAL-COMPAT-001; it only returns a replay of a fully completed stream."
+      },
+      {
+        "file": "src/resources/chat.rs",
+        "line": 693,
+        "severity": "blocking",
+        "description": "`ChatCompletionAccumulator::finish` only errors when both `[DONE]` and a terminal chunk are missing, so a transcript that emits `[DONE]` without any terminal `finish_reason` chunk is accepted as successful. The shared architecture explicitly says `[DONE]` alone must never imply completed success, so this can report truncated compatibility streams as valid final snapshots."
+      },
+      {
+        "file": "src/resources/chat.rs",
+        "line": 740,
+        "severity": "non_blocking",
+        "description": "`append_query` concatenates raw keys and values without percent-encoding. Stored-completion filters like `metadata[...]`, cursor ids, or model names containing reserved characters will produce malformed URLs and break VAL-COMPAT-003 forwarding semantics for non-trivial inputs."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Query serialization guidance is inconsistent across resource families. `responses` percent-encodes query pairs, while `chat` and `conversations` each carry a local `append_query` helper that concatenates raw values. This gap makes it easy for new family work to ship malformed query handling.",
+      "evidence": "`src/resources/responses.rs:2239-2252` percent-encodes query keys/values; `src/resources/chat.rs:740-747` and `src/resources/conversations.rs:356-363` do not."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the compatibility surface is mostly implemented, but the reviewed commit does not provide true incremental streaming and it treats `[DONE]` alone as a successful terminal condition. I also noted a non-blocking query-encoding bug in the new list helpers."
+}

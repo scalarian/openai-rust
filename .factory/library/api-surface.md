@@ -18,6 +18,13 @@ High-level scope map for the crate. This file is for workers choosing where new 
 - Stored chat completions and stored message listing
 - Legacy Completions
 
+### Compatibility invariants
+- Legacy Completions streamed and non-streamed payloads are the same `text_completion` shape; `[DONE]` alone is not sufficient proof of a valid terminal completion payload.
+- Legacy Completions rejects `best_of` when `stream=true`; treat that combination as an invalid compatibility request.
+
+### Shared query serialization note
+- `responses` percent-encodes query keys and values, but `chat` and `conversations` currently use local `append_query` helpers that concatenate raw strings. When adding or fixing list/filter helpers, prefer percent-encoded query serialization and avoid copying the raw concatenation pattern.
+
 ## Core Retrieval Surfaces
 - Embeddings
 - Models
