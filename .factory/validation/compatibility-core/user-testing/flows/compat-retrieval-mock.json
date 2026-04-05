@@ -1,0 +1,52 @@
+{
+  "groupId": "compat-retrieval-mock",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-COMPAT-006",
+      "status": "pass",
+      "reason": "Proven by cargo test binary `embeddings_contract`: `embeddings_default_transport_decodes_base64_but_preserves_explicit_formats` passed, and the source assertions verify preserved item order/indexes, forwarded `dimensions`/`user`, default on-wire `encoding_format = base64`, decoded float output for omitted encoding, and explicit `float`/`base64` handling (tests/embeddings_contract.rs:8-90)."
+    },
+    {
+      "id": "VAL-COMPAT-007",
+      "status": "pass",
+      "reason": "Proven by cargo test binary `models_contract_mock`: `retrieve_and_list_preserve_model_ids_without_inventing_pagination` passed, and the source assertions verify retrieve requests preserve raw ids in the outgoing path (`/v1/models/ft:gpt-4.1-mini:custom` and encoded whitespace variant) while `models.list()` reports `has_next_page() == false` and `next_after() == None` (tests/models_contract_mock.rs:8-51)."
+    },
+    {
+      "id": "VAL-COMPAT-008",
+      "status": "pass",
+      "reason": "Proven by cargo test binary `moderations_contract`: `moderations_preserve_text_and_multimodal_input_correspondence` passed, and the source assertions verify text-array and multimodal inputs are forwarded to `/v1/moderations`, results lengths match inputs, and `flagged` plus `category_applied_input_types` stay aligned per input item (tests/moderations_contract.rs:8-77)."
+    },
+    {
+      "id": "VAL-COMPAT-009",
+      "status": "pass",
+      "reason": "Proven by cargo test binary `models_contract_mock`: `delete_owned_or_denied` passed, and the source assertions verify `DELETE /v1/models/{id}`, local blank-id validation, successful deletion parsing, preserved raw outgoing id encoding, and unchanged typed 403 permission-denied plus 404 not-found errors (tests/models_contract_mock.rs:55-148)."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-retrieval-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test embeddings_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/embeddings_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "`embeddings_contract` compiled and ran 1 test; `embeddings_default_transport_decodes_base64_but_preserves_explicit_formats ... ok`; suite result `1 passed; 0 failed`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/embeddings_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-retrieval-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test models_contract_mock -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/models_contract_mock.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "`models_contract_mock` compiled and ran 2 tests; `retrieve_and_list_preserve_model_ids_without_inventing_pagination ... ok` and `delete_owned_or_denied ... ok`; suite result `2 passed; 0 failed`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/models_contract_mock.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-retrieval-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test moderations_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/moderations_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "`moderations_contract` compiled and ran 1 test; `moderations_preserve_text_and_multimodal_input_correspondence ... ok`; suite result `1 passed; 0 failed`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-retrieval-mock/moderations_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assigned compatibility-core assertions through mocked cargo validation. VAL-COMPAT-006, VAL-COMPAT-007, VAL-COMPAT-008, and VAL-COMPAT-009 are all supported by passing cargo evidence and matching test-source assertions."
+}

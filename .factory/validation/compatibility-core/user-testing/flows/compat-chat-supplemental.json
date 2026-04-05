@@ -1,0 +1,39 @@
+{
+  "groupId": "compat-chat-supplemental",
+  "surface": "supplemental user-surface validation",
+  "assertions": [
+    {
+      "id": "VAL-COMPAT-002",
+      "status": "fail",
+      "reason": "A budget-capped live SDK probe created a chat completion with `store=true`, but retrieval never succeeded through the SDK user surface: the first retrieve returned `Api(NotFound)` and four later retries returned `Parse` (`invalid type: null, expected a sequence at line 1 column 621`). The same probe could still delete the stored completion successfully, so stored CRUD does not behave correctly end-to-end."
+    },
+    {
+      "id": "VAL-COMPAT-005",
+      "status": "pass",
+      "reason": "The mocked cargo tests already proved legacy `/v1/completions` create/stream behavior, `text_completion` shape parity, and `best_of`+`stream` rejection; a supplemental compile probe against the public crate API confirmed `client.completions()` exposes no `retrieve` method (`no method named `retrieve` found for reference `&Completions``), which closes the remaining create-only surface gap."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-supplemental\" cargo check --manifest-path \"<temporary compat_compile_probe Cargo.toml>\" > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-supplemental/completions_compile_probe.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "The command intentionally expected compilation to fail; the captured diagnostics include `no method named `retrieve` found for reference `&Completions` in the current scope`, confirming the legacy completions namespace does not expose retrieve-style CRUD methods.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-supplemental/completions_compile_probe.txt"
+    },
+    {
+      "command": "set -a && . /Users/staticpayload/Mainframe/openai-rust/creds.txt && set +a && unset OPENAI_BASE_URL && env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-supplemental\" cargo run --quiet --manifest-path \"<temporary compat_chat_live_retry_probe Cargo.toml>\" > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-supplemental/chat_store_live_retry_probe.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "The live probe created `chatcmpl-DRPLa1LdGIrxP2yI9WidxHpY1qCGk` (`stored_create_request_id=req_64fa66e5aba94a97b880be09992c3daa`), but retrieve attempt 1 returned `Api(NotFound)` and attempts 2-5 returned the same parse error `invalid type: null, expected a sequence at line 1 column 621`; `list_count=0` for the tagged filter and `delete_ok=true` showed deletion still worked.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-supplemental/chat_store_live_retry_probe.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo check",
+    "cargo run"
+  ],
+  "frictions": [
+    "The live stored-chat probe showed eventual-consistency-like behavior: the first retrieve returned 404, then subsequent retries returned a stable parse error instead of a successful stored completion payload."
+  ],
+  "blockers": [],
+  "summary": "Supplemental validation closed the VAL-COMPAT-005 create-only gap and found a real end-to-end failure for VAL-COMPAT-002 on the live stored-chat retrieval path."
+}

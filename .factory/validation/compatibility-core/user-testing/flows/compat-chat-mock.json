@@ -1,0 +1,83 @@
+{
+  "groupId": "compat-chat-mock",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-COMPAT-001",
+      "status": "pass",
+      "reason": "Observed passing create and stream coverage: `compatibility_surface_supports_create_and_stored_completion_crud` asserted `POST /v1/chat/completions` with a full chat completion object, and `stream_yields_incremental_chunks_before_terminal_tail_arrives` / `compatibility_stream_accumulates_legacy_function_and_tool_call_arguments` proved `client.chat().completions().stream(...)` yields compatibility chunks and a final message snapshot."
+    },
+    {
+      "id": "VAL-COMPAT-002",
+      "status": "blocked",
+      "reason": "`compatibility_surface_supports_create_and_stored_completion_crud` proved CRUD on a record created with `store=true` and that update sends only a metadata body, but the available cargo evidence does not prove retrieve/update/list/delete are gated exclusively to stored chat completions."
+    },
+    {
+      "id": "VAL-COMPAT-003",
+      "status": "pass",
+      "reason": "`compatibility_surface_supports_create_and_stored_completion_crud` asserted `after`, `limit`, `order`, `model`, and nested `metadata[tenant]` query forwarding and verified pagination helper behavior via `has_next_page()` and `next_after() == Some(\"chatcmpl_store\")`."
+    },
+    {
+      "id": "VAL-COMPAT-004",
+      "status": "pass",
+      "reason": "`stored_messages_list_preserves_cursor_ordering_and_termination` asserted `/v1/chat/completions/chatcmpl_store/messages?after=msg_0&limit=2&order=asc`, advanced the next cursor from the last id to `msg_2`, then confirmed descending follow-up and clean termination on an empty `has_more=false` page."
+    },
+    {
+      "id": "VAL-COMPAT-005",
+      "status": "blocked",
+      "reason": "The cargo evidence proves legacy `/v1/completions` create/stream behavior, `text_completion` response objects, shared streamed/non-streamed shape, and local rejection of `best_of` with `stream=true`, but it does not prove the surface is create-only or otherwise clearly labeled compatibility-only."
+    },
+    {
+      "id": "VAL-STREAM-008",
+      "status": "pass",
+      "reason": "`compatibility_stream_accumulates_legacy_function_and_tool_call_arguments` proved both legacy `function_call.arguments` and indexed `tool_calls[0].function.arguments` accumulate across chunks and match the final streamed message snapshot with `lookup_weather` / `{\"city\":\"Paris\"}`."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test chat_completions_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "Passed `compatibility_surface_supports_create_and_stored_completion_crud`; output shows 1 passed test and the test source maps that pass to `/v1/chat/completions` create plus stored CRUD, metadata-only update body, and filtered list query assertions.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test chat_completions_messages_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_messages_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "Passed `stored_messages_list_preserves_cursor_ordering_and_termination`; output shows 1 passed test and the test source maps that pass to stored-message cursor, ordering, and termination behavior.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_messages_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test chat_completions_stream_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_stream_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "Passed 4 tests including `compatibility_stream_accumulates_legacy_function_and_tool_call_arguments` and `stream_yields_incremental_chunks_before_terminal_tail_arrives`, providing the streaming evidence for compatibility chat chunks and final legacy/tool call state.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/chat_completions_stream_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test completions_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/completions_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "Passed `legacy_completions_create_preserves_text_completion_shape` and `streaming_best_of_is_rejected_locally`, proving legacy completions create behavior, `text_completion` parsing, and local validation of `best_of` with streaming.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/completions_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/compatibility-core/user-testing/target/compat-chat-mock\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test completions_stream_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/completions_stream_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "Passed 4 tests including `streamed_and_non_streamed_payloads_share_the_text_completion_shape` and `stream_posts_to_legacy_completions_endpoint`, proving legacy `/v1/completions` streaming shape parity and endpoint routing.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/compatibility-core/compat-chat-mock/completions_stream_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "assertionId": "VAL-COMPAT-002",
+      "description": "Available mocked cargo coverage does not include a negative proof that stored-chat CRUD is unavailable without `store=true`; only the positive `store=true` path is exercised."
+    },
+    {
+      "assertionId": "VAL-COMPAT-005",
+      "description": "Available mocked cargo coverage does not prove the legacy completions namespace is create-only or otherwise explicitly compatibility-only; it only proves the exercised create and stream behavior."
+    }
+  ],
+  "summary": "Ran 5 assigned cargo test commands successfully. Marked 4 assertions as pass (VAL-COMPAT-001, VAL-COMPAT-003, VAL-COMPAT-004, VAL-STREAM-008) and 2 as blocked due insufficient cargo evidence for the full assertion scope (VAL-COMPAT-002, VAL-COMPAT-005)."
+}
