@@ -145,6 +145,35 @@ fn interleaved_reasoning_text_and_tool_indices_stay_isolated() {
     assert_eq!(snapshot.output[2].content[0].text.as_deref(), Some("Plan"));
     assert_eq!(snapshot.output[2].content[1].text.as_deref(), Some("Beta!"));
     assert_eq!(snapshot.output_text(), "AnswerBeta!");
+
+    stream.next_event();
+    let final_response = stream.final_response().expect("completed response");
+    assert_eq!(final_response.status.as_deref(), Some("completed"));
+    assert_eq!(
+        final_response.output[0].content[0].text.as_deref(),
+        Some("Thinking")
+    );
+    assert_eq!(
+        final_response.output[0].content[1].text.as_deref(),
+        Some("Answer")
+    );
+    assert_eq!(
+        final_response.output[1].arguments.as_deref(),
+        Some("{\"x\":1}")
+    );
+    assert_eq!(
+        final_response.output[1].status.as_deref(),
+        Some("completed")
+    );
+    assert_eq!(
+        final_response.output[2].content[0].text.as_deref(),
+        Some("Plan")
+    );
+    assert_eq!(
+        final_response.output[2].content[1].text.as_deref(),
+        Some("Beta!")
+    );
+    assert_eq!(final_response.output_text(), "AnswerBeta!");
 }
 
 #[test]
@@ -240,6 +269,36 @@ fn multimodal_content_parts_remain_isolated_until_completion() {
     );
     assert_eq!(
         snapshot.output[0].content[1].extra.get("sequence"),
+        Some(&json!(2))
+    );
+
+    stream.next_event();
+    let final_response = stream.final_response().expect("completed response");
+    assert_eq!(final_response.status.as_deref(), Some("completed"));
+    assert_eq!(final_response.output_text(), "AlphaBeta!");
+    assert_eq!(
+        final_response.output[0].content[0].text.as_deref(),
+        Some("Alpha")
+    );
+    assert_eq!(
+        final_response.output[1].content[0].text.as_deref(),
+        Some("Beta!")
+    );
+    assert_eq!(
+        final_response.output[0].content[1].content_type,
+        "output_audio"
+    );
+    assert_eq!(
+        final_response.output[0].content[1].extra.get("audio"),
+        Some(&json!({
+            "id": "aud_1",
+            "data": "pcm-final",
+            "transcript": "Hello there",
+            "format": "wav"
+        }))
+    );
+    assert_eq!(
+        final_response.output[0].content[1].extra.get("sequence"),
         Some(&json!(2))
     );
 }
