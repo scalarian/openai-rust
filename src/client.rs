@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use url::Url;
 
 /// Root async-first SDK client scaffold.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct OpenAI {
     config: ClientConfig,
     resources: ResourceFamilies,
@@ -18,7 +18,7 @@ pub struct OpenAI {
 impl OpenAI {
     /// Creates a client with default scaffold configuration.
     pub fn new() -> Self {
-        Self::default()
+        Self::builder().build()
     }
 
     /// Starts building a client configuration.
@@ -253,10 +253,16 @@ impl OpenAIBuilder {
     /// Builds the scaffold client.
     pub fn build(self) -> OpenAI {
         OpenAI {
-            config: self.config,
+            config: self.config.with_env_defaults(),
             resources: ResourceFamilies::default(),
             realtime: Realtime,
         }
+    }
+}
+
+impl Default for OpenAI {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

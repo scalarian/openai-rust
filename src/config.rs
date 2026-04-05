@@ -57,13 +57,25 @@ impl ClientConfig {
         }
     }
 
+    /// Freezes environment defaults into this config without overriding explicit values.
+    pub fn with_env_defaults(&self) -> Self {
+        let env_config = Self::from_env();
+        Self {
+            api_key: self.api_key.clone().or(env_config.api_key),
+            base_url: self.base_url.clone().or(env_config.base_url),
+            organization: self.organization.clone().or(env_config.organization),
+            project: self.project.clone().or(env_config.project),
+            user_agent: self.user_agent.clone(),
+            timeout: self.timeout,
+            max_retries: self.max_retries,
+        }
+    }
+
     /// Resolves explicit configuration against environment defaults.
     pub fn resolve(&self) -> Result<ResolvedClientConfig, OpenAIError> {
-        let env_config = Self::from_env();
         let api_key = self
             .api_key
             .as_deref()
-            .or(env_config.api_key.as_deref())
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| {
@@ -74,19 +86,10 @@ impl ClientConfig {
             })?
             .to_string();
 
-        let base_url = normalize_base_url(
-            self.base_url
-                .as_deref()
-                .or(env_config.base_url.as_deref())
-                .unwrap_or(DEFAULT_BASE_URL),
-        )?;
+        let base_url = normalize_base_url(self.base_url.as_deref().unwrap_or(DEFAULT_BASE_URL))?;
 
-        let organization = normalize_optional(
-            self.organization
-                .as_deref()
-                .or(env_config.organization.as_deref()),
-        );
-        let project = normalize_optional(self.project.as_deref().or(env_config.project.as_deref()));
+        let organization = normalize_optional(self.organization.as_deref());
+        let project = normalize_optional(self.project.as_deref());
         let user_agent = build_user_agent(self.user_agent.as_deref());
         let timeout = self
             .timeout

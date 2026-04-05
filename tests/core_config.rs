@@ -177,6 +177,72 @@ fn env_loaded_request_can_be_sent_to_a_loopback_server() {
     );
 }
 
+#[test]
+fn env_loaded_clients_keep_immutable_config() {
+    let original_server =
+        mock_http::MockHttpServer::spawn(mock_http::ScriptedResponse::default()).unwrap();
+    let mutated_server =
+        mock_http::MockHttpServer::spawn(mock_http::ScriptedResponse::default()).unwrap();
+
+    with_env(
+        &[
+            ("OPENAI_API_KEY", Some("original-key")),
+            ("OPENAI_BASE_URL", Some(original_server.url().as_str())),
+            ("OPENAI_ORG_ID", Some("original-org")),
+            ("OPENAI_PROJECT_ID", Some("original-project")),
+        ],
+        || {
+            let client = OpenAI::new();
+
+            unsafe {
+                std::env::set_var("OPENAI_API_KEY", "mutated-key");
+                std::env::set_var("OPENAI_BASE_URL", mutated_server.url().as_str());
+                std::env::set_var("OPENAI_ORG_ID", "mutated-org");
+                std::env::set_var("OPENAI_PROJECT_ID", "mutated-project");
+            }
+
+            let request = client.prepare_request("GET", "/models").unwrap();
+            assert_eq!(request.url, format!("{}/v1/models", original_server.url()));
+            assert_eq!(
+                request.headers.get("authorization").map(String::as_str),
+                Some("Bearer original-key")
+            );
+            assert_eq!(
+                request
+                    .headers
+                    .get("openai-organization")
+                    .map(String::as_str),
+                Some("original-org")
+            );
+            assert_eq!(
+                request.headers.get("openai-project").map(String::as_str),
+                Some("original-project")
+            );
+
+            send_prepared_request(&request).unwrap();
+
+            let captured = original_server.captured_request().unwrap();
+            assert_eq!(captured.path, "/v1/models");
+            assert_eq!(
+                captured.headers.get("authorization").map(String::as_str),
+                Some("Bearer original-key")
+            );
+            assert_eq!(
+                captured
+                    .headers
+                    .get("openai-organization")
+                    .map(String::as_str),
+                Some("original-org")
+            );
+            assert_eq!(
+                captured.headers.get("openai-project").map(String::as_str),
+                Some("original-project")
+            );
+            assert_eq!(mutated_server.captured_request(), None);
+        },
+    );
+}
+
 fn send_prepared_request(
     request: &openai_rust::core::request::PreparedRequest,
 ) -> std::io::Result<()> {
