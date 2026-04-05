@@ -25,4 +25,6 @@ pub struct PreparedRequest {
     pub url: String,
     /// Lower-cased request headers.
     pub headers: BTreeMap<String, String>,
+    /// Optional raw request body.
+    pub body: Option<Vec<u8>>,
 }

@@ -26,20 +26,11 @@ pub(crate) fn execute_json<T>(
 where
     T: DeserializeOwned,
 {
-    let client = Client::builder()
-        .timeout(options.timeout)
-        .build()
-        .map_err(|error| {
-            OpenAIError::new(
-                ErrorKind::Transport,
-                format!("failed to build shared HTTP client: {error}"),
-            )
-            .with_source(error)
-        })?;
+    let client = build_client(options)?;
 
     let mut last_error = None;
     for attempt in 0..=options.max_retries {
-        match execute_once(&client, request, options) {
+        match execute_once_json(&client, request, options) {
             Ok(response) => return Ok(response),
             Err(error) => {
                 let should_retry = attempt < options.max_retries && should_retry(&error);
@@ -62,7 +53,51 @@ where
     }))
 }
 
-fn execute_once<T>(
+pub(crate) fn execute_unit(
+    request: &PreparedRequest,
+    options: &ResolvedRequestOptions,
+) -> Result<ApiResponse<()>, OpenAIError> {
+    let client = build_client(options)?;
+
+    let mut last_error = None;
+    for attempt in 0..=options.max_retries {
+        match execute_once_unit(&client, request, options) {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                let should_retry = attempt < options.max_retries && should_retry(&error);
+                let retry_delay = retry_delay(&error, attempt);
+                last_error = Some(error);
+                if should_retry {
+                    thread::sleep(retry_delay);
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Transport,
+            "shared transport exited without a response or error",
+        )
+    }))
+}
+
+fn build_client(options: &ResolvedRequestOptions) -> Result<Client, OpenAIError> {
+    Client::builder()
+        .timeout(options.timeout)
+        .build()
+        .map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("failed to build shared HTTP client: {error}"),
+            )
+            .with_source(error)
+        })
+}
+
+fn execute_once_json<T>(
     client: &Client,
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
@@ -70,6 +105,46 @@ fn execute_once<T>(
 where
     T: DeserializeOwned,
 {
+    let response = execute_once_bytes(client, request, options)?;
+    let ResponseBytes { metadata, body } = response;
+    let output = serde_json::from_slice::<T>(&body).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse OpenAI success response: {error}"),
+        )
+        .with_response_metadata(
+            metadata.status_code,
+            metadata.headers.clone(),
+            metadata.request_id.clone(),
+        )
+        .with_source(error)
+    })?;
+
+    Ok(ApiResponse { output, metadata })
+}
+
+fn execute_once_unit(
+    client: &Client,
+    request: &PreparedRequest,
+    options: &ResolvedRequestOptions,
+) -> Result<ApiResponse<()>, OpenAIError> {
+    let response = execute_once_bytes(client, request, options)?;
+    Ok(ApiResponse {
+        output: (),
+        metadata: response.metadata,
+    })
+}
+
+struct ResponseBytes {
+    metadata: ResponseMetadata,
+    body: Vec<u8>,
+}
+
+fn execute_once_bytes(
+    client: &Client,
+    request: &PreparedRequest,
+    options: &ResolvedRequestOptions,
+) -> Result<ResponseBytes, OpenAIError> {
     let url = Url::parse(&request.url).map_err(|error| {
         OpenAIError::new(
             ErrorKind::Validation,
@@ -86,13 +161,16 @@ where
     for (name, value) in &request.headers {
         builder = builder.header(name.as_str(), value.as_str());
     }
+    if let Some(body) = &request.body {
+        builder = builder.body(body.clone());
+    }
 
     let response = builder.send().map_err(map_transport_error)?;
     let status = response.status();
     let headers = normalize_headers(response.headers());
     let request_id = headers.get("x-request-id").cloned();
     let status_code = status.as_u16();
-    let body = response.bytes().map_err(map_transport_error)?;
+    let body = response.bytes().map_err(map_transport_error)?.to_vec();
 
     if !status.is_success() {
         let mut error = OpenAIError::new(
@@ -108,33 +186,21 @@ where
         return Err(error);
     }
 
-    let output = serde_json::from_slice::<T>(&body).map_err(|error| {
-        OpenAIError::new(
-            ErrorKind::Parse,
-            format!("failed to parse OpenAI success response: {error}"),
-        )
-        .with_response_metadata(status_code, headers.clone(), request_id.clone())
-        .with_source(error)
-    })?;
-
-    Ok(ApiResponse {
-        output,
+    Ok(ResponseBytes {
         metadata: ResponseMetadata {
             status_code,
             headers,
             request_id,
         },
+        body,
     })
 }
 
-fn execute_http_loopback<T>(
+fn execute_http_loopback(
     url: &Url,
     request: &PreparedRequest,
     timeout: Duration,
-) -> Result<ApiResponse<T>, OpenAIError>
-where
-    T: DeserializeOwned,
-{
+) -> Result<ResponseBytes, OpenAIError> {
     let host = url.host_str().ok_or_else(|| {
         OpenAIError::new(
             ErrorKind::Validation,
@@ -165,10 +231,19 @@ where
         raw_request.push_str(value);
         raw_request.push_str("\r\n");
     }
-    raw_request.push_str("\r\n");
-    stream
-        .write_all(raw_request.as_bytes())
-        .map_err(map_io_error)?;
+    if let Some(body) = &request.body {
+        raw_request.push_str("content-length: ");
+        raw_request.push_str(&body.len().to_string());
+        raw_request.push_str("\r\n\r\n");
+        let mut request_bytes = raw_request.into_bytes();
+        request_bytes.extend_from_slice(body);
+        stream.write_all(&request_bytes).map_err(map_io_error)?;
+    } else {
+        raw_request.push_str("\r\n");
+        stream
+            .write_all(raw_request.as_bytes())
+            .map_err(map_io_error)?;
+    }
     stream.flush().map_err(map_io_error)?;
     let _ = stream.shutdown(Shutdown::Write);
 
@@ -188,10 +263,7 @@ fn map_io_error(error: std::io::Error) -> OpenAIError {
     OpenAIError::new(kind, error.to_string()).with_source(error)
 }
 
-fn parse_raw_http_response<T>(raw_response: &[u8]) -> Result<ApiResponse<T>, OpenAIError>
-where
-    T: DeserializeOwned,
-{
+fn parse_raw_http_response(raw_response: &[u8]) -> Result<ResponseBytes, OpenAIError> {
     let Some(header_end) = raw_response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
@@ -242,22 +314,13 @@ where
         return Err(error);
     }
 
-    let output = serde_json::from_slice::<T>(&body).map_err(|error| {
-        OpenAIError::new(
-            ErrorKind::Parse,
-            format!("failed to parse OpenAI success response: {error}"),
-        )
-        .with_response_metadata(status_code, headers.clone(), request_id.clone())
-        .with_source(error)
-    })?;
-
-    Ok(ApiResponse {
-        output,
+    Ok(ResponseBytes {
         metadata: ResponseMetadata {
             status_code,
             headers,
             request_id,
         },
+        body,
     })
 }
 

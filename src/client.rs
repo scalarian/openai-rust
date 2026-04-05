@@ -1,16 +1,21 @@
+use std::sync::Arc;
+
+use serde::de::DeserializeOwned;
+
 use crate::{
     config::{ClientConfig, ResolvedClientConfig},
-    core::request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
+    core::{
+        request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
+        runtime::ClientRuntime,
+    },
     realtime::Realtime,
     resources::ResourceFamilies,
 };
-use serde::de::DeserializeOwned;
-use url::Url;
 
 /// Root async-first SDK client scaffold.
 #[derive(Clone, Debug)]
 pub struct OpenAI {
-    config: ClientConfig,
+    runtime: Arc<ClientRuntime>,
     resources: ResourceFamilies,
     realtime: Realtime,
 }
@@ -28,12 +33,12 @@ impl OpenAI {
 
     /// Returns the current client configuration scaffold.
     pub fn config(&self) -> &ClientConfig {
-        &self.config
+        self.runtime.config()
     }
 
     /// Resolves the current configuration against environment defaults.
     pub fn resolved_config(&self) -> Result<ResolvedClientConfig, crate::OpenAIError> {
-        self.config.resolve()
+        self.runtime.resolved_config()
     }
 
     /// Prepares an authenticated REST request before any transport is attempted.
@@ -42,29 +47,7 @@ impl OpenAI {
         method: impl AsRef<str>,
         path: impl AsRef<str>,
     ) -> Result<PreparedRequest, crate::OpenAIError> {
-        let method = method.as_ref().trim().to_ascii_uppercase();
-        if method.is_empty() {
-            return Err(crate::OpenAIError::new(
-                crate::ErrorKind::Validation,
-                "request method cannot be blank",
-            ));
-        }
-
-        let endpoint = normalize_endpoint(path.as_ref());
-        if endpoint.is_empty() {
-            return Err(crate::OpenAIError::new(
-                crate::ErrorKind::Validation,
-                "request path cannot be blank",
-            ));
-        }
-
-        let resolved = self.resolved_config()?;
-
-        Ok(PreparedRequest {
-            method,
-            url: join_url(&resolved.base_url, &endpoint)?,
-            headers: resolved.headers(),
-        })
+        self.runtime.prepare_request(method, path)
     }
 
     /// Resolves per-request execution options against client defaults.
@@ -72,11 +55,7 @@ impl OpenAI {
         &self,
         options: &RequestOptions,
     ) -> Result<ResolvedRequestOptions, crate::OpenAIError> {
-        let resolved = self.resolved_config()?;
-        Ok(ResolvedRequestOptions {
-            timeout: options.timeout.unwrap_or(resolved.timeout),
-            max_retries: options.max_retries.unwrap_or(resolved.max_retries),
-        })
+        self.runtime.resolve_request_options(options)
     }
 
     /// Executes a JSON request through the shared transport path.
@@ -89,9 +68,7 @@ impl OpenAI {
     where
         T: DeserializeOwned,
     {
-        let request = self.prepare_request(method, path)?;
-        let resolved_options = self.resolve_request_options(&options)?;
-        crate::core::transport::execute_json(&request, &resolved_options)
+        self.runtime.execute_json(method, path, options)
     }
 
     /// Accesses the responses family handle.
@@ -252,9 +229,10 @@ impl OpenAIBuilder {
 
     /// Builds the scaffold client.
     pub fn build(self) -> OpenAI {
+        let runtime = Arc::new(ClientRuntime::new(self.config.with_env_defaults()));
         OpenAI {
-            config: self.config.with_env_defaults(),
-            resources: ResourceFamilies::default(),
+            runtime: runtime.clone(),
+            resources: ResourceFamilies::new(runtime),
             realtime: Realtime,
         }
     }
@@ -264,32 +242,4 @@ impl Default for OpenAI {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn normalize_endpoint(path: &str) -> String {
-    path.trim()
-        .trim_start_matches('/')
-        .trim_start_matches("v1/")
-        .to_string()
-}
-
-fn join_url(base_url: &str, endpoint: &str) -> Result<String, crate::OpenAIError> {
-    let mut url = Url::parse(base_url).map_err(|error| {
-        crate::OpenAIError::new(
-            crate::ErrorKind::Configuration,
-            format!("invalid OpenAI base URL `{base_url}`: {error}"),
-        )
-    })?;
-    let (endpoint_path, endpoint_query) = endpoint
-        .split_once('?')
-        .map_or((endpoint, None), |(path, query)| (path, Some(query)));
-    let mut path = url.path().trim_end_matches('/').to_string();
-    if path.is_empty() {
-        path.push_str("/v1");
-    }
-    path.push('/');
-    path.push_str(endpoint_path);
-    url.set_path(&path);
-    url.set_query(endpoint_query.filter(|query| !query.is_empty()));
-    Ok(url.to_string().trim_end_matches('/').to_string())
 }

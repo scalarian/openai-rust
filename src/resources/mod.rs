@@ -1,5 +1,9 @@
 //! Public API family placeholders aligned to the clean-room architecture.
 
+use std::sync::Arc;
+
+use crate::core::runtime::ClientRuntime;
+
 pub mod audio;
 pub mod batches;
 pub mod chat;
@@ -21,7 +25,7 @@ pub mod videos;
 pub mod webhooks;
 
 /// Root collection of resource-family handles.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ResourceFamilies {
     pub(crate) responses: responses::Responses,
     pub(crate) conversations: conversations::Conversations,
@@ -42,4 +46,30 @@ pub struct ResourceFamilies {
     pub(crate) containers: containers::Containers,
     pub(crate) skills: skills::Skills,
     pub(crate) videos: videos::Videos,
+}
+
+impl ResourceFamilies {
+    pub(crate) fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self {
+            responses: responses::Responses::new(runtime),
+            conversations: conversations::Conversations,
+            chat: chat::Chat,
+            completions: completions::Completions,
+            embeddings: embeddings::Embeddings,
+            models: models::Models,
+            moderations: moderations::Moderations,
+            images: images::Images,
+            audio: audio::Audio::default(),
+            files: files::Files,
+            uploads: uploads::Uploads,
+            vector_stores: vector_stores::VectorStores::default(),
+            batches: batches::Batches,
+            webhooks: webhooks::Webhooks,
+            fine_tuning: fine_tuning::FineTuning,
+            evals: evals::Evals,
+            containers: containers::Containers,
+            skills: skills::Skills,
+            videos: videos::Videos,
+        }
+    }
 }

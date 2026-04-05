@@ -5,5 +5,6 @@ pub mod metadata;
 pub mod request;
 pub mod response;
 pub mod retry;
+pub mod runtime;
 pub mod timeout;
 pub mod transport;
