@@ -1,7 +1,7 @@
 {
   "milestone": "primary-generation",
-  "round": 3,
-  "status": "fail",
+  "round": 4,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,27 +20,21 @@
     }
   },
   "reviewsSummary": {
-    "total": 2,
+    "total": 1,
     "passed": 1,
-    "failed": 1,
-    "failedFeatures": [
-      "primary-generation-fix-streaming-reasoning-and-multimodal-proof"
-    ]
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
     {
-      "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
-      "severity": "blocking",
-      "description": "`tests/streaming_state_machine_contract.rs:135` only checks the pre-terminal accumulator state in `interleaved_reasoning_text_and_tool_indices_stay_isolated` and never consumes the queued `response.completed` event or asserts `final_response()`, so it does not prove terminal reconciliation preserves reasoning/text/tool isolation."
-    },
-    {
-      "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
-      "severity": "blocking",
-      "description": "`tests/streaming_state_machine_contract.rs:228` only checks pre-terminal multimodal assembly in `multimodal_content_parts_remain_isolated_until_completion` and never advances through `response.completed` or asserts `final_response()`, so VAL-STREAM-015 remains only partially proven."
+      "target": "sdk-surface-worker skill",
+      "suggestion": "Relax the TDD wording for proof-only or validation-gap features so workers may strengthen assertions first and accept an immediate passing run when no runtime defect exists.",
+      "evidence": "The rerun review for `primary-generation-fix-streaming-reasoning-and-multimodal-proof` found the worker correctly invoked `test-driven-development`, but the handoff still had to mark `followedProcedure=false` only because the stronger terminal assertions passed immediately without requiring a runtime edit. The current `sdk-surface-worker` skill text still requires workers to 'add failing tests first' with no proof-only exception.",
+      "isSystemic": true
     }
   ],
-  "appliedUpdates": [],
-  "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": ".factory/validation/primary-generation/scrutiny/synthesis.round2.json"
+  "previousRound": ".factory/validation/primary-generation/scrutiny/synthesis.round3.json"
 }

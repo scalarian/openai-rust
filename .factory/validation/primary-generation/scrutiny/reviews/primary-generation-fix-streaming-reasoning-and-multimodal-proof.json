@@ -1,28 +1,21 @@
 {
   "featureId": "primary-generation-fix-streaming-reasoning-and-multimodal-proof",
-  "reviewedAt": "2026-04-05T19:17:25Z",
-  "commitId": "a4f88c621c8b6188749166d99b90cf5c66c3754f",
+  "reviewedAt": "2026-04-05T19:33:54Z",
+  "commitId": "9caee82",
   "transcriptSkeletonReviewed": true,
   "diffReviewed": true,
-  "status": "fail",
+  "status": "pass",
   "codeReview": {
-    "summary": "The change is narrowly scoped and correctly adds two new state-machine regressions for interleaved reasoning/text/tool updates and multimodal content-part updates, but it does not fully close the proof gap it claims to address. Both new tests stop on pre-terminal snapshots and never assert the `response.completed`/`final_response()` reconciliation path, even though the stream runtime replaces the snapshot with the terminal wire response at completion.",
-    "issues": [
-      {
-        "file": "tests/streaming_state_machine_contract.rs",
-        "line": 135,
-        "severity": "blocking",
-        "description": "`interleaved_reasoning_text_and_tool_indices_stay_isolated` only asserts the accumulator state after `response.reasoning_text.done` and `response.output_text.done`, then exits without consuming the queued `response.completed` event declared earlier in the fixture (`tests/streaming_state_machine_contract.rs:96`) or checking `final_response()`. Because `response.completed` replaces the snapshot wholesale in `src/resources/responses.rs:1652-1658`, this test does not actually prove the final reconciled streamed response preserves the same reasoning/text/tool isolation that the feature description requires."
-      },
-      {
-        "file": "tests/streaming_state_machine_contract.rs",
-        "line": 228,
-        "severity": "blocking",
-        "description": "`multimodal_content_parts_remain_isolated_until_completion` likewise stops after the sibling `response.output_text.done` snapshot and never advances to the fixture's `response.completed` event (`tests/streaming_state_machine_contract.rs:177`) or asserts `final_response()`. That leaves VAL-STREAM-015 only partially proven: the test covers incremental `response.content_part.*` assembly for `output_audio`, but not the final terminal reconciliation step where the runtime swaps in the completed response object (`src/resources/responses.rs:1652-1658`)."
-      }
-    ]
+    "summary": "Commit `9caee82` resolves the prior scrutiny blockers. Both strengthened regressions now advance through the fixture's terminal `response.completed` event and assert `final_response()` against the reconciled completed response, proving terminal preservation for the reasoning/text/tool and multimodal output-audio cases without needing a runtime change.",
+    "issues": []
   },
-  "sharedStateObservations": [],
-  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/synthesis.round1.json",
-  "summary": "Review failed. I examined the fix handoff, transcript skeleton, prior scrutiny synthesis/reviews, and commit `a4f88c621c8b6188749166d99b90cf5c66c3754f`. The new regressions do improve coverage for interleaved reasoning and multimodal content-part accumulation, but they still stop short of proving the terminal `response.completed` reconciliation path that this feature was supposed to close."
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The `sdk-surface-worker` skill's TDD step is slightly too rigid for proof-only features whose expected outcome may be 'stronger assertions pass with no runtime edit'. This rerun correctly invoked `test-driven-development`, but the handoff still had to mark `followedProcedure` false solely because the new terminal assertions passed immediately.",
+      "evidence": "Transcript skeleton for worker session `3b446879-34f9-4176-9093-c6dd7e2c79c3` shows `test-driven-development` was invoked before editing. `handoffs/2026-04-05T19-29-36-008Z__primary-generation-fix-streaming-reasoning-and-multimodal-proof__3b446879-34f9-4176-9093-c6dd7e2c79c3.json` records `skillFeedback.followedProcedure=false` with a suggested change that proof-gap features should explicitly allow a passing first run when the strengthened assertions materially increase coverage. `openai-rust/.factory/skills/sdk-surface-worker/SKILL.md` step 3 currently requires workers to 'add failing tests first' without that exception."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/primary-generation/scrutiny/reviews/primary-generation-fix-streaming-reasoning-and-multimodal-proof.json",
+  "summary": "Pass. I reviewed the prior failed report, the rerun transcript skeleton, handoff, mission guidance, and commit `9caee82`. The earlier blocking findings are now resolved: both regressions consume terminal completion and assert the reconciled `final_response()` state for VAL-STREAM-007 and VAL-STREAM-015, and no new code issues were found."
 }
