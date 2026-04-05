@@ -53,7 +53,7 @@ impl ResourceFamilies {
         Self {
             responses: responses::Responses::new(runtime.clone()),
             conversations: conversations::Conversations::new(runtime.clone()),
-            chat: chat::Chat,
+            chat: chat::Chat::new(runtime.clone()),
             completions: completions::Completions,
             embeddings: embeddings::Embeddings,
             models: models::Models,
