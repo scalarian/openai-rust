@@ -1,31 +1,24 @@
 {
   "milestone": "compatibility-core",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 10,
-    "passed": 9,
-    "failed": 1,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
     "blocked": 0
   },
   "passedAssertions": [
-    "VAL-COMPAT-001",
-    "VAL-COMPAT-003",
-    "VAL-COMPAT-004",
-    "VAL-COMPAT-005",
-    "VAL-COMPAT-006",
-    "VAL-COMPAT-007",
-    "VAL-COMPAT-008",
-    "VAL-COMPAT-009",
-    "VAL-STREAM-008"
+    "VAL-COMPAT-002"
   ],
-  "failedAssertions": [
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
     {
-      "id": "VAL-COMPAT-002",
-      "reason": "Live SDK validation created a stored chat completion successfully, but retrieve never worked end-to-end: attempt 1 returned Api(NotFound) and attempts 2-5 returned Parse (invalid type: null, expected a sequence at line 1 column 621). The same stored completion could still be deleted successfully."
+      "target": "user-testing.md",
+      "description": "Recorded that live stored chat completion retrieval can return a transient 404 immediately after creation and should be retried briefly before marking the assertion failed.",
+      "source": "flow-report"
     }
   ],
-  "blockedAssertions": [],
-  "appliedUpdates": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/compatibility-core/user-testing/synthesis.round1.json"
 }

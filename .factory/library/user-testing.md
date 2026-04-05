@@ -57,6 +57,7 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 - Source credentials in the same shell as the live command: `set -a && . ./creds.txt && set +a`.
 - Explicitly clear `OPENAI_BASE_URL` before the smoke so the validation proves default-host behavior: `unset OPENAI_BASE_URL`.
 - Run only the assigned budget-capped live smoke; do not expand coverage or use extra models/endpoints.
+- Live stored chat-completion retrieval may be briefly eventually consistent after a `store=true` create; allow a short retry loop before concluding the stored completion is missing or malformed.
 - Use an isolated `CARGO_TARGET_DIR` under `.factory/validation/<milestone>/user-testing/target/<group>` for the live flow so repeated runs do not collide with mocked validators.
 - Live validation is serialized at concurrency 1 to avoid rate-limit noise and to keep evidence tied to a single request sequence.
 - Capture the command, exit code, resolved default-host proof from output, and any surfaced request ID.
