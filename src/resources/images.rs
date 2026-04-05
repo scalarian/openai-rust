@@ -1,6 +1,10 @@
 use std::{
     collections::{BTreeMap, VecDeque},
-    sync::Arc,
+    sync::{
+        Arc,
+        mpsc::{self, Receiver},
+    },
+    thread,
 };
 
 use serde::{Deserialize, Serialize};
@@ -19,7 +23,7 @@ use crate::{
     helpers::{
         media::{DecodedMedia, MediaDecodeMode, decode_media_response, parse_sse_frames},
         multipart::{MultipartBuilder, MultipartFile},
-        sse::SseFrame,
+        sse::{SseFrame, SseParser},
     },
 };
 
@@ -63,34 +67,7 @@ impl Images {
         let options = self
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
-
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| {
-                OpenAIError::new(
-                    ErrorKind::Transport,
-                    format!("failed to build images streaming runtime: {error}"),
-                )
-                .with_source(error)
-            })?;
-
-        let (metadata, chunks) = runtime.block_on(async move {
-            let response = execute_text_stream(&request, &options).await?;
-            let metadata = response.metadata.clone();
-            let mut response_body = response.response;
-            let mut chunks = Vec::new();
-            while let Some(chunk) = response_body
-                .chunk()
-                .await
-                .map_err(map_live_transport_error)?
-            {
-                chunks.push(String::from_utf8_lossy(chunk.as_ref()).to_string());
-            }
-            Ok::<_, OpenAIError>((metadata, chunks))
-        })?;
-
-        ImageGenerationStream::from_sse_chunks(metadata, chunks)
+        ImageGenerationStream::start_live(request, options)
     }
 
     /// Creates an edited image using multipart semantics.
@@ -120,34 +97,7 @@ impl Images {
         let options = self
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
-
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| {
-                OpenAIError::new(
-                    ErrorKind::Transport,
-                    format!("failed to build images edit streaming runtime: {error}"),
-                )
-                .with_source(error)
-            })?;
-
-        let (metadata, chunks) = runtime.block_on(async move {
-            let response = execute_text_stream(&request, &options).await?;
-            let metadata = response.metadata.clone();
-            let mut response_body = response.response;
-            let mut chunks = Vec::new();
-            while let Some(chunk) = response_body
-                .chunk()
-                .await
-                .map_err(map_live_transport_error)?
-            {
-                chunks.push(String::from_utf8_lossy(chunk.as_ref()).to_string());
-            }
-            Ok::<_, OpenAIError>((metadata, chunks))
-        })?;
-
-        ImageEditStream::from_sse_chunks(metadata, chunks)
+        ImageEditStream::start_live(request, options)
     }
 
     /// Creates a variation from one source image using the DALL·E-style multipart contract.
@@ -521,11 +471,13 @@ pub enum ImageEditStreamEvent {
 }
 
 /// Eagerly parsed image-generation stream transcript.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ImageGenerationStream {
     metadata: ResponseMetadata,
     events: VecDeque<ImageGenerationStreamEvent>,
     final_completed: Option<ImageGenerationCompletedEvent>,
+    terminal_error: Option<OpenAIError>,
+    live: Option<LiveImageGenerationHandle>,
 }
 
 impl ImageGenerationStream {
@@ -545,14 +497,26 @@ impl ImageGenerationStream {
             metadata,
             events,
             final_completed,
+            terminal_error: None,
+            live: None,
         })
     }
 
     pub fn next_event(&mut self) -> Option<ImageGenerationStreamEvent> {
+        if self.events.is_empty() {
+            self.fill_from_live();
+        }
         self.events.pop_front()
     }
 
-    pub fn final_completed(&self) -> Result<&ImageGenerationCompletedEvent, OpenAIError> {
+    pub fn final_completed(&mut self) -> Result<&ImageGenerationCompletedEvent, OpenAIError> {
+        self.drain_live_messages();
+        while self.live.is_some() {
+            self.fill_from_live();
+        }
+        if let Some(error) = self.terminal_error.clone() {
+            return Err(error);
+        }
         self.final_completed.as_ref().ok_or_else(|| {
             OpenAIError::new(
                 ErrorKind::Parse,
@@ -564,14 +528,120 @@ impl ImageGenerationStream {
     pub fn metadata(&self) -> &ResponseMetadata {
         &self.metadata
     }
+
+    fn start_live(
+        request: crate::core::request::PreparedRequest,
+        options: crate::core::request::ResolvedRequestOptions,
+    ) -> Result<Self, OpenAIError> {
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let runtime = match Builder::new_current_thread().enable_all().build() {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let error = OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to build images streaming runtime: {error}"),
+                    )
+                    .with_source(error);
+                    let _ = startup_tx.send(Err(error));
+                    return;
+                }
+            };
+
+            runtime.block_on(async move {
+                match execute_text_stream(&request, &options).await {
+                    Ok(response) => {
+                        let metadata = response.metadata.clone();
+                        let _ = startup_tx.send(Ok(metadata));
+                        if let Err(error) =
+                            consume_live_generation_stream(response, event_tx.clone()).await
+                        {
+                            let _ = event_tx.send(LiveImageGenerationMessage::Error(error));
+                        }
+                    }
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error));
+                    }
+                }
+            });
+        });
+
+        let metadata = startup_rx.recv().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("image generation stream worker exited before startup completed: {error}"),
+            )
+        })??;
+
+        Ok(Self {
+            metadata,
+            events: VecDeque::new(),
+            final_completed: None,
+            terminal_error: None,
+            live: Some(LiveImageGenerationHandle {
+                receiver: event_rx,
+                worker: Some(worker),
+            }),
+        })
+    }
+
+    fn fill_from_live(&mut self) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+
+        let Some(message) = live.receiver.recv().ok() else {
+            live.join_worker();
+            self.live = None;
+            return;
+        };
+        self.process_live_message(message);
+        self.drain_live_messages();
+    }
+
+    fn drain_live_messages(&mut self) {
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn process_live_message(&mut self, message: LiveImageGenerationMessage) {
+        match message {
+            LiveImageGenerationMessage::Event(event) => {
+                if let ImageGenerationStreamEvent::Completed(completed) = &event {
+                    self.final_completed = Some(completed.clone());
+                }
+                self.events.push_back(event);
+            }
+            LiveImageGenerationMessage::Finished => {
+                if let Some(live) = self.live.as_mut() {
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+            LiveImageGenerationMessage::Error(error) => {
+                self.terminal_error = Some(error);
+                if let Some(live) = self.live.as_mut() {
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+        }
+    }
 }
 
 /// Eagerly parsed image-edit stream transcript.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ImageEditStream {
     metadata: ResponseMetadata,
     events: VecDeque<ImageEditStreamEvent>,
     final_completed: Option<ImageEditCompletedEvent>,
+    terminal_error: Option<OpenAIError>,
+    live: Option<LiveImageEditHandle>,
 }
 
 impl ImageEditStream {
@@ -591,14 +661,26 @@ impl ImageEditStream {
             metadata,
             events,
             final_completed,
+            terminal_error: None,
+            live: None,
         })
     }
 
     pub fn next_event(&mut self) -> Option<ImageEditStreamEvent> {
+        if self.events.is_empty() {
+            self.fill_from_live();
+        }
         self.events.pop_front()
     }
 
-    pub fn final_completed(&self) -> Result<&ImageEditCompletedEvent, OpenAIError> {
+    pub fn final_completed(&mut self) -> Result<&ImageEditCompletedEvent, OpenAIError> {
+        self.drain_live_messages();
+        while self.live.is_some() {
+            self.fill_from_live();
+        }
+        if let Some(error) = self.terminal_error.clone() {
+            return Err(error);
+        }
         self.final_completed.as_ref().ok_or_else(|| {
             OpenAIError::new(
                 ErrorKind::Parse,
@@ -610,19 +692,121 @@ impl ImageEditStream {
     pub fn metadata(&self) -> &ResponseMetadata {
         &self.metadata
     }
+
+    fn start_live(
+        request: crate::core::request::PreparedRequest,
+        options: crate::core::request::ResolvedRequestOptions,
+    ) -> Result<Self, OpenAIError> {
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let runtime = match Builder::new_current_thread().enable_all().build() {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let error = OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to build images edit streaming runtime: {error}"),
+                    )
+                    .with_source(error);
+                    let _ = startup_tx.send(Err(error));
+                    return;
+                }
+            };
+
+            runtime.block_on(async move {
+                match execute_text_stream(&request, &options).await {
+                    Ok(response) => {
+                        let metadata = response.metadata.clone();
+                        let _ = startup_tx.send(Ok(metadata));
+                        if let Err(error) =
+                            consume_live_edit_stream(response, event_tx.clone()).await
+                        {
+                            let _ = event_tx.send(LiveImageEditMessage::Error(error));
+                        }
+                    }
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error));
+                    }
+                }
+            });
+        });
+
+        let metadata = startup_rx.recv().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("image edit stream worker exited before startup completed: {error}"),
+            )
+        })??;
+
+        Ok(Self {
+            metadata,
+            events: VecDeque::new(),
+            final_completed: None,
+            terminal_error: None,
+            live: Some(LiveImageEditHandle {
+                receiver: event_rx,
+                worker: Some(worker),
+            }),
+        })
+    }
+
+    fn fill_from_live(&mut self) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+
+        let Some(message) = live.receiver.recv().ok() else {
+            live.join_worker();
+            self.live = None;
+            return;
+        };
+        self.process_live_message(message);
+        self.drain_live_messages();
+    }
+
+    fn drain_live_messages(&mut self) {
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn process_live_message(&mut self, message: LiveImageEditMessage) {
+        match message {
+            LiveImageEditMessage::Event(event) => {
+                if let ImageEditStreamEvent::Completed(completed) = &event {
+                    self.final_completed = Some(completed.clone());
+                }
+                self.events.push_back(event);
+            }
+            LiveImageEditMessage::Finished => {
+                if let Some(live) = self.live.as_mut() {
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+            LiveImageEditMessage::Error(error) => {
+                self.terminal_error = Some(error);
+                if let Some(live) = self.live.as_mut() {
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 struct ImageGenerationAccumulator {
     events: VecDeque<ImageGenerationStreamEvent>,
     final_completed: Option<ImageGenerationCompletedEvent>,
-    saw_done: bool,
 }
 
 impl ImageGenerationAccumulator {
     fn ingest_frame(&mut self, frame: SseFrame) -> Result<(), OpenAIError> {
         if frame.data == "[DONE]" {
-            self.saw_done = true;
             return Ok(());
         }
 
@@ -660,7 +844,7 @@ impl ImageGenerationAccumulator {
         ),
         OpenAIError,
     > {
-        if self.saw_done && self.final_completed.is_none() {
+        if self.final_completed.is_none() {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
                 "image generation stream ended without a terminal completed event",
@@ -674,13 +858,11 @@ impl ImageGenerationAccumulator {
 struct ImageEditAccumulator {
     events: VecDeque<ImageEditStreamEvent>,
     final_completed: Option<ImageEditCompletedEvent>,
-    saw_done: bool,
 }
 
 impl ImageEditAccumulator {
     fn ingest_frame(&mut self, frame: SseFrame) -> Result<(), OpenAIError> {
         if frame.data == "[DONE]" {
-            self.saw_done = true;
             return Ok(());
         }
 
@@ -718,13 +900,55 @@ impl ImageEditAccumulator {
         ),
         OpenAIError,
     > {
-        if self.saw_done && self.final_completed.is_none() {
+        if self.final_completed.is_none() {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
                 "image edit stream ended without a terminal completed event",
             ));
         }
         Ok((self.events, self.final_completed))
+    }
+}
+
+#[derive(Debug)]
+enum LiveImageGenerationMessage {
+    Event(ImageGenerationStreamEvent),
+    Finished,
+    Error(OpenAIError),
+}
+
+#[derive(Debug)]
+struct LiveImageGenerationHandle {
+    receiver: Receiver<LiveImageGenerationMessage>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl LiveImageGenerationHandle {
+    fn join_worker(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+#[derive(Debug)]
+enum LiveImageEditMessage {
+    Event(ImageEditStreamEvent),
+    Finished,
+    Error(OpenAIError),
+}
+
+#[derive(Debug)]
+struct LiveImageEditHandle {
+    receiver: Receiver<LiveImageEditMessage>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl LiveImageEditHandle {
+    fn join_worker(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 
@@ -771,6 +995,81 @@ fn stream_parse_error(error_event: &str, error: serde_json::Error) -> OpenAIErro
         format!("failed to parse streamed `{error_event}` payload: {error}"),
     )
     .with_source(error)
+}
+
+async fn consume_live_generation_stream(
+    response: crate::core::transport::StreamingTextResponse,
+    event_tx: mpsc::Sender<LiveImageGenerationMessage>,
+) -> Result<(), OpenAIError> {
+    let mut response = response.response;
+    let mut parser = SseParser::default();
+    let mut accumulator = ImageGenerationAccumulator::default();
+
+    while let Some(chunk) = response.chunk().await.map_err(map_live_transport_error)? {
+        for frame in parser.push(chunk.as_ref())? {
+            accumulator.ingest_frame(frame)?;
+            drain_generation_events(&mut accumulator, &event_tx);
+        }
+    }
+
+    for frame in parser.finish()? {
+        accumulator.ingest_frame(frame)?;
+        drain_generation_events(&mut accumulator, &event_tx);
+    }
+
+    let _ = accumulator.finish()?;
+    let _ = event_tx.send(LiveImageGenerationMessage::Finished);
+    Ok(())
+}
+
+fn drain_generation_events(
+    accumulator: &mut ImageGenerationAccumulator,
+    event_tx: &mpsc::Sender<LiveImageGenerationMessage>,
+) {
+    while let Some(event) = accumulator.events.pop_front() {
+        if event_tx
+            .send(LiveImageGenerationMessage::Event(event))
+            .is_err()
+        {
+            break;
+        }
+    }
+}
+
+async fn consume_live_edit_stream(
+    response: crate::core::transport::StreamingTextResponse,
+    event_tx: mpsc::Sender<LiveImageEditMessage>,
+) -> Result<(), OpenAIError> {
+    let mut response = response.response;
+    let mut parser = SseParser::default();
+    let mut accumulator = ImageEditAccumulator::default();
+
+    while let Some(chunk) = response.chunk().await.map_err(map_live_transport_error)? {
+        for frame in parser.push(chunk.as_ref())? {
+            accumulator.ingest_frame(frame)?;
+            drain_edit_events(&mut accumulator, &event_tx);
+        }
+    }
+
+    for frame in parser.finish()? {
+        accumulator.ingest_frame(frame)?;
+        drain_edit_events(&mut accumulator, &event_tx);
+    }
+
+    let _ = accumulator.finish()?;
+    let _ = event_tx.send(LiveImageEditMessage::Finished);
+    Ok(())
+}
+
+fn drain_edit_events(
+    accumulator: &mut ImageEditAccumulator,
+    event_tx: &mpsc::Sender<LiveImageEditMessage>,
+) {
+    while let Some(event) = accumulator.events.pop_front() {
+        if event_tx.send(LiveImageEditMessage::Event(event)).is_err() {
+            break;
+        }
+    }
 }
 
 fn decode_images_json_response(

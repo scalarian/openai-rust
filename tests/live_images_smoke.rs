@@ -28,10 +28,13 @@ fn live_image_stream_smoke_captures_request_id_and_completed_event() {
         }
     }
 
-    let completed = stream
-        .final_completed()
-        .expect("live image stream should finish with a completed event");
-    assert!(!completed.b64_json.trim().is_empty());
+    let completed_b64_len = {
+        let completed = stream
+            .final_completed()
+            .expect("live image stream should finish with a completed event");
+        assert!(!completed.b64_json.trim().is_empty());
+        completed.b64_json.len()
+    };
 
     let request_id = stream
         .metadata()
@@ -43,6 +46,6 @@ fn live_image_stream_smoke_captures_request_id_and_completed_event() {
     println!("partial image events observed: {partial_events}");
     println!(
         "completed image bytes (base64 chars): {}",
-        completed.b64_json.len()
+        completed_b64_len
     );
 }
