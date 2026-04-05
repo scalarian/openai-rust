@@ -1,0 +1,34 @@
+{
+  "featureId": "images-surface",
+  "reviewedAt": "2026-04-05T22:52:20.135801Z",
+  "commitId": "fb96b44c0d5cf6ce9a803687ca9e185cad67c816",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds the expected Images generation/edit/variation surface, typed JSON models, multipart builders, and SSE transcript parsing, but both stream entry points are still buffered replays rather than live streams and the terminal-event guard is too weak for truncated EOF cases.",
+    "issues": [
+      {
+        "file": "src/resources/images.rs",
+        "line": 55,
+        "severity": "blocking",
+        "description": "`generate_stream` (and the mirrored `edit_stream` implementation at line 107) calls `execute_text_stream`, then immediately drains the entire HTTP body into `chunks` before constructing `ImageGenerationStream`/`ImageEditStream`. That means callers cannot observe `image_generation.partial_image` or `image_edit.partial_image` incrementally while the request is in flight; they only get a replay after the server has already finished. This breaks the streamed-event contract in VAL-MEDIA-001/002 and the architecture's event-first streaming model."
+      },
+      {
+        "file": "src/resources/images.rs",
+        "line": 654,
+        "severity": "blocking",
+        "description": "`ImageGenerationAccumulator::finish` only errors when `[DONE]` was seen without a terminal `image_generation.completed`, and `ImageEditAccumulator::finish` repeats the same pattern at line 712. If the socket closes or EOF arrives after one or more partial-image events but before the completed event, `generate_stream`/`edit_stream` still return `Ok(...)` and expose those partial events as though the stream ended cleanly unless the caller separately checks `final_completed()`. `.factory/library/architecture.md` says `[DONE]`, EOF, or socket close alone must never imply completed success, so truncated image streams can slip through as successful."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "`sdk-surface-worker` requires `brainstorming` before introducing a new public resource-family API, or at minimum a handoff note recording the chosen and rejected design direction in mission Exec Mode. This images worker added the new public `client.images()` family but the transcript skeleton only shows `sdk-surface-worker`, `test-driven-development`, and `verification-before-completion`, and the handoff contains no chosen-vs-rejected design note. The procedure is therefore hard to audit in practice for new public surfaces.",
+      "evidence": "`.factory/skills/sdk-surface-worker/SKILL.md:16,24` requires brainstorming or an in-handoff design comparison; the reviewed transcript skeleton in `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/worker-transcripts.jsonl` for session `220774de-1efb-43a7-8414-e3874d28f6c5` shows no `brainstorming` invocation, and `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-05T22-14-38-617Z__images-surface__220774de-1efb-43a7-8414-e3874d28f6c5.json` contains no chosen/rejected design note."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed the feature entry, handoff, worker transcript skeleton, skill contract, validation assertions, and commit `fb96b44c0d5cf6ce9a803687ca9e185cad67c816`. Result: fail. The JSON and multipart portions look aligned with the feature contract, but the new image stream APIs still buffer the full SSE response before exposing events and they do not reject EOF-truncated streams unless `[DONE]` was seen, so the implementation does not yet satisfy the milestone's streaming correctness requirements."
+}

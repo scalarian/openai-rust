@@ -1,0 +1,28 @@
+{
+  "featureId": "multimodal-input-types-and-media-parser",
+  "reviewedAt": "2026-04-05T22:51:40Z",
+  "commitId": "8941ac5b019f414aad2bb62fc47958c97b40c8a6",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature correctly centralizes media decode helpers and adds reusable multimodal builders for Responses and Chat, but the new shared image-detail type over-generalizes the Chat wire contract and allows an unsupported `original` detail value to be serialized for chat-completions image parts.",
+    "issues": [
+      {
+        "file": "src/resources/multimodal.rs",
+        "line": 172,
+        "severity": "blocking",
+        "description": "`ChatCompletionContentPart::image_url(..., detail: Option<ImageDetail>)` reuses the shared `ImageDetail` enum from the top of the file, which includes the `Original` variant. Chat Completions image parts only document `auto`, `low`, and `high`, so this builder now lets callers serialize `\"detail\": \"original\"` on `/chat/completions` requests. That violates the documented chat multimodal contract the feature claims to preserve and can produce server-side validation failures for otherwise type-checked SDK code."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The mission guidance says shared model types should only be introduced when families genuinely share the same concept, but this feature shows that partially overlapping wire enums are easy to over-share. A sharper convention about keeping per-family enums separate unless their allowed wire values are identical would help prevent this class of bug.",
+      "evidence": "`.factory/library/architecture.md:17` and mission `AGENTS.md:22` say shared types should only be used when truly shared. `src/resources/multimodal.rs:6-10` defines one `ImageDetail` enum with `Original`, and `src/resources/multimodal.rs:172-177` reuses it for Chat even though the upstream chat image contract only allows `auto|low|high` while Responses allows `original` too."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the shared multimodal builders and media parser refactor are mostly sound, but Chat image-part typing is too broad because it accepts `detail=original`, which is not part of the documented Chat Completions wire contract."
+}
