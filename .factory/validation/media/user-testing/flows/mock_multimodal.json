@@ -1,0 +1,113 @@
+{
+  "groupId": "mock_multimodal",
+  "testedAt": "2026-04-05T16:36:00Z",
+  "surface": "mocked cargo validation",
+  "isolation": {
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_multimodal",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/media/mock_multimodal"
+  },
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_multimodal cargo test --test media_parser_contract -- --nocapture",
+      "exitCode": 0,
+      "evidence": "media/mock_multimodal/media_parser_contract.txt"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_multimodal cargo test --test multimodal_request_contract -- --nocapture",
+      "exitCode": 0,
+      "evidence": "media/mock_multimodal/multimodal_request_contract.txt"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-MEDIA-008",
+      "title": "Shared Media Response Parsing Respects Binary, Text, JSON, and SSE Modes",
+      "status": "pass",
+      "tests": [
+        "tests/media_parser_contract.rs:18 shared_media_parser_selects_json_text_binary_and_sse_paths"
+      ],
+      "steps": [
+        {
+          "action": "Run media_parser_contract through cargo test",
+          "expected": "Mocked media parser chooses JSON, text, binary, and SSE decode paths without cross-mode leakage",
+          "observed": "Test passed"
+        },
+        {
+          "action": "Inspect test coverage for decode-path selection",
+          "expected": "JSON transcription, plain-text translation, binary speech, and SSE image streaming are each asserted independently",
+          "observed": "The test asserts transcription JSON payload text=\"transcribed\", translation text payload=\"translated text\", speech output bytes=[1,2,3,4], and image SSE yields ordered partial/completed events"
+        }
+      ],
+      "evidence": {
+        "commandOutput": [
+          "media/mock_multimodal/media_parser_contract.txt"
+        ],
+        "network": "Mocked server sequence returned application/json, text/plain, audio/mpeg, and text/event-stream responses in order; the passing test confirms the parser selected the corresponding decode path for each response mode."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-MEDIA-009",
+      "title": "Multimodal Request Composition Preserves Ordered Text, Image, and Audio Inputs on Supporting Surfaces",
+      "status": "pass",
+      "tests": [
+        "tests/multimodal_request_contract.rs:19 shared_multimodal_request_builders_preserve_ordered_text_image_audio_parts",
+        "tests/multimodal_request_contract.rs:123 chat_image_parts_reject_original_detail_while_responses_keep_it"
+      ],
+      "steps": [
+        {
+          "action": "Run multimodal_request_contract through cargo test",
+          "expected": "Mixed content arrays preserve order and media metadata across supported request builders",
+          "observed": "Both relevant tests passed"
+        },
+        {
+          "action": "Inspect request-shaping assertions",
+          "expected": "Responses input preserves input_text -> input_image -> input_audio ordering with detail/format metadata, and chat completions preserve text -> image_url -> input_audio ordering",
+          "observed": "The test validates responses parts with type/text/image_url/detail/input_audio.format=mp3 and chat parts with type/text/image_url.url/detail/input_audio.format=wav in original order; a companion test confirms response image parts retain detail=original while chat image parts serialize supported detail values"
+        }
+      ],
+      "evidence": {
+        "commandOutput": [
+          "media/mock_multimodal/multimodal_request_contract.txt"
+        ],
+        "network": "Mocked captured request bodies verified ordered content arrays and preserved media metadata fields across responses and chat request serialization."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-RESP-010",
+      "title": "Multimodal input composition preserves ordered text/image/file parts",
+      "status": "pass",
+      "tests": [
+        "tests/multimodal_request_contract.rs:141 responses_multimodal_request_preserves_text_image_and_file_field_names"
+      ],
+      "steps": [
+        {
+          "action": "Run multimodal_request_contract through cargo test",
+          "expected": "Responses multimodal message serialization preserves ordered text/image/file parts without flattening or field renaming",
+          "observed": "Relevant test passed"
+        },
+        {
+          "action": "Inspect field-name assertions",
+          "expected": "Serialized parts preserve input_text, input_image.file_id/detail, and input_file file_id/file_url/file_data/filename fields in order",
+          "observed": "The test validates ordered parts for input_text, input_image(file_id + detail), input_file(file_id), input_file(file_url), and input_file(file_data + filename), and confirms no unrelated image_url field leaks onto input_file entries"
+        }
+      ],
+      "evidence": {
+        "commandOutput": [
+          "media/mock_multimodal/multimodal_request_contract.txt"
+        ],
+        "network": "Mocked captured request body preserved ordered response content items and field names: image_url remained specific to input_image while file_id/file_url/file_data/filename stayed on input_file parts."
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Validated 3 assigned assertions through mocked cargo tests. VAL-MEDIA-008, VAL-MEDIA-009, and VAL-RESP-010 all passed; command outputs were captured under mission evidence, and source inspection confirmed the assertion-to-test mapping plus the expected decode-path and request-serialization details."
+}

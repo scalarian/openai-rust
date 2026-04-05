@@ -1,0 +1,51 @@
+{
+  "groupId": "mock_images",
+  "testedAt": "2026-04-05T23:37:59.701335+00:00",
+  "surface": "mocked cargo validation",
+  "isolation": {
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "targetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_images",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/media/mock_images"
+  },
+  "assertions": [
+    {
+      "id": "VAL-MEDIA-001",
+      "title": "Image Generation Returns Typed Payloads and Streamed Image Events",
+      "status": "pass",
+      "reason": "`cargo test --test images_contract -- --nocapture` passed `images_generate_edit_and_variation_preserve_typed_and_multipart_contracts`, confirming `images.generate` posted JSON to `/v1/images/generations` and parsed `created`, mixed `b64_json`/`url` entries, and `usage.total_tokens`. `cargo test --test images_stream_contract -- --nocapture` passed `images_generate_and_edit_stream_surface_partial_and_completed_events`, `image_stream_yields_incremental_generation_events_before_terminal_tail_arrives`, `image_stream_requires_terminal_completed_event`, and `image_stream_rejects_eof_truncated_transcripts_without_completed_event`, confirming ordered `image_generation.partial_image` then `image_generation.completed` SSE events with base64 payloads/metadata, incremental delivery before the delayed terminal tail, and parse failures when the terminal completed event is missing or truncated."
+    },
+    {
+      "id": "VAL-MEDIA-002",
+      "title": "Image Edit Builds Multipart Bodies for One-or-Many Source Images and Optional Mask",
+      "status": "pass",
+      "reason": "`cargo test --test images_contract -- --nocapture` passed `images_generate_edit_and_variation_preserve_typed_and_multipart_contracts`, which inspected the `/v1/images/edits` multipart body and proved repeated `image` parts stayed in caller order, preserved filenames/content types/byte fidelity, preserved the optional `mask`, and forwarded non-file fields including `background`, `output_format`, `quality`, and `partial_images`. `cargo test --test images_stream_contract -- --nocapture` passed `images_generate_and_edit_stream_surface_partial_and_completed_events` and `image_edit_stream_rejects_eof_truncated_transcripts_without_completed_event`, confirming streamed `image_edit.partial_image`/`image_edit.completed` parsing and the terminal completion guard on truncated edit streams."
+    },
+    {
+      "id": "VAL-MEDIA-003",
+      "title": "Image Variation Preserves the Single-PNG DALL\u00b7E Contract",
+      "status": "pass",
+      "reason": "`cargo test --test images_contract -- --nocapture` passed `images_generate_edit_and_variation_preserve_typed_and_multipart_contracts`, which verified `/v1/images/variations` sent exactly one `image` multipart part with preserved filename (`frame-2.png`), content type (`image/png`), and byte fidelity, while also preserving `response_format=b64_json`, `size=1024x1024`, and parsing the returned variation payload without conflating base64 and URL response modes."
+    }
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_images cargo test --test images_contract -- --nocapture",
+      "exitCode": 0,
+      "observation": "The `images_contract` test binary finished successfully with 1/1 tests passing: `images_generate_edit_and_variation_preserve_typed_and_multipart_contracts`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/media/mock_images/images_contract.txt"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/media/user-testing/target/mock_images cargo test --test images_stream_contract -- --nocapture",
+      "exitCode": 0,
+      "observation": "The `images_stream_contract` test binary finished successfully with 5/5 tests passing: `image_stream_rejects_eof_truncated_transcripts_without_completed_event`, `image_edit_stream_rejects_eof_truncated_transcripts_without_completed_event`, `image_stream_requires_terminal_completed_event`, `images_generate_and_edit_stream_surface_partial_and_completed_events`, and `image_stream_yields_incremental_generation_events_before_terminal_tail_arrives`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/media/mock_images/images_stream_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 3 assigned media image assertions passed under the mocked cargo validation surface: typed image generation parsing, multipart edit/variation fidelity, streamed partial/completed image events, and terminal completion guards were all confirmed by the required test runs."
+}
