@@ -17,3 +17,4 @@ target/
 #.idea/
 # Local credentials for live SDK validation
 creds.txt
+references/

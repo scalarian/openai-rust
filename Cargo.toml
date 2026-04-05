@@ -1,0 +1,27 @@
+[package]
+name = "openai-rust"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Clean-room Rust SDK scaffold for the OpenAI API"
+license = "Apache-2.0"
+publish = true
+
+[lib]
+name = "openai_rust"
+path = "src/lib.rs"
+
+[features]
+default = ["rustls-tls"]
+blocking = []
+rustls-tls = []
+native-tls = []
+webhooks = []
+realtime = []
+
+[dependencies]
+
+[dev-dependencies]
+futures-util = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "sync", "time"] }
+tokio-tungstenite = "0.28"
