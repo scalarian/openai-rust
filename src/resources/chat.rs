@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use tokio::runtime::Builder;
 use tokio::sync::watch;
@@ -298,7 +298,7 @@ pub struct ChatCompletionMessage {
     pub content: Option<String>,
     #[serde(default)]
     pub function_call: Option<LegacyFunctionCall>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub tool_calls: Vec<ChatCompletionMessageToolCall>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -414,7 +414,7 @@ pub struct StoredChatCompletionMessage {
     pub role: Option<String>,
     #[serde(default)]
     pub content: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub tool_calls: Vec<ChatCompletionMessageToolCall>,
     #[serde(default)]
     pub function_call: Option<LegacyFunctionCall>,
@@ -471,6 +471,14 @@ pub struct ChatCompletionChunkDelta {
     pub tool_calls: Vec<ChatCompletionMessageToolCall>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<Vec<T>>::deserialize(deserializer).map(Option::unwrap_or_default)
 }
 
 /// Compatibility stream that surfaces raw chunks plus a final accumulated snapshot.

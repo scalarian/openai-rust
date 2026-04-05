@@ -148,6 +148,43 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
     assert_eq!(blank_delete.kind, ErrorKind::Validation);
 }
 
+#[test]
+fn stored_chat_retrieve_accepts_nullable_tool_calls() {
+    let body = json!({
+        "id": "chatcmpl_store",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "gpt-4.1-mini",
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {
+                    "role": "assistant",
+                    "content": "stored hello",
+                    "tool_calls": null
+                }
+            }
+        ]
+    })
+    .to_string();
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(body)]).unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let retrieved = client
+        .chat()
+        .completions()
+        .retrieve("chatcmpl_store")
+        .expect("stored chat completion should deserialize when tool_calls is null");
+
+    assert!(retrieved.output().choices[0].message.tool_calls.is_empty());
+}
+
 fn json_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![
