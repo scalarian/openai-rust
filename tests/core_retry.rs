@@ -216,6 +216,32 @@ fn server_retry_directives_override_generic_backoff() {
     assert_eq!(do_retry_server.captured_requests(2).unwrap().len(), 2);
 }
 
+#[test]
+fn loopback_requests_preserve_query_strings() {
+    let server = mock_http::MockHttpServer::spawn(json_ok()).unwrap();
+    let client = OpenAI::builder()
+        .api_key("retry-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let response = client
+        .execute_json::<OkResponse>(
+            "GET",
+            "/models?limit=2&after=cursor&filter=name%3Ddemo",
+            Default::default(),
+        )
+        .unwrap();
+
+    assert!(response.output.ok);
+    let captured = server.captured_request().unwrap();
+    println!("captured loopback path: {}", captured.path);
+    assert_eq!(
+        captured.path,
+        "/v1/models?limit=2&after=cursor&filter=name%3Ddemo"
+    );
+}
+
 fn json_ok() -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![

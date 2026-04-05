@@ -151,11 +151,13 @@ where
     let mut stream = TcpStream::connect((host, port)).map_err(map_io_error)?;
     let _ = stream.set_read_timeout(Some(timeout));
     let _ = stream.set_write_timeout(Some(timeout));
+    let request_target = match url.query() {
+        Some(query) => format!("{}?{}", url.path(), query),
+        None => url.path().to_string(),
+    };
     let mut raw_request = format!(
         "{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n",
-        request.method,
-        url.path(),
-        host
+        request.method, request_target, host
     );
     for (name, value) in &request.headers {
         raw_request.push_str(name);
@@ -224,7 +226,7 @@ where
     }
 
     let request_id = headers.get("x-request-id").cloned();
-    let body = &raw_response[body_start..];
+    let body = decode_http_body(&raw_response[body_start..], &headers)?;
 
     if !(200..300).contains(&status_code) {
         let mut error = OpenAIError::new(
@@ -233,14 +235,14 @@ where
         )
         .with_response_metadata(status_code, headers.clone(), request_id);
 
-        if let Ok(payload) = parse_api_error_payload(body) {
+        if let Ok(payload) = parse_api_error_payload(&body) {
             error = error.with_api_error(payload);
         }
 
         return Err(error);
     }
 
-    let output = serde_json::from_slice::<T>(body).map_err(|error| {
+    let output = serde_json::from_slice::<T>(&body).map_err(|error| {
         OpenAIError::new(
             ErrorKind::Parse,
             format!("failed to parse OpenAI success response: {error}"),
@@ -257,6 +259,70 @@ where
             request_id,
         },
     })
+}
+
+fn decode_http_body(
+    body: &[u8],
+    headers: &BTreeMap<String, String>,
+) -> Result<Vec<u8>, OpenAIError> {
+    let is_chunked = headers
+        .get("transfer-encoding")
+        .map(|value| {
+            value
+                .split(',')
+                .any(|entry| entry.trim().eq_ignore_ascii_case("chunked"))
+        })
+        .unwrap_or(false);
+
+    if is_chunked {
+        decode_chunked_body(body)
+    } else {
+        Ok(body.to_vec())
+    }
+}
+
+fn decode_chunked_body(mut body: &[u8]) -> Result<Vec<u8>, OpenAIError> {
+    let mut decoded = Vec::new();
+
+    loop {
+        let Some(line_end) = body.windows(2).position(|window| window == b"\r\n") else {
+            return Err(OpenAIError::new(
+                ErrorKind::Transport,
+                "received malformed chunked HTTP response without chunk size terminator",
+            ));
+        };
+
+        let size_line = std::str::from_utf8(&body[..line_end]).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("received malformed chunked HTTP response size line: {error}"),
+            )
+            .with_source(error)
+        })?;
+        let size_hex = size_line.split(';').next().unwrap_or_default().trim();
+        let size = usize::from_str_radix(size_hex, 16).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("received malformed chunked HTTP response size `{size_line}`: {error}"),
+            )
+            .with_source(error)
+        })?;
+        body = &body[line_end + 2..];
+
+        if size == 0 {
+            return Ok(decoded);
+        }
+
+        if body.len() < size + 2 || &body[size..size + 2] != b"\r\n" {
+            return Err(OpenAIError::new(
+                ErrorKind::Transport,
+                "received malformed chunked HTTP response body",
+            ));
+        }
+
+        decoded.extend_from_slice(&body[..size]);
+        body = &body[size + 2..];
+    }
 }
 
 fn parse_method(method: &str) -> Result<reqwest::Method, OpenAIError> {

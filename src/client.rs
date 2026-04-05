@@ -280,12 +280,16 @@ fn join_url(base_url: &str, endpoint: &str) -> Result<String, crate::OpenAIError
             format!("invalid OpenAI base URL `{base_url}`: {error}"),
         )
     })?;
+    let (endpoint_path, endpoint_query) = endpoint
+        .split_once('?')
+        .map_or((endpoint, None), |(path, query)| (path, Some(query)));
     let mut path = url.path().trim_end_matches('/').to_string();
     if path.is_empty() {
         path.push_str("/v1");
     }
     path.push('/');
-    path.push_str(endpoint);
+    path.push_str(endpoint_path);
     url.set_path(&path);
+    url.set_query(endpoint_query.filter(|query| !query.is_empty()));
     Ok(url.to_string().trim_end_matches('/').to_string())
 }

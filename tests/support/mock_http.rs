@@ -24,6 +24,7 @@ pub struct ScriptedResponse {
     pub reason: &'static str,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+    pub chunked: bool,
     pub delay: Duration,
 }
 
@@ -34,6 +35,7 @@ impl Default for ScriptedResponse {
             reason: "OK",
             headers: vec![(String::from("content-length"), String::from("0"))],
             body: Vec::new(),
+            chunked: false,
             delay: Duration::ZERO,
         }
     }
@@ -76,9 +78,16 @@ impl MockHttpServer {
                         response_bytes
                             .extend_from_slice(format!("{}: {}\r\n", name, value).as_bytes());
                     }
+                    if response.chunked {
+                        response_bytes.extend_from_slice(b"transfer-encoding: chunked\r\n");
+                    }
                     response_bytes.extend_from_slice(b"connection: close\r\n");
                     response_bytes.extend_from_slice(b"\r\n");
-                    response_bytes.extend_from_slice(&response.body);
+                    if response.chunked {
+                        response_bytes.extend_from_slice(&encode_chunked_body(&response.body));
+                    } else {
+                        response_bytes.extend_from_slice(&response.body);
+                    }
                     let _ = stream.write_all(&response_bytes);
                     let _ = stream.flush();
                     let _ = stream.shutdown(Shutdown::Write);
@@ -116,6 +125,25 @@ impl MockHttpServer {
         }
         Some(captured)
     }
+}
+
+fn encode_chunked_body(body: &[u8]) -> Vec<u8> {
+    if body.is_empty() {
+        return b"0\r\n\r\n".to_vec();
+    }
+
+    let midpoint = (body.len() / 2).max(1).min(body.len());
+    let mut encoded = Vec::new();
+    for chunk in [&body[..midpoint], &body[midpoint..]] {
+        if chunk.is_empty() {
+            continue;
+        }
+        encoded.extend_from_slice(format!("{:X}\r\n", chunk.len()).as_bytes());
+        encoded.extend_from_slice(chunk);
+        encoded.extend_from_slice(b"\r\n");
+    }
+    encoded.extend_from_slice(b"0\r\n\r\n");
+    encoded
 }
 
 impl Drop for MockHttpServer {

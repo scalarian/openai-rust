@@ -133,6 +133,36 @@ fn malformed_success_responses_raise_parse_errors() {
 }
 
 #[test]
+fn loopback_chunked_responses_parse_cleanly() {
+    let chunked_server =
+        mock_http::MockHttpServer::spawn_sequence(vec![mock_http::ScriptedResponse {
+            headers: vec![(
+                String::from("content-type"),
+                String::from("application/json"),
+            )],
+            body: br#"{"answer":"chunked ok"}"#.to_vec(),
+            chunked: true,
+            ..Default::default()
+        }])
+        .unwrap();
+    let client = OpenAI::builder()
+        .api_key("error-key")
+        .base_url(chunked_server.url())
+        .max_retries(0)
+        .build();
+
+    let response = client
+        .execute_json::<ExpectedShape>("GET", "/models", Default::default())
+        .unwrap();
+
+    assert_eq!(response.output.answer, "chunked ok");
+    assert_eq!(
+        chunked_server.captured_requests(1).unwrap()[0].path,
+        "/v1/models"
+    );
+}
+
+#[test]
 fn validation_failures_are_distinct() {
     let client = OpenAI::builder().api_key("error-key").build();
 
