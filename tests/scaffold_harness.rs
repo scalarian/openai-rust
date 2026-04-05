@@ -82,6 +82,26 @@ fn multipart_helper_extracts_named_parts() {
     assert_eq!(multipart.parts[1].filename.as_deref(), Some("input.jsonl"));
 }
 
+#[test]
+fn multipart_binary_parts_round_trip() {
+    let mut body = Vec::new();
+    body.extend_from_slice(b"--boundary\r\n");
+    body.extend_from_slice(
+        b"Content-Disposition: form-data; name=\"file\"; filename=\"blob.bin\"\r\n",
+    );
+    body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+
+    let binary = [0_u8, 159, 255, b'\r', b'\n', b'-', b'-', b'x'];
+    body.extend_from_slice(&binary);
+    body.extend_from_slice(b"\r\n--boundary--\r\n");
+
+    let multipart = support::multipart::parse_multipart(&body, "boundary").unwrap();
+
+    assert_eq!(multipart.parts.len(), 1);
+    assert_eq!(multipart.parts[0].filename.as_deref(), Some("blob.bin"));
+    assert_eq!(multipart.parts[0].body, binary);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn websocket_harness_records_bidirectional_frames() {
     let server =
