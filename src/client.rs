@@ -1,4 +1,10 @@
-use crate::{config::ClientConfig, realtime::Realtime, resources::ResourceFamilies};
+use crate::{
+    config::{ClientConfig, ResolvedClientConfig},
+    core::request::PreparedRequest,
+    realtime::Realtime,
+    resources::ResourceFamilies,
+};
+use url::Url;
 
 /// Root async-first SDK client scaffold.
 #[derive(Clone, Debug, Default)]
@@ -22,6 +28,41 @@ impl OpenAI {
     /// Returns the current client configuration scaffold.
     pub fn config(&self) -> &ClientConfig {
         &self.config
+    }
+
+    /// Resolves the current configuration against environment defaults.
+    pub fn resolved_config(&self) -> Result<ResolvedClientConfig, crate::OpenAIError> {
+        self.config.resolve()
+    }
+
+    /// Prepares an authenticated REST request before any transport is attempted.
+    pub fn prepare_request(
+        &self,
+        method: impl AsRef<str>,
+        path: impl AsRef<str>,
+    ) -> Result<PreparedRequest, crate::OpenAIError> {
+        let resolved = self.resolved_config()?;
+        let method = method.as_ref().trim().to_ascii_uppercase();
+        if method.is_empty() {
+            return Err(crate::OpenAIError::new(
+                crate::ErrorKind::Configuration,
+                "request method cannot be blank",
+            ));
+        }
+
+        let endpoint = normalize_endpoint(path.as_ref());
+        if endpoint.is_empty() {
+            return Err(crate::OpenAIError::new(
+                crate::ErrorKind::Configuration,
+                "request path cannot be blank",
+            ));
+        }
+
+        Ok(PreparedRequest {
+            method,
+            url: join_url(&resolved.base_url, &endpoint)?,
+            headers: resolved.headers(),
+        })
     }
 
     /// Accesses the responses family handle.
@@ -138,6 +179,36 @@ impl OpenAIBuilder {
         self
     }
 
+    /// Sets an explicit API key.
+    pub fn api_key(mut self, api_key: impl Into<String>) -> Self {
+        self.config.api_key = Some(api_key.into());
+        self
+    }
+
+    /// Sets an explicit base URL.
+    pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.config.base_url = Some(base_url.into());
+        self
+    }
+
+    /// Sets an explicit organization identifier.
+    pub fn organization(mut self, organization: impl Into<String>) -> Self {
+        self.config.organization = Some(organization.into());
+        self
+    }
+
+    /// Sets an explicit project identifier.
+    pub fn project(mut self, project: impl Into<String>) -> Self {
+        self.config.project = Some(project.into());
+        self
+    }
+
+    /// Sets a custom user-agent token or prefix.
+    pub fn user_agent(mut self, user_agent: impl Into<String>) -> Self {
+        self.config.user_agent = Some(user_agent.into());
+        self
+    }
+
     /// Builds the scaffold client.
     pub fn build(self) -> OpenAI {
         OpenAI {
@@ -146,4 +217,28 @@ impl OpenAIBuilder {
             realtime: Realtime,
         }
     }
+}
+
+fn normalize_endpoint(path: &str) -> String {
+    path.trim()
+        .trim_start_matches('/')
+        .trim_start_matches("v1/")
+        .to_string()
+}
+
+fn join_url(base_url: &str, endpoint: &str) -> Result<String, crate::OpenAIError> {
+    let mut url = Url::parse(base_url).map_err(|error| {
+        crate::OpenAIError::new(
+            crate::ErrorKind::Configuration,
+            format!("invalid OpenAI base URL `{base_url}`: {error}"),
+        )
+    })?;
+    let mut path = url.path().trim_end_matches('/').to_string();
+    if path.is_empty() {
+        path.push_str("/v1");
+    }
+    path.push('/');
+    path.push_str(endpoint);
+    url.set_path(&path);
+    Ok(url.to_string().trim_end_matches('/').to_string())
 }

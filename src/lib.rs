@@ -22,3 +22,5 @@ pub mod resources;
 pub use client::{OpenAI, OpenAIBuilder};
 pub use config::ClientConfig;
 pub use error::{ErrorKind, OpenAIError};
+
+pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";

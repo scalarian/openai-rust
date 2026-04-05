@@ -20,6 +20,7 @@ webhooks = []
 realtime = []
 
 [dependencies]
+url = "2"
 
 [dev-dependencies]
 futures-util = "0.3"
