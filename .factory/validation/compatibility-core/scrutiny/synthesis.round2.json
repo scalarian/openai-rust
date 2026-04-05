@@ -1,6 +1,6 @@
 {
   "milestone": "compatibility-core",
-  "round": 3,
+  "round": 2,
   "status": "pass",
   "validatorsRun": {
     "test": {
@@ -20,8 +20,8 @@
     }
   },
   "reviewsSummary": {
-    "total": 1,
-    "passed": 1,
+    "total": 3,
+    "passed": 3,
     "failed": 0,
     "failedFeatures": []
   },
@@ -29,11 +29,11 @@
   "appliedUpdates": [
     {
       "target": "library",
-      "description": "Added the stored-chat retrieval compatibility invariant to `.factory/library/api-surface.md`, documenting that live stored chat completions may return `choices[].message.tool_calls: null` and therefore require null-tolerant parsing.",
-      "sourceFeature": "compatibility-core-fix-stored-chat-retrieve-nullable-tool-calls"
+      "description": "Added the chat-completions terminal-chunk invariant to `.factory/library/api-surface.md`, documenting that `[DONE]` alone is not sufficient without a real terminal `finish_reason` chunk.",
+      "sourceFeature": "compatibility-core-fix-chat-completions-streaming"
     }
   ],
   "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": ".factory/validation/compatibility-core/scrutiny/synthesis.round2.json"
+  "previousRound": ".factory/validation/compatibility-core/scrutiny/synthesis.round1.json"
 }
