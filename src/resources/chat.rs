@@ -1,11 +1,14 @@
 use std::{
     collections::{BTreeMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, Condvar, Mutex, mpsc},
+    thread,
+    time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::runtime::Builder;
+use tokio::sync::watch;
 
 use crate::{
     OpenAIError,
@@ -77,33 +80,7 @@ impl ChatCompletions {
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
 
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| {
-                OpenAIError::new(
-                    ErrorKind::Transport,
-                    format!("failed to build chat streaming runtime: {error}"),
-                )
-                .with_source(error)
-            })?;
-
-        let (metadata, chunks) = runtime.block_on(async move {
-            let response = execute_text_stream(&request, &options).await?;
-            let metadata = response.metadata.clone();
-            let mut response_body = response.response;
-            let mut chunks = Vec::new();
-            while let Some(chunk) = response_body
-                .chunk()
-                .await
-                .map_err(map_live_transport_error)?
-            {
-                chunks.push(String::from_utf8_lossy(chunk.as_ref()).to_string());
-            }
-            Ok::<_, OpenAIError>((metadata, chunks))
-        })?;
-
-        ChatCompletionStream::from_sse_chunks(metadata, chunks)
+        ChatCompletionStream::start_live(request, options)
     }
 
     /// Retrieves a stored chat completion by id.
@@ -497,11 +474,13 @@ pub struct ChatCompletionChunkDelta {
 }
 
 /// Compatibility stream that surfaces raw chunks plus a final accumulated snapshot.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ChatCompletionStream {
     metadata: ResponseMetadata,
     chunks: VecDeque<ChatCompletionChunk>,
-    final_completion: ChatCompletion,
+    final_completion: Option<ChatCompletion>,
+    live: Option<LiveChatCompletionStreamHandle>,
+    aborted: bool,
 }
 
 impl ChatCompletionStream {
@@ -531,27 +510,66 @@ impl ChatCompletionStream {
         Ok(Self {
             metadata,
             chunks: surfaced,
-            final_completion,
+            final_completion: Some(final_completion),
+            live: None,
+            aborted: false,
         })
     }
 
     pub fn next_chunk(&mut self) -> Option<ChatCompletionChunk> {
-        self.chunks.pop_front()
+        if self.aborted {
+            return None;
+        }
+        if self.chunks.is_empty() {
+            self.fill_from_live();
+        }
+        let chunk = self.chunks.pop_front()?;
+        self.drain_live_messages();
+        if self.final_completion.is_none() {
+            self.poll_live_messages(Duration::from_millis(5));
+        }
+        Some(chunk)
     }
 
     pub async fn next_chunk_async(&mut self) -> Option<ChatCompletionChunk> {
         self.next_chunk()
     }
 
-    pub fn final_completion(&self) -> &ChatCompletion {
-        &self.final_completion
+    pub fn final_completion(&mut self) -> Result<&ChatCompletion, OpenAIError> {
+        if self.aborted {
+            return Err(OpenAIError::new(
+                ErrorKind::Transport,
+                "chat completion stream was aborted before completion",
+            ));
+        }
+
+        if let Some(live) = &self.live {
+            live.shared.wait_until_finished();
+            if let Some(error) = live.shared.error() {
+                return Err(error);
+            }
+        }
+        self.drain_live_messages();
+        if self.final_completion.is_none() {
+            if let Some(live) = &self.live {
+                self.final_completion = live.shared.final_completion_cloned();
+            }
+        }
+
+        self.final_completion.as_ref().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Parse,
+                "chat completion stream ended without a terminal chunk",
+            )
+        })
     }
 
     pub fn final_message(
-        &self,
+        &mut self,
         choice_index: usize,
     ) -> Result<&ChatCompletionMessage, OpenAIError> {
-        self.final_completion
+        let final_completion = self.final_completion()?;
+        final_completion
             .choices
             .get(choice_index)
             .map(|choice| &choice.message)
@@ -566,8 +584,238 @@ impl ChatCompletionStream {
     pub fn metadata(&self) -> &ResponseMetadata {
         &self.metadata
     }
+
+    pub fn abort(&mut self) {
+        self.aborted = true;
+        self.chunks.clear();
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            let _ = live.receiver.try_recv();
+            live.join_worker();
+        }
+    }
+
+    fn start_live(
+        request: crate::core::request::PreparedRequest,
+        options: crate::core::request::ResolvedRequestOptions,
+    ) -> Result<Self, OpenAIError> {
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let (chunk_tx, chunk_rx) = mpsc::channel();
+        let (abort_tx, abort_rx) = watch::channel(false);
+        let shared = Arc::new(LiveChatCompletionShared::default());
+        let thread_shared = shared.clone();
+
+        let worker = thread::spawn(move || {
+            let runtime = match Builder::new_current_thread().enable_all().build() {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let error = OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to build chat streaming runtime: {error}"),
+                    )
+                    .with_source(error);
+                    let _ = startup_tx.send(Err(error.clone()));
+                    thread_shared.finish_with_error(error);
+                    return;
+                }
+            };
+
+            runtime.block_on(async move {
+                match execute_text_stream(&request, &options).await {
+                    Ok(response) => {
+                        let metadata = response.metadata.clone();
+                        let _ = startup_tx.send(Ok(metadata));
+                        if let Err(error) = consume_live_stream(
+                            response,
+                            abort_rx,
+                            chunk_tx.clone(),
+                            thread_shared.clone(),
+                        )
+                        .await
+                        {
+                            thread_shared.finish_with_error(error.clone());
+                            let _ = chunk_tx.send(LiveChatCompletionMessage::Error(error));
+                        }
+                    }
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error.clone()));
+                        thread_shared.finish_with_error(error);
+                    }
+                }
+            });
+        });
+
+        let metadata = startup_rx.recv().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("chat stream worker exited before startup completed: {error}"),
+            )
+        })??;
+
+        Ok(Self {
+            metadata,
+            chunks: VecDeque::new(),
+            final_completion: None,
+            live: Some(LiveChatCompletionStreamHandle {
+                receiver: chunk_rx,
+                abort: abort_tx,
+                worker: Some(worker),
+                shared,
+            }),
+            aborted: false,
+        })
+    }
+
+    fn fill_from_live(&mut self) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+
+        let Some(message) = live.receiver.recv().ok() else {
+            if self.final_completion.is_none() {
+                self.final_completion = live.shared.final_completion_cloned();
+            }
+            live.join_worker();
+            self.live = None;
+            return;
+        };
+        self.process_live_message(message);
+
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn drain_live_messages(&mut self) {
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn poll_live_messages(&mut self, timeout: Duration) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+        if let Ok(message) = live.receiver.recv_timeout(timeout) {
+            self.process_live_message(message);
+            self.drain_live_messages();
+        }
+    }
+
+    fn process_live_message(&mut self, message: LiveChatCompletionMessage) {
+        match message {
+            LiveChatCompletionMessage::Chunk(chunk) => {
+                self.chunks.push_back(chunk);
+            }
+            LiveChatCompletionMessage::Finished => {
+                if let Some(live) = self.live.as_mut() {
+                    if self.final_completion.is_none() {
+                        self.final_completion = live.shared.final_completion_cloned();
+                    }
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+            LiveChatCompletionMessage::Error(error) => {
+                if let Some(live) = self.live.as_mut() {
+                    live.shared.finish_with_error(error);
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+        }
+    }
 }
 
+impl Drop for ChatCompletionStream {
+    fn drop(&mut self) {
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            live.join_worker();
+        }
+    }
+}
+
+#[derive(Debug)]
+enum LiveChatCompletionMessage {
+    Chunk(ChatCompletionChunk),
+    Finished,
+    Error(OpenAIError),
+}
+
+#[derive(Debug)]
+struct LiveChatCompletionStreamHandle {
+    receiver: mpsc::Receiver<LiveChatCompletionMessage>,
+    abort: watch::Sender<bool>,
+    worker: Option<thread::JoinHandle<()>>,
+    shared: Arc<LiveChatCompletionShared>,
+}
+
+impl LiveChatCompletionStreamHandle {
+    fn join_worker(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct LiveChatCompletionShared {
+    state: Mutex<LiveChatCompletionSharedState>,
+    done: Condvar,
+}
+
+impl LiveChatCompletionShared {
+    fn finish_with_completion(&self, completion: ChatCompletion) {
+        let mut state = self.state.lock().expect("chat completion shared state");
+        state.final_completion = Some(completion);
+        state.finished = true;
+        self.done.notify_all();
+    }
+
+    fn finish_with_error(&self, error: OpenAIError) {
+        let mut state = self.state.lock().expect("chat completion shared state");
+        state.error = Some(error);
+        state.finished = true;
+        self.done.notify_all();
+    }
+
+    fn wait_until_finished(&self) {
+        let mut state = self.state.lock().expect("chat completion shared state");
+        while !state.finished {
+            state = self.done.wait(state).expect("chat completion shared state");
+        }
+    }
+
+    fn error(&self) -> Option<OpenAIError> {
+        self.state
+            .lock()
+            .expect("chat completion shared state")
+            .error
+            .clone()
+    }
+
+    fn final_completion_cloned(&self) -> Option<ChatCompletion> {
+        self.state
+            .lock()
+            .expect("chat completion shared state")
+            .final_completion
+            .clone()
+    }
+}
+
+#[derive(Debug, Default)]
+struct LiveChatCompletionSharedState {
+    final_completion: Option<ChatCompletion>,
+    error: Option<OpenAIError>,
+    finished: bool,
+}
 #[derive(Clone, Debug, Default)]
 struct ChatCompletionAccumulator {
     id: Option<String>,
@@ -690,10 +938,10 @@ impl ChatCompletionAccumulator {
     }
 
     fn finish(self) -> Result<ChatCompletion, OpenAIError> {
-        if !self.seen_done && !self.seen_terminal_chunk {
+        if !self.seen_terminal_chunk {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
-                "chat completion stream ended without a [DONE] marker or terminal chunk",
+                "chat completion stream ended without a terminal chunk carrying finish_reason",
             ));
         }
 
@@ -757,4 +1005,55 @@ fn map_live_transport_error(error: reqwest::Error) -> OpenAIError {
         ErrorKind::Transport
     };
     OpenAIError::new(kind, error.to_string()).with_source(error)
+}
+
+async fn consume_live_stream(
+    response: crate::core::transport::StreamingTextResponse,
+    mut abort_rx: watch::Receiver<bool>,
+    chunk_tx: mpsc::Sender<LiveChatCompletionMessage>,
+    shared: Arc<LiveChatCompletionShared>,
+) -> Result<(), OpenAIError> {
+    let mut response = response.response;
+    let mut parser = SseParser::default();
+    let mut accumulator = ChatCompletionAccumulator::default();
+
+    loop {
+        tokio::select! {
+            changed = abort_rx.changed() => {
+                if changed.is_ok() && *abort_rx.borrow() {
+                    let _ = chunk_tx.send(LiveChatCompletionMessage::Finished);
+                    return Ok(());
+                }
+            }
+            chunk = response.chunk() => {
+                let chunk = chunk.map_err(map_live_transport_error)?;
+                let Some(chunk) = chunk else {
+                    break;
+                };
+                for frame in parser.push(chunk.as_ref())? {
+                    if let Some(parsed) = accumulator.ingest_frame(frame)? {
+                        if chunk_tx.send(LiveChatCompletionMessage::Chunk(parsed)).is_err() {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for frame in parser.finish()? {
+        if let Some(parsed) = accumulator.ingest_frame(frame)? {
+            if chunk_tx
+                .send(LiveChatCompletionMessage::Chunk(parsed))
+                .is_err()
+            {
+                return Ok(());
+            }
+        }
+    }
+
+    let final_completion = accumulator.finish()?;
+    shared.finish_with_completion(final_completion);
+    let _ = chunk_tx.send(LiveChatCompletionMessage::Finished);
+    Ok(())
 }
