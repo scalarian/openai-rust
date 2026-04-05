@@ -17,6 +17,7 @@ pub mod fine_tuning;
 pub mod images;
 pub mod models;
 pub mod moderations;
+pub mod multimodal;
 pub mod responses;
 pub mod skills;
 pub mod uploads;

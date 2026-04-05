@@ -208,6 +208,14 @@ pub struct ResponseCreateParams {
 }
 
 impl ResponseCreateParams {
+    pub fn with_serialized_input<T>(mut self, input: T) -> Result<Self, OpenAIError>
+    where
+        T: Serialize,
+    {
+        self.input = Some(serialize_json_value("responses.input", input)?);
+        Ok(self)
+    }
+
     fn into_request_body(self) -> Value {
         let mut value =
             serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
@@ -357,6 +365,16 @@ pub struct ResponseInputTokensCountParams {
     pub truncation: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseInputTokensCountParams {
+    pub fn with_serialized_input<T>(mut self, input: T) -> Result<Self, OpenAIError>
+    where
+        T: Serialize,
+    {
+        self.input = Some(serialize_json_value("responses.input_tokens.input", input)?);
+        Ok(self)
+    }
 }
 
 /// Input-item list query parameters.
@@ -2223,6 +2241,19 @@ fn stream_parse_error(error_event: &str, error: serde_json::Error) -> OpenAIErro
         format!("failed to parse streamed `{error_event}` payload: {error}"),
     )
     .with_source(error)
+}
+
+fn serialize_json_value<T>(label: &str, value: T) -> Result<Value, OpenAIError>
+where
+    T: Serialize,
+{
+    serde_json::to_value(value).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Validation,
+            format!("failed to serialize {label}: {error}"),
+        )
+        .with_source(error)
+    })
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {

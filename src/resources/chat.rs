@@ -186,6 +186,21 @@ pub struct ChatCompletionCreateParams {
 }
 
 impl ChatCompletionCreateParams {
+    pub fn with_serialized_messages<T>(mut self, messages: T) -> Result<Self, OpenAIError>
+    where
+        T: Serialize,
+    {
+        let value = serialize_json_value("chat.completions.messages", messages)?;
+        let Value::Array(messages) = value else {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                "chat.completions.messages must serialize to a JSON array",
+            ));
+        };
+        self.messages = messages;
+        Ok(self)
+    }
+
     fn into_request_body(self, stream: bool) -> Value {
         let mut value =
             serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
@@ -980,6 +995,19 @@ impl ChatCompletionAccumulator {
 struct AccumulatedChoice {
     message: ChatCompletionMessage,
     finish_reason: Option<String>,
+}
+
+fn serialize_json_value<T>(label: &str, value: T) -> Result<Value, OpenAIError>
+where
+    T: Serialize,
+{
+    serde_json::to_value(value).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Validation,
+            format!("failed to serialize {label}: {error}"),
+        )
+        .with_source(error)
+    })
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {

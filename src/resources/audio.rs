@@ -17,8 +17,9 @@ use crate::{
     },
     error::ErrorKind,
     helpers::{
+        media::{DecodedMedia, MediaDecodeMode, decode_media_response, parse_sse_frames},
         multipart::{MultipartBuilder, MultipartFile, MultipartPayload},
-        sse::{SseFrame, SseParser},
+        sse::SseFrame,
     },
 };
 
@@ -486,6 +487,11 @@ impl Speech {
 
     /// Creates a speech generation request and returns the raw binary/event bytes.
     pub fn create(&self, params: SpeechParams) -> Result<crate::ApiResponse<Vec<u8>>, OpenAIError> {
+        let decode_mode = if matches!(params.stream_format, Some(SpeechStreamFormat::Sse)) {
+            MediaDecodeMode::Sse
+        } else {
+            MediaDecodeMode::Binary
+        };
         let mut request = self
             .runtime
             .prepare_json_request("POST", "/audio/speech", &params)?;
@@ -496,7 +502,21 @@ impl Speech {
         let options = self
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
-        execute_bytes(&request, &options)
+        let response = execute_bytes(&request, &options)?;
+        let decoded =
+            decode_media_response::<serde_json::Value>(response, decode_mode, "speech audio")?;
+        let (metadata, body) = decoded.into_parts();
+        let output = match body {
+            DecodedMedia::Binary(bytes) => bytes,
+            DecodedMedia::Sse { text, .. } => text.into_bytes(),
+            DecodedMedia::Json(_) | DecodedMedia::Text(_) => {
+                return Err(OpenAIError::new(
+                    ErrorKind::Parse,
+                    "audio.speech expected a binary or SSE response body",
+                ));
+            }
+        };
+        Ok(crate::ApiResponse { output, metadata })
     }
 }
 
@@ -746,15 +766,9 @@ impl TranscriptionStream {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        let mut parser = SseParser::default();
         let mut accumulator = TranscriptionAccumulator::default();
 
-        for chunk in chunks {
-            for frame in parser.push(chunk.as_ref().as_bytes())? {
-                accumulator.ingest_frame(frame)?;
-            }
-        }
-        for frame in parser.finish()? {
+        for frame in parse_sse_frames(chunks)? {
             accumulator.ingest_frame(frame)?;
         }
 
@@ -863,27 +877,42 @@ fn parse_transcription_response(
     response: crate::ApiResponse<Vec<u8>>,
     format: AudioResponseFormat,
 ) -> Result<crate::ApiResponse<TranscriptionResponse>, OpenAIError> {
-    let (metadata, body) = response.into_parts();
-    let output = match format {
-        AudioResponseFormat::Json => {
-            TranscriptionResponse::Json(parse_json_body::<Transcription>(&body, &metadata)?)
+    let decode_mode = match format {
+        AudioResponseFormat::Json
+        | AudioResponseFormat::VerboseJson
+        | AudioResponseFormat::DiarizedJson => MediaDecodeMode::Json,
+        AudioResponseFormat::Text | AudioResponseFormat::Srt | AudioResponseFormat::Vtt => {
+            MediaDecodeMode::Text
         }
-        AudioResponseFormat::VerboseJson => {
-            TranscriptionResponse::VerboseJson(parse_json_body::<VerboseTranscription>(
-                &body, &metadata,
-            )?)
-        }
-        AudioResponseFormat::DiarizedJson => TranscriptionResponse::DiarizedJson(
-            parse_json_body::<DiarizedTranscription>(&body, &metadata)?,
+    };
+    let decoded =
+        decode_media_response::<serde_json::Value>(response, decode_mode, "transcription")?;
+    let (metadata, body) = decoded.into_parts();
+    let output = match (format, body) {
+        (AudioResponseFormat::Json, DecodedMedia::Json(value)) => TranscriptionResponse::Json(
+            serde_json::from_value(value)
+                .map_err(|error| stream_parse_error("transcription_json", error))?,
         ),
-        AudioResponseFormat::Text => {
-            TranscriptionResponse::Text(parse_text_body(&body, &metadata, "transcription text")?)
+        (AudioResponseFormat::VerboseJson, DecodedMedia::Json(value)) => {
+            TranscriptionResponse::VerboseJson(
+                serde_json::from_value(value)
+                    .map_err(|error| stream_parse_error("transcription_verbose_json", error))?,
+            )
         }
-        AudioResponseFormat::Srt => {
-            TranscriptionResponse::Srt(parse_text_body(&body, &metadata, "transcription srt")?)
+        (AudioResponseFormat::DiarizedJson, DecodedMedia::Json(value)) => {
+            TranscriptionResponse::DiarizedJson(
+                serde_json::from_value(value)
+                    .map_err(|error| stream_parse_error("transcription_diarized_json", error))?,
+            )
         }
-        AudioResponseFormat::Vtt => {
-            TranscriptionResponse::Vtt(parse_text_body(&body, &metadata, "transcription vtt")?)
+        (AudioResponseFormat::Text, DecodedMedia::Text(text)) => TranscriptionResponse::Text(text),
+        (AudioResponseFormat::Srt, DecodedMedia::Text(text)) => TranscriptionResponse::Srt(text),
+        (AudioResponseFormat::Vtt, DecodedMedia::Text(text)) => TranscriptionResponse::Vtt(text),
+        _ => {
+            return Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "audio transcription decode mode did not match the requested response format",
+            ));
         }
     };
     Ok(crate::ApiResponse { output, metadata })
@@ -893,69 +922,44 @@ fn parse_translation_response(
     response: crate::ApiResponse<Vec<u8>>,
     format: AudioResponseFormat,
 ) -> Result<crate::ApiResponse<TranslationResponse>, OpenAIError> {
-    let (metadata, body) = response.into_parts();
-    let output =
-        match format {
-            AudioResponseFormat::Json => {
-                TranslationResponse::Json(parse_json_body::<Translation>(&body, &metadata)?)
-            }
-            AudioResponseFormat::VerboseJson => TranslationResponse::VerboseJson(
-                parse_json_body::<TranslationVerbose>(&body, &metadata)?,
-            ),
-            AudioResponseFormat::Text => {
-                TranslationResponse::Text(parse_text_body(&body, &metadata, "translation text")?)
-            }
-            AudioResponseFormat::Srt => {
-                TranslationResponse::Srt(parse_text_body(&body, &metadata, "translation srt")?)
-            }
-            AudioResponseFormat::Vtt => {
-                TranslationResponse::Vtt(parse_text_body(&body, &metadata, "translation vtt")?)
-            }
-            AudioResponseFormat::DiarizedJson => {
-                return Err(OpenAIError::new(
-                    ErrorKind::Validation,
-                    "audio.translations does not support `diarized_json` response format",
-                ));
-            }
-        };
+    if format == AudioResponseFormat::DiarizedJson {
+        return Err(OpenAIError::new(
+            ErrorKind::Validation,
+            "audio.translations does not support `diarized_json` response format",
+        ));
+    }
+
+    let decode_mode = match format {
+        AudioResponseFormat::Json | AudioResponseFormat::VerboseJson => MediaDecodeMode::Json,
+        AudioResponseFormat::Text | AudioResponseFormat::Srt | AudioResponseFormat::Vtt => {
+            MediaDecodeMode::Text
+        }
+        AudioResponseFormat::DiarizedJson => unreachable!(),
+    };
+    let decoded = decode_media_response::<serde_json::Value>(response, decode_mode, "translation")?;
+    let (metadata, body) = decoded.into_parts();
+    let output = match (format, body) {
+        (AudioResponseFormat::Json, DecodedMedia::Json(value)) => TranslationResponse::Json(
+            serde_json::from_value(value)
+                .map_err(|error| stream_parse_error("translation_json", error))?,
+        ),
+        (AudioResponseFormat::VerboseJson, DecodedMedia::Json(value)) => {
+            TranslationResponse::VerboseJson(
+                serde_json::from_value(value)
+                    .map_err(|error| stream_parse_error("translation_verbose_json", error))?,
+            )
+        }
+        (AudioResponseFormat::Text, DecodedMedia::Text(text)) => TranslationResponse::Text(text),
+        (AudioResponseFormat::Srt, DecodedMedia::Text(text)) => TranslationResponse::Srt(text),
+        (AudioResponseFormat::Vtt, DecodedMedia::Text(text)) => TranslationResponse::Vtt(text),
+        _ => {
+            return Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "audio translation decode mode did not match the requested response format",
+            ));
+        }
+    };
     Ok(crate::ApiResponse { output, metadata })
-}
-
-fn parse_json_body<T>(body: &[u8], metadata: &ResponseMetadata) -> Result<T, OpenAIError>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    serde_json::from_slice(body).map_err(|error| {
-        OpenAIError::new(
-            ErrorKind::Parse,
-            format!("failed to parse OpenAI success response: {error}"),
-        )
-        .with_response_metadata(
-            metadata.status_code,
-            metadata.headers.clone(),
-            metadata.request_id.clone(),
-        )
-        .with_source(error)
-    })
-}
-
-fn parse_text_body(
-    body: &[u8],
-    metadata: &ResponseMetadata,
-    label: &str,
-) -> Result<String, OpenAIError> {
-    String::from_utf8(body.to_vec()).map_err(|error| {
-        OpenAIError::new(
-            ErrorKind::Parse,
-            format!("failed to decode {label} response as UTF-8: {error}"),
-        )
-        .with_response_metadata(
-            metadata.status_code,
-            metadata.headers.clone(),
-            metadata.request_id.clone(),
-        )
-        .with_source(error)
-    })
 }
 
 fn add_optional_text(builder: &mut MultipartBuilder, name: &str, value: Option<String>) {

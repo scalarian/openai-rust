@@ -13,12 +13,13 @@ use crate::{
         metadata::ResponseMetadata,
         request::RequestOptions,
         runtime::ClientRuntime,
-        transport::{execute_json, execute_text_stream},
+        transport::{execute_bytes, execute_text_stream},
     },
     error::ErrorKind,
     helpers::{
+        media::{DecodedMedia, MediaDecodeMode, decode_media_response, parse_sse_frames},
         multipart::{MultipartBuilder, MultipartFile},
-        sse::{SseFrame, SseParser},
+        sse::SseFrame,
     },
 };
 
@@ -40,12 +41,14 @@ impl Images {
     ) -> Result<crate::ApiResponse<ImagesResponse>, OpenAIError> {
         params.validate_for_generate()?;
         let body = params.into_request_body(false);
-        self.runtime.execute_json_with_body(
-            "POST",
-            "/images/generations",
-            &body,
-            RequestOptions::default(),
-        )
+        let request = self
+            .runtime
+            .prepare_json_request("POST", "/images/generations", &body)?;
+        let options = self
+            .runtime
+            .resolve_request_options(&RequestOptions::default())?;
+        let response = execute_bytes(&request, &options)?;
+        decode_images_json_response(response)
     }
 
     /// Streams image generation events until a terminal completed event is observed.
@@ -174,7 +177,8 @@ impl Images {
         let options = self
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
-        execute_json(&request, &options)
+        let response = execute_bytes(&request, &options)?;
+        decode_images_json_response(response)
     }
 }
 
@@ -530,15 +534,9 @@ impl ImageGenerationStream {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        let mut parser = SseParser::default();
         let mut accumulator = ImageGenerationAccumulator::default();
 
-        for chunk in chunks {
-            for frame in parser.push(chunk.as_ref().as_bytes())? {
-                accumulator.ingest_frame(frame)?;
-            }
-        }
-        for frame in parser.finish()? {
+        for frame in parse_sse_frames(chunks)? {
             accumulator.ingest_frame(frame)?;
         }
 
@@ -582,15 +580,9 @@ impl ImageEditStream {
         I: IntoIterator<Item = B>,
         B: AsRef<str>,
     {
-        let mut parser = SseParser::default();
         let mut accumulator = ImageEditAccumulator::default();
 
-        for chunk in chunks {
-            for frame in parser.push(chunk.as_ref().as_bytes())? {
-                accumulator.ingest_frame(frame)?;
-            }
-        }
-        for frame in parser.finish()? {
+        for frame in parse_sse_frames(chunks)? {
             accumulator.ingest_frame(frame)?;
         }
 
@@ -779,6 +771,28 @@ fn stream_parse_error(error_event: &str, error: serde_json::Error) -> OpenAIErro
         format!("failed to parse streamed `{error_event}` payload: {error}"),
     )
     .with_source(error)
+}
+
+fn decode_images_json_response(
+    response: crate::ApiResponse<Vec<u8>>,
+) -> Result<crate::ApiResponse<ImagesResponse>, OpenAIError> {
+    let decoded =
+        decode_media_response::<serde_json::Value>(response, MediaDecodeMode::Json, "images JSON")?;
+    let (metadata, body) = decoded.into_parts();
+    let DecodedMedia::Json(value) = body else {
+        return Err(OpenAIError::new(
+            ErrorKind::Parse,
+            "images endpoint expected a JSON response body",
+        ));
+    };
+    let output = serde_json::from_value(value).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse OpenAI success response: {error}"),
+        )
+        .with_source(error)
+    })?;
+    Ok(crate::ApiResponse { output, metadata })
 }
 
 fn map_live_transport_error(error: reqwest::Error) -> OpenAIError {
