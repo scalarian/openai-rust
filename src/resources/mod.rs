@@ -51,8 +51,8 @@ pub struct ResourceFamilies {
 impl ResourceFamilies {
     pub(crate) fn new(runtime: Arc<ClientRuntime>) -> Self {
         Self {
-            responses: responses::Responses::new(runtime),
-            conversations: conversations::Conversations,
+            responses: responses::Responses::new(runtime.clone()),
+            conversations: conversations::Conversations::new(runtime.clone()),
             chat: chat::Chat,
             completions: completions::Completions,
             embeddings: embeddings::Embeddings,
