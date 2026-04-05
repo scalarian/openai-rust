@@ -101,6 +101,37 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
 }
 
 #[test]
+fn multi_block_structured_output_parses_from_canonical_parts() {
+    let server =
+        mock_http::MockHttpServer::spawn(json_response(multi_block_parsed_response_payload()))
+            .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let response = client
+        .responses()
+        .parse::<Scorecard>(parse_params())
+        .expect("canonical structured block should parse");
+
+    assert_eq!(
+        response.output().output_parsed(),
+        Some(&Scorecard {
+            winner: "Dodgers".into(),
+            score: 4
+        })
+    );
+    assert_eq!(
+        response.output().output_text(),
+        r#"{"winner":"Dodgers","score":4}
+Thanks for using structured outputs."#
+    );
+}
+
+#[test]
 fn parse_surfaces_explicit_refusal_and_parse_failures() {
     let refusal_server =
         mock_http::MockHttpServer::spawn(json_response(refusal_response_payload())).unwrap();
@@ -203,6 +234,35 @@ fn parsed_response_payload(output_text: &str) -> String {
             }
         ],
         "usage": {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10}
+    })
+    .to_string()
+}
+
+fn multi_block_parsed_response_payload() -> String {
+    json!({
+        "id": "resp_parse_multiblock",
+        "object": "response",
+        "created_at": 1,
+        "status": "completed",
+        "output": [
+            {
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": r#"{"winner":"Dodgers","score":4}"#}
+                ]
+            },
+            {
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {"type": "output_text", "text": "\nThanks for using structured outputs."}
+                ]
+            }
+        ],
+        "usage": {"input_tokens": 4, "output_tokens": 8, "total_tokens": 12}
     })
     .to_string()
 }

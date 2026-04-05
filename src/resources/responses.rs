@@ -1743,18 +1743,7 @@ where
 
     let output_parsed = match text_format {
         Some(ResponseFormatTextConfig::JsonSchema(_)) => {
-            let output_text = response.output_text().trim();
-            if output_text.is_empty() {
-                None
-            } else {
-                Some(serde_json::from_str(output_text).map_err(|error| {
-                    OpenAIError::new(
-                        ErrorKind::Parse,
-                        format!("failed to parse structured output: {error}"),
-                    )
-                    .with_source(error)
-                })?)
-            }
+            parse_structured_output_from_content_parts(&response.output)?
         }
         _ => None,
     };
@@ -1794,6 +1783,53 @@ fn aggregate_output_text(output: &[ResponseOutputItem]) -> String {
         }
     }
     text
+}
+
+fn parse_structured_output_from_content_parts<T>(
+    output: &[ResponseOutputItem],
+) -> Result<Option<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
+    let mut first_parse_error = None;
+
+    for item in output {
+        if item.item_type != "message" {
+            continue;
+        }
+
+        for content in &item.content {
+            if content.content_type != "output_text" {
+                continue;
+            }
+
+            let Some(text) = content.text.as_deref().map(str::trim) else {
+                continue;
+            };
+            if text.is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str(text) {
+                Ok(parsed) => return Ok(Some(parsed)),
+                Err(error) => {
+                    if first_parse_error.is_none() {
+                        first_parse_error = Some(error);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(error) = first_parse_error {
+        Err(OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse structured output: {error}"),
+        )
+        .with_source(error))
+    } else {
+        Ok(None)
+    }
 }
 
 fn get_content_mut<'a>(
