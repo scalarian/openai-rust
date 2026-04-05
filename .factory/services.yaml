@@ -1,0 +1,12 @@
+commands:
+  install: cargo fetch
+  fmt: cargo fmt --all --check
+  typecheck: cargo check --all-targets --all-features
+  build: cargo build --all-features
+  test: cargo test --all-features -- --test-threads=5
+  lint: cargo clippy --all-targets --all-features -- -D warnings
+  doc: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features
+  package: cargo package --allow-dirty
+  live_test: set -a && . ./creds.txt && set +a && cargo test --ignored -- --test-threads=1
+
+services: {}
