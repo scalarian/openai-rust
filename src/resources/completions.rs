@@ -266,6 +266,7 @@ struct CompletionAccumulator {
     usage: Option<Value>,
     seen_done: bool,
     seen_terminal_chunk: bool,
+    parsed_completion: bool,
 }
 
 impl CompletionAccumulator {
@@ -287,6 +288,7 @@ impl CompletionAccumulator {
     }
 
     fn apply_completion(&mut self, completion: &Completion) -> Result<(), OpenAIError> {
+        self.parsed_completion = true;
         if self.id.is_none() {
             self.id = Some(completion.id.clone());
         }
@@ -337,6 +339,12 @@ impl CompletionAccumulator {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
                 "legacy completions stream ended without a [DONE] marker or terminal completion",
+            ));
+        }
+        if !self.parsed_completion {
+            return Err(OpenAIError::new(
+                ErrorKind::Parse,
+                "legacy completions stream ended without any parsed completion payload",
             ));
         }
 

@@ -63,6 +63,26 @@ fn stream_requires_done_or_terminal_completion() {
 }
 
 #[test]
+fn done_only_transcript_is_rejected() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+
+    let error = CompletionStream::from_sse_chunks(metadata, ["data: [DONE]\n\n"])
+        .expect_err("[DONE]-only transcript should fail");
+
+    assert_eq!(error.kind, ErrorKind::Parse);
+    assert!(
+        error
+            .message
+            .contains("without any parsed completion payload"),
+        "unexpected error: {}",
+        error.message
+    );
+}
+
+#[test]
 fn stream_posts_to_legacy_completions_endpoint() {
     let body = concat!(
         "data: {\"id\":\"cmpl_stream\",\"object\":\"text_completion\",\"created\":1,\"model\":\"gpt-3.5-turbo-instruct\",\"choices\":[{\"text\":\"Hel\",\"index\":0,\"logprobs\":null,\"finish_reason\":null}]}\n\n",
