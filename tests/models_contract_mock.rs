@@ -8,6 +8,7 @@ mod mock_http;
 fn retrieve_and_list_preserve_model_ids_without_inventing_pagination() {
     let server = mock_http::MockHttpServer::spawn_sequence(vec![
         json_response(model_payload("gpt-4.1-mini")),
+        json_response(model_payload("gpt-4.1-mini")),
         json_response(list_payload()),
     ])
     .unwrap();
@@ -22,6 +23,12 @@ fn retrieve_and_list_preserve_model_ids_without_inventing_pagination() {
     assert_eq!(retrieved.output().id, "gpt-4.1-mini");
     assert_eq!(retrieved.output().owned_by.as_deref(), Some("openai"));
 
+    let preserved = client
+        .models()
+        .retrieve(" ft:gpt-4.1-mini:custom ")
+        .unwrap();
+    assert_eq!(preserved.output().id, "gpt-4.1-mini");
+
     let listed = client.models().list().unwrap();
     assert_eq!(listed.output().data.len(), 2);
     assert_eq!(listed.output().data[0].id, "gpt-4.1-mini");
@@ -29,11 +36,13 @@ fn retrieve_and_list_preserve_model_ids_without_inventing_pagination() {
     assert!(!listed.output().has_next_page());
     assert_eq!(listed.output().next_after(), None);
 
-    let requests = server.captured_requests(2).expect("captured requests");
+    let requests = server.captured_requests(3).expect("captured requests");
     assert_eq!(requests[0].method, "GET");
     assert_eq!(requests[0].path, "/v1/models/ft:gpt-4.1-mini:custom");
     assert_eq!(requests[1].method, "GET");
-    assert_eq!(requests[1].path, "/v1/models");
+    assert_eq!(requests[1].path, "/v1/models/%20ft:gpt-4.1-mini:custom%20");
+    assert_eq!(requests[2].method, "GET");
+    assert_eq!(requests[2].path, "/v1/models");
 
     let blank_id = client
         .models()
@@ -58,6 +67,21 @@ fn delete_owned_or_denied() {
     let request = success_server.captured_request().expect("captured request");
     assert_eq!(request.method, "DELETE");
     assert_eq!(request.path, "/v1/models/model-owned");
+
+    let preserved_server =
+        mock_http::MockHttpServer::spawn(json_response(delete_payload("model-owned"))).unwrap();
+    let preserved_client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(preserved_server.url())
+        .max_retries(0)
+        .build();
+    let preserved = preserved_client.models().delete(" model-owned\t").unwrap();
+    assert_eq!(preserved.output().id, "model-owned");
+    let preserved_request = preserved_server
+        .captured_request()
+        .expect("captured preserved request");
+    assert_eq!(preserved_request.method, "DELETE");
+    assert_eq!(preserved_request.path, "/v1/models/%20model-owned%09");
 
     let denied_server = mock_http::MockHttpServer::spawn(error_response(
         403,

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt::Write as _, sync::Arc};
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -22,7 +22,7 @@ impl Models {
 
     /// Retrieves a model by id without rewriting caller-supplied ids.
     pub fn retrieve(&self, model_id: &str) -> Result<ApiResponse<Model>, OpenAIError> {
-        let model_id = validate_path_id("model_id", model_id)?;
+        let model_id = encode_path_id(validate_path_id("model_id", model_id)?);
         self.runtime.execute_json(
             "GET",
             format!("/models/{model_id}"),
@@ -38,7 +38,7 @@ impl Models {
 
     /// Deletes an owned model and preserves server permission/not-found semantics.
     pub fn delete(&self, model_id: &str) -> Result<ApiResponse<DeletedModel>, OpenAIError> {
-        let model_id = validate_path_id("model_id", model_id)?;
+        let model_id = encode_path_id(validate_path_id("model_id", model_id)?);
         self.runtime.execute_json(
             "DELETE",
             format!("/models/{model_id}"),
@@ -94,12 +94,45 @@ pub struct DeletedModel {
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
+    if value.trim().is_empty() {
         return Err(OpenAIError::new(
             ErrorKind::Validation,
             format!("{label} cannot be blank"),
         ));
     }
-    Ok(trimmed)
+    Ok(value)
+}
+
+fn encode_path_id(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if matches!(
+            byte,
+            b'A'..=b'Z'
+                | b'a'..=b'z'
+                | b'0'..=b'9'
+                | b'-'
+                | b'.'
+                | b'_'
+                | b'~'
+                | b'!'
+                | b'$'
+                | b'&'
+                | b'\''
+                | b'('
+                | b')'
+                | b'*'
+                | b'+'
+                | b','
+                | b';'
+                | b'='
+                | b':'
+                | b'@'
+        ) {
+            encoded.push(byte as char);
+        } else {
+            let _ = write!(&mut encoded, "%{byte:02X}");
+        }
+    }
+    encoded
 }
