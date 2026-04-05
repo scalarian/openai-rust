@@ -21,7 +21,7 @@ Use this skill for resource-family features: Responses, Conversations, Chat/Comp
 ## Work Procedure
 
 1. Read `mission.md`, `AGENTS.md`, `.factory/library/architecture.md`, `.factory/library/api-surface.md`, `.factory/library/environment.md`, `.factory/library/user-testing.md`, and `.factory/services.yaml`.
-2. Invoke `brainstorming` when the feature affects public family ergonomics, helper naming, builder flows, or compatibility labeling.
+2. Invoke `brainstorming` when the feature affects public family ergonomics, helper naming, builder flows, or compatibility labeling. In mission Exec Mode, satisfy this by comparing plausible API/design directions in-session and recording the chosen direction plus a rejected alternative in your notes/handoff; do not wait for an unavailable user approval loop.
 3. Invoke `test-driven-development` and add failing tests before implementation. Choose the right validation seam:
    - request-shaping/multipart tests
    - mocked family integration tests
@@ -30,7 +30,7 @@ Use this skill for resource-family features: Responses, Conversations, Chat/Comp
    - env-gated live smokes only for assertions that require real API proof
 4. Implement the family surface using the shared transport/parser core. Do not add a family-specific HTTP stack or duplicate shared metadata/error logic.
 5. Keep family models local unless a type is truly shared across multiple families.
-6. Add or update representative examples when the public API shape changes.
+6. Add or update representative examples only when the feature description, validation contract, or existing failing validators explicitly require example coverage. Do not broaden scope with unrelated example/docs churn when the feature is otherwise code-only.
 7. Run targeted tests for the family first, then broader cargo validators required by the feature.
 8. Perform at least one manual or smoke verification step appropriate to the feature:
    - inspect multipart bodies or captured queries
