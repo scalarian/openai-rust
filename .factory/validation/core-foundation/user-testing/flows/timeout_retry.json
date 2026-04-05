@@ -1,0 +1,66 @@
+{
+  "groupId": "timeout_retry",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-CORE-006",
+      "status": "pass",
+      "reason": "`cargo test --test core_timeout` passed `timeout_policy_honors_defaults_and_per_request_overrides`, and source inspection shows it asserts the default 600s timeout, a client-level 12s override, and a per-request 250ms override taking precedence."
+    },
+    {
+      "id": "VAL-CORE-007",
+      "status": "pass",
+      "reason": "`cargo test --test core_timeout` passed `timeout_expiry_produces_a_dedicated_timeout_error_after_retry_budget`, and the test asserts a timeout-specific error after 3 total attempts when `max_retries(2)` is configured."
+    },
+    {
+      "id": "VAL-CORE-008",
+      "status": "blocked",
+      "reason": "`cargo test --test core_retry` passed `default_retry_policy_covers_retryable_failures` for HTTP 408/409/429/500 with 3 total attempts and success on the third try, but the observed cargo surface does not exercise the contract's connection-failure branch or a terminal failure after retries are exhausted."
+    },
+    {
+      "id": "VAL-CORE-009",
+      "status": "pass",
+      "reason": "`cargo test --test core_retry` passed `retry_after_guidance_is_honored`, and source inspection shows explicit timing assertions for both `retry-after: 1` and `retry-after-ms: 150` with bounded tolerances."
+    },
+    {
+      "id": "VAL-CORE-010",
+      "status": "blocked",
+      "reason": "`cargo test --test core_retry` passed `disabling_retries_surfaces_the_first_failure_immediately` for an HTTP 429 case, but the contract also requires the no-retry behavior for retryable connection failures and the current cargo surface does not cover that branch."
+    },
+    {
+      "id": "VAL-CORE-011",
+      "status": "pass",
+      "reason": "`cargo test --test core_retry` passed `non_retryable_client_errors_do_not_retry`; the test iterates 400/401/403/404/422 and would fail if a retry occurred because each scripted second response is successful while the assertion requires an immediate error."
+    },
+    {
+      "id": "VAL-CORE-021",
+      "status": "pass",
+      "reason": "`cargo test --test core_retry` passed both `retry_after_guidance_is_honored` and `server_retry_directives_override_generic_backoff`, collectively proving `retry-after`, `retry-after-ms`, and explicit `x-should-retry` retry/stop directives override generic backoff behavior."
+    }
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/core-foundation/user-testing/target/timeout_retry cargo test --manifest-path /Users/staticpayload/Mainframe/openai-rust/Cargo.toml --test core_timeout -- --nocapture",
+      "exitCode": 0,
+      "observation": "2 tests passed: `timeout_policy_honors_defaults_and_per_request_overrides` and `timeout_expiry_produces_a_dedicated_timeout_error_after_retry_budget`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/core-foundation/timeout_retry/core_timeout.txt"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/core-foundation/user-testing/target/timeout_retry cargo test --manifest-path /Users/staticpayload/Mainframe/openai-rust/Cargo.toml --test core_retry -- --nocapture",
+      "exitCode": 0,
+      "observation": "6 tests passed: `default_retry_policy_covers_retryable_failures`, `retry_after_guidance_is_honored`, `disabling_retries_surfaces_the_first_failure_immediately`, `non_retryable_client_errors_do_not_retry`, `server_retry_directives_override_generic_backoff`, and `loopback_requests_preserve_query_strings`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/core-foundation/timeout_retry/core_retry.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [
+    "The cargo output confirms which tests passed, but not the internal timing/call-count assertions, so source inspection of `tests/core_timeout.rs` and `tests/core_retry.rs` was needed to map observed passes to the validation contract."
+  ],
+  "blockers": [
+    "VAL-CORE-008 is not fully proven because the current `core_retry` cargo surface does not exercise retryable connection failures or a terminal failure after exhausting default retries.",
+    "VAL-CORE-010 is not fully proven because the current `core_retry` cargo surface does not exercise the `max_retries=0` connection-failure path."
+  ],
+  "summary": "Ran the assigned mocked cargo validation commands successfully. Confirmed VAL-CORE-006, VAL-CORE-007, VAL-CORE-009, VAL-CORE-011, and VAL-CORE-021; marked VAL-CORE-008 and VAL-CORE-010 blocked because the observed cargo tests do not cover the connection-failure branches required by the contract."
+}

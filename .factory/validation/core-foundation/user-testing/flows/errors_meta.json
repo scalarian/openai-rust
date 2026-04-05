@@ -1,0 +1,56 @@
+{
+  "groupId": "errors_meta",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-CORE-012",
+      "status": "pass",
+      "reason": "`cargo test --test core_errors` passed `api_status_errors_preserve_taxonomy_and_server_payload`, and the test source verifies 400/401/403/404/409/422/429/500 map to distinct API error kinds while preserving status, headers, request ID, and parsed API error payload fields."
+    },
+    {
+      "id": "VAL-CORE-013",
+      "status": "pass",
+      "reason": "`cargo test --test core_errors` passed `transport_failures_stay_distinct_from_api_status_failures`, which asserts `ErrorKind::Transport`, preserves an underlying source error, and reports no status code or API payload on connection failure."
+    },
+    {
+      "id": "VAL-CORE-014",
+      "status": "pass",
+      "reason": "`cargo test --test core_response_meta` passed both `request_id_is_exposed_on_success_and_error` and `missing_request_id_header_returns_none_without_failing`, proving success metadata returns `Some(x-request-id)` when present and `None` when absent."
+    },
+    {
+      "id": "VAL-CORE-015",
+      "status": "pass",
+      "reason": "`cargo test --test core_errors` passed `api_status_errors_preserve_taxonomy_and_server_payload`, whose status matrix includes representative 429 and 500 responses and asserts the surfaced error preserves the injected `x-request-id`."
+    },
+    {
+      "id": "VAL-CORE-016",
+      "status": "pass",
+      "reason": "`cargo test --test core_response_meta` passed `raw_response_access_preserves_status_headers_and_parsed_data`, showing the same successful response exposes status/header metadata and the parsed typed body without divergence."
+    },
+    {
+      "id": "VAL-CORE-017",
+      "status": "pass",
+      "reason": "`cargo test --test core_errors` passed `malformed_success_responses_raise_parse_errors`, which covers both malformed JSON and schema-mismatched 2xx bodies and asserts `ErrorKind::Parse` rather than API-status success."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/core-foundation/user-testing/target/errors_meta\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test core_errors",
+      "exitCode": 0,
+      "observation": "The `core_errors` test binary finished successfully with 5/5 tests passing, including `api_status_errors_preserve_taxonomy_and_server_payload`, `transport_failures_stay_distinct_from_api_status_failures`, and `malformed_success_responses_raise_parse_errors`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/core-foundation/errors_meta/core_errors.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/core-foundation/user-testing/target/errors_meta\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test core_response_meta",
+      "exitCode": 0,
+      "observation": "The `core_response_meta` test binary finished successfully with 3/3 tests passing, including `request_id_is_exposed_on_success_and_error`, `raw_response_access_preserves_status_headers_and_parsed_data`, and `missing_request_id_header_returns_none_without_failing`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/core-foundation/errors_meta/core_response_meta.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 6 assigned core error/metadata assertions were confirmed by passing mocked cargo tests and their assertion-specific test coverage."
+}

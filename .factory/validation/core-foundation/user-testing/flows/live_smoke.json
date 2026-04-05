@@ -1,0 +1,25 @@
+{
+  "groupId": "live_smoke",
+  "surface": "live API validation",
+  "assertions": [
+    {
+      "id": "VAL-CORE-019",
+      "status": "pass",
+      "reason": "The live smoke passed with OPENAI_BASE_URL unset, printed `live base url: https://api.openai.com/v1`, and surfaced a non-empty request ID `335851d1-8115-4807-8c42-95fdde875fb8` from the real response metadata."
+    }
+  ],
+  "commands": [
+    {
+      "command": "cd /Users/staticpayload/Mainframe/openai-rust && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/core-foundation/user-testing/target/live_smoke cargo test --test live_core_smoke -- --ignored --nocapture",
+      "exitCode": 0,
+      "observation": "The ignored live test `default_host_core_client_captures_real_request_id` passed. Output included `live base url: https://api.openai.com/v1`, `live request id: 335851d1-8115-4807-8c42-95fdde875fb8`, and `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/core-foundation/live_smoke/VAL-CORE-019-cargo-test.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "VAL-CORE-019 passed: the real live smoke used the default OpenAI host and exposed a non-empty request ID."
+}
