@@ -54,7 +54,7 @@ impl ResourceFamilies {
             responses: responses::Responses::new(runtime.clone()),
             conversations: conversations::Conversations::new(runtime.clone()),
             chat: chat::Chat::new(runtime.clone()),
-            completions: completions::Completions,
+            completions: completions::Completions::new(runtime.clone()),
             embeddings: embeddings::Embeddings,
             models: models::Models,
             moderations: moderations::Moderations,
