@@ -2,8 +2,9 @@ use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
     resources::responses::{
-        ResponseCreateParams, ResponseRetrieveParams, ResponseStream, ResponseStreamEvent,
-        ResponseStreamTerminal,
+        ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
+        ResponseRetrieveParams, ResponseStream, ResponseStreamEvent, ResponseStreamTerminal,
+        ResponseTextConfig,
     },
 };
 use serde_json::json;
@@ -264,6 +265,55 @@ fn terminal_failure_and_refusal_states_remain_explicit() {
         error.kind,
         ErrorKind::Api(openai_rust::ApiErrorKind::Server)
     );
+}
+
+#[test]
+fn terminal_incomplete_state_remains_explicit() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+    let incomplete_stream = concat!(
+        "event: response.created\n",
+        "data: {\"id\":\"resp_incomplete\",\"object\":\"response\",\"created_at\":1,\"status\":\"in_progress\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"\"}]}],\"usage\":{}}\n\n",
+        "event: response.output_text.delta\n",
+        "data: {\"output_index\":0,\"content_index\":0,\"delta\":\"{\\\"city\\\":\\\"Paris\\\"\"}\n\n",
+        "event: response.incomplete\n",
+        "data: {\"id\":\"resp_incomplete\",\"object\":\"response\",\"created_at\":1,\"status\":\"incomplete\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"{\\\"city\\\":\\\"Paris\\\"\"}]}],\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{}}\n\n",
+        "data: [DONE]\n\n"
+    );
+
+    let mut incomplete = ResponseStream::from_sse_chunks(metadata, vec![incomplete_stream])
+        .expect("incomplete transcript");
+    assert!(matches!(
+        incomplete.terminal_state(),
+        Some(ResponseStreamTerminal::Incomplete(response))
+            if response.status.as_deref() == Some("incomplete")
+                && response.incomplete_details.as_ref() == Some(&json!({"reason": "max_output_tokens"}))
+    ));
+
+    let response_error = incomplete
+        .final_response()
+        .expect_err("incomplete streams must not become a successful response");
+    assert_eq!(response_error.kind, ErrorKind::Parse);
+
+    let parse_error = incomplete
+        .parse_final::<serde_json::Value>(
+            Some(ResponseTextConfig {
+                format: Some(ResponseFormatTextConfig::JsonSchema(
+                    ResponseFormatTextJSONSchemaConfig {
+                        name: String::from("partial_city"),
+                        schema: json!({"type": "object"}),
+                        description: None,
+                        strict: Some(true),
+                    },
+                )),
+                verbosity: None,
+            }),
+            &[],
+        )
+        .expect_err("parsed helpers must not synthesize success for incomplete streams");
+    assert_eq!(parse_error.kind, ErrorKind::Parse);
 }
 
 fn sse_response(body: impl Into<Vec<u8>>) -> support::mock_http::ScriptedResponse {

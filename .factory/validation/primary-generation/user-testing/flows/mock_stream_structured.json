@@ -1,0 +1,61 @@
+{
+  "groupId": "mock_stream_structured",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-STREAM-005",
+      "status": "pass",
+      "reason": "`cargo test --test responses_structured_stream_contract -- --nocapture` passed both `structured_outputs_parse_only_at_completion_boundaries` and `malformed_json_and_refusals_fail_at_completion_boundary`; source inspection shows the first test withholds typed parsing until the completed JSON payload is assembled, while the second asserts malformed JSON stays streamable until completion and then fails with `ErrorKind::Parse`."
+    },
+    {
+      "id": "VAL-STREAM-009",
+      "status": "pass",
+      "reason": "`cargo test --test responses_stream_contract -- --nocapture` passed `unknown_events_and_invalid_ordering_are_deterministic`; source inspection shows the fixture injects an unknown `response.future.added` event plus an extra field on `response.output_text.delta`, preserves the unknown event as `ResponseStreamEvent::Unknown`, and still assembles the final response text `Hello`."
+    },
+    {
+      "id": "VAL-STREAM-010",
+      "status": "pass",
+      "reason": "The same `responses_stream_contract` run passed `unknown_events_and_invalid_ordering_are_deterministic`; its negative fixture starts with `response.output_text.delta` before any creation state and asserts `ResponseStream::from_sse_chunks(...)` fails immediately with `ErrorKind::Validation`, which matches the contract's fast-fail ordering requirement."
+    },
+    {
+      "id": "VAL-STREAM-012",
+      "status": "blocked",
+      "reason": "`cargo test --test responses_stream_contract -- --nocapture` passed `terminal_failure_and_refusal_states_remain_explicit`, proving explicit refusal and failed terminal handling, and `responses_structured_stream_contract` passed `malformed_json_and_refusals_fail_at_completion_boundary`, proving structured refusal does not synthesize a typed success. However, the observed cargo surface does not exercise a `response.incomplete` terminal fixture, which the contract explicitly requires."
+    },
+    {
+      "id": "VAL-STREAM-014",
+      "status": "pass",
+      "reason": "`cargo test --test responses_stream_contract -- --nocapture` passed `terminal_failure_and_refusal_states_remain_explicit`; source inspection shows the fixture emits ordered `response.refusal.delta` and `response.refusal.done` events, and the final assertions require `output_text()` to remain empty while `refusal_text()` equals `I can't comply`."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_structured\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test responses_structured_stream_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/responses_structured_stream_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `responses_structured_stream_contract` test binary finished successfully with 2/2 tests passing: `structured_outputs_parse_only_at_completion_boundaries` and `malformed_json_and_refusals_fail_at_completion_boundary`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/responses_structured_stream_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_structured\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test responses_stream_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/responses_stream_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `responses_stream_contract` test binary finished successfully with 6/6 tests passing, including `unknown_events_and_invalid_ordering_are_deterministic` and `terminal_failure_and_refusal_states_remain_explicit`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/responses_stream_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_structured\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test streaming_parser_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/streaming_parser_contract.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `streaming_parser_contract` test binary finished successfully with 3/3 tests passing: `crlf_and_eof_boundaries_do_not_corrupt_sse_parsing`, `fragmented_sse_frames_reassemble_into_same_logical_events`, and `resume_uses_server_sequence_numbers`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_structured/streaming_parser_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [
+    "The cargo output confirms which contract test functions passed, but mapping those passes to the validation assertions required source inspection because the assertion-level event and error expectations are encoded inside the tests rather than printed by cargo."
+  ],
+  "blockers": [
+    "VAL-STREAM-012 is not fully proven because the observed mocked cargo surface covers refusal and failed terminal states but does not include a `response.incomplete` fixture."
+  ],
+  "summary": "Ran all assigned mocked cargo validation commands successfully. Confirmed VAL-STREAM-005, VAL-STREAM-009, VAL-STREAM-010, and VAL-STREAM-014; marked VAL-STREAM-012 blocked because the observed tests do not exercise an incomplete terminal stream."
+}

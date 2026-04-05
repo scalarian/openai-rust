@@ -1,0 +1,85 @@
+{
+  "groupId": "live_primary_generation",
+  "surface": "live API validation",
+  "assertions": [
+    {
+      "id": "VAL-RESP-002",
+      "status": "pass",
+      "reason": "`live_responses_store_smoke` exited 0 with `OPENAI_BASE_URL` unset, created stored response `resp_0cc02879000bdcff0069d2add0afac819aa04c8c524b850c9e` (`req_fd1d6853f7f64ffba886edd761e6f8b1`), retrieved it by id (`req_de96b4f746fc41ebad82890af21bd54a`), and printed `stored output_text: stored response smoke`, proving live retrieve round-tripped helper behavior."
+    },
+    {
+      "id": "VAL-RESP-006",
+      "status": "pass",
+      "reason": "`live_responses_background_cancel_smoke` exited 0 with `OPENAI_BASE_URL` unset, created background response `resp_01cd834d4eb9b77d0069d2ade29fb08198a6ae01c5a50efda8` in `queued` state (`req_c4b033d8196b42369ce241e968cab846`), then `cancel` returned parsed terminal state `cancelled` with request id `req_1c8999ada01d444dbcfc99f574912bff`."
+    },
+    {
+      "id": "VAL-RESP-007",
+      "status": "pass",
+      "reason": "`live_responses_compact_smoke` exited 0 with `OPENAI_BASE_URL` unset and printed `compaction object: response.compaction`, `compaction output items: 2`, and `compaction total tokens: 335`; the live compaction request surfaced request id `req_3847808be58792a08c1303501bc61275`."
+    },
+    {
+      "id": "VAL-RESP-008",
+      "status": "pass",
+      "reason": "`live_responses_conflicting_state_smoke` exited 0 with `OPENAI_BASE_URL` unset after the live API rejected mixed continuity modes with `Api(BadRequest)`, request id `req_d4145ce759864d99a8593ad80590cb2d`, and message `Mutually exclusive parameters: ''. Ensure you are only providing one of: 'pre..._id' or 'conversation'.`"
+    },
+    {
+      "id": "VAL-RESP-009",
+      "status": "pass",
+      "reason": "The same `live_responses_store_smoke` run showed `store` controls retrievability: stored response `resp_0cc02879000bdcff0069d2add0afac819aa04c8c524b850c9e` retrieved successfully, while the unstored response retrieval failed as expected with `Api(NotFound)` and request id `req_8aa0c6fb6b7d4e91b13c230542f879a7`."
+    },
+    {
+      "id": "VAL-RESP-011",
+      "status": "pass",
+      "reason": "`live_conversations_crud_smoke` exited 0 with `OPENAI_BASE_URL` unset and printed create/retrieve/update/delete request ids (`d5e8f208-494e-409e-877f-7c23d1ea5cab`, `bc6f8283-528a-4303-99c0-85408f4f90f0`, `39b79665-4c67-4e34-9116-de2bfee23bb9`, `6d3963c3-e744-48c0-aa75-dbdff4e2f533`) for conversation `conv_69d2ae0f2b9c8193b83ff7b0de89bcf600589e55542b33a4`; the example’s internal checks for metadata round-trip, metadata update, and `deleted=true` all passed."
+    },
+    {
+      "id": "VAL-RESP-012",
+      "status": "pass",
+      "reason": "`live_conversations_items_smoke` exited 0 with `OPENAI_BASE_URL` unset and printed live request ids for create/retrieve/list/delete/list (`1d12292b-5cf0-45a1-8c46-92ade4422cf4`, `b8e56b18-24b8-4122-a96c-2e04ac23a299`, `060d64aa-0a14-4efe-9732-262469c98637`, `5cbb569d-8fd3-4022-8597-4d210eca74ae`, `13896d19-7e8e-4538-9049-0459b3fc5482`) for item `msg_69d2ae1f714c81959a473d79b1e3fe8b0ee19d785811bef2`; the example’s internal checks confirmed the item appeared in the ascending list before delete and disappeared afterward."
+    }
+  ],
+  "commands": [
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_responses_store_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_store_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the live smoke produced request ids `req_fd1d6853f7f64ffba886edd761e6f8b1`, `req_de96b4f746fc41ebad82890af21bd54a`, and `req_8aa0c6fb6b7d4e91b13c230542f879a7`; stored retrieval succeeded with `stored output_text: stored response smoke`, and unstored retrieval failed with `Api(NotFound)`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_store_smoke.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_responses_background_cancel_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_background_cancel_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the smoke created background response `resp_01cd834d4eb9b77d0069d2ade29fb08198a6ae01c5a50efda8` in `queued` state and `cancel` returned terminal status `cancelled`; request ids were `req_c4b033d8196b42369ce241e968cab846` and `req_1c8999ada01d444dbcfc99f574912bff`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_background_cancel_smoke.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_responses_compact_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_compact_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the live compaction returned request id `req_3847808be58792a08c1303501bc61275`, object type `response.compaction`, 2 output items, and 335 total tokens.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_compact_smoke.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_responses_conflicting_state_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_conflicting_state_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the live API rejected conflicting continuity fields with `Api(BadRequest)`, request id `req_d4145ce759864d99a8593ad80590cb2d`, and a mutually-exclusive-parameters error message.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_responses_conflicting_state_smoke.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_conversations_crud_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_conversations_crud_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the CRUD smoke completed create/retrieve/update/delete for conversation `conv_69d2ae0f2b9c8193b83ff7b0de89bcf600589e55542b33a4` and printed request ids `d5e8f208-494e-409e-877f-7c23d1ea5cab`, `bc6f8283-528a-4303-99c0-85408f4f90f0`, `39b79665-4c67-4e34-9116-de2bfee23bb9`, and `6d3963c3-e744-48c0-aa75-dbdff4e2f533`; exit 0 means the metadata and deletion checks passed.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_conversations_crud_smoke.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/live_primary_generation\" cargo run --example live_conversations_items_smoke > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_conversations_items_smoke.txt\" 2>&1",
+      "exitCode": 0,
+      "observation": "With `OPENAI_BASE_URL` unset, the items smoke created, retrieved, listed, deleted, and relisted item `msg_69d2ae1f714c81959a473d79b1e3fe8b0ee19d785811bef2` in conversation `conv_69d2ae1ead3481959540b98566bc71e60ee19d785811bef2`; request ids were `1d12292b-5cf0-45a1-8c46-92ade4422cf4`, `b8e56b18-24b8-4122-a96c-2e04ac23a299`, `060d64aa-0a14-4efe-9732-262469c98637`, `5cbb569d-8fd3-4022-8597-4d210eca74ae`, and `13896d19-7e8e-4538-9049-0459b3fc5482`, and exit 0 means the item disappeared from the post-delete ascending list.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/live_primary_generation/live_conversations_items_smoke.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo run"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Ran the six assigned live smokes serially with `OPENAI_BASE_URL` unset and the isolated target dir. All assigned assertions passed: stored response retrieval preserved `output_text`, background cancellation returned `cancelled`, compaction returned `response.compaction`, conflicting continuity fields failed with `Api(BadRequest)`, unstored retrieval failed with `Api(NotFound)`, and both conversation CRUD and item lifecycle smokes completed with live request IDs and no observed blockers."
+}

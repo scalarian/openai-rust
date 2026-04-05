@@ -1,0 +1,62 @@
+{
+  "groupId": "mock_stream_tools",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-STREAM-006",
+      "status": "pass",
+      "reason": "`cargo test --test tool_streaming_contract -- --nocapture` passed `function_and_custom_tool_inputs_accumulate_until_completion`; source inspection shows streamed `response.function_call_arguments.delta` updates the addressed call cumulatively (`{\"city\":\"Pa`), preserves the exact final raw argument string (`{\"city\":\"Paris\"}`), keeps `parsed_arguments` absent during streaming, and only materializes parsed arguments after `parse_final(...)` is invoked with a strict tool definition."
+    },
+    {
+      "id": "VAL-STREAM-007",
+      "status": "blocked",
+      "reason": "`cargo test --test streaming_state_machine_contract -- --nocapture` passed `interleaved_output_and_content_indices_stay_isolated`, which proves interleaved `output_text` and `function_call_arguments` updates stay isolated by `output_index`/`content_index`. However, the observed mocked cargo surface does not include an interleaved `reasoning_text` fixture, so the full text/reasoning/tool isolation contract is not completely proven."
+    },
+    {
+      "id": "VAL-STREAM-013",
+      "status": "pass",
+      "reason": "The same `tool_streaming_contract` run passed `function_and_custom_tool_inputs_accumulate_until_completion`; source inspection shows modern Responses tool events for a `function_call` and `custom_tool_call` accumulate per item, finalize on their respective `.done` events, preserve final raw payloads, and yield stable final call records at stream completion."
+    },
+    {
+      "id": "VAL-STREAM-015",
+      "status": "blocked",
+      "reason": "`cargo test --test streaming_state_machine_contract -- --nocapture` passed `interleaved_output_and_content_indices_stay_isolated`, which proves structural `response.output_item.added` and `response.content_part.added` handling for text messages plus a function call. The observed fixture does not exercise multimodal content parts such as audio or other non-text parts, so the contract's full multimodal-assembly requirement is not completely proven."
+    },
+    {
+      "id": "VAL-STREAM-016",
+      "status": "pass",
+      "reason": "`cargo test --test tool_family_streaming_contract -- --nocapture` passed `tool_family_events_reconcile_with_final_state`; source inspection shows file-search, web-search, code-interpreter, and MCP events accumulate on the correct output items, transition through their family-specific event states, and reconcile with the final completed response while preserving search action data, interpreter code/output, and MCP arguments."
+    }
+  ],
+  "commands": [
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_tools\" cargo test --test tool_streaming_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_streaming_contract.txt\" 2>&1; status=$?; printf '\\nEXIT_CODE=%s\\n' \"$status\" >> \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_streaming_contract.txt\"; exit \"$status\"",
+      "exitCode": 0,
+      "observation": "The `tool_streaming_contract` test binary finished successfully with 1/1 tests passing: `function_and_custom_tool_inputs_accumulate_until_completion`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_streaming_contract.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_tools\" cargo test --test streaming_state_machine_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/streaming_state_machine_contract.txt\" 2>&1; status=$?; printf '\\nEXIT_CODE=%s\\n' \"$status\" >> \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/streaming_state_machine_contract.txt\"; exit \"$status\"",
+      "exitCode": 0,
+      "observation": "The `streaming_state_machine_contract` test binary finished successfully with 1/1 tests passing: `interleaved_output_and_content_indices_stay_isolated`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/streaming_state_machine_contract.txt"
+    },
+    {
+      "command": "cd \"/Users/staticpayload/Mainframe/openai-rust\" && env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/primary-generation/user-testing/target/mock_stream_tools\" cargo test --test tool_family_streaming_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_family_streaming_contract.txt\" 2>&1; status=$?; printf '\\nEXIT_CODE=%s\\n' \"$status\" >> \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_family_streaming_contract.txt\"; exit \"$status\"",
+      "exitCode": 0,
+      "observation": "The `tool_family_streaming_contract` test binary finished successfully with 1/1 tests passing: `tool_family_events_reconcile_with_final_state`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/primary-generation/mock_stream_tools/tool_family_streaming_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [
+    "The cargo output only reports the test function names, so mapping those passes back to assertion-level streaming guarantees required source inspection of the assigned contract tests."
+  ],
+  "blockers": [
+    "VAL-STREAM-007 is not fully proven because the observed interleaving fixture does not include `reasoning_text` updates.",
+    "VAL-STREAM-015 is not fully proven because the observed structural-event fixture does not include multimodal content parts such as audio or other non-text parts."
+  ],
+  "summary": "Ran all three assigned mocked cargo validation commands successfully. Confirmed VAL-STREAM-006, VAL-STREAM-013, and VAL-STREAM-016; marked VAL-STREAM-007 and VAL-STREAM-015 blocked because the observed fixtures do not cover reasoning-text interleaving or multimodal content-part assembly."
+}
