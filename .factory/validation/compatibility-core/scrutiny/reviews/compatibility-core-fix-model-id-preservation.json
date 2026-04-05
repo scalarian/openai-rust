@@ -1,0 +1,15 @@
+{
+  "featureId": "compatibility-core-fix-model-id-preservation",
+  "reviewedAt": "2026-04-05T21:09:55.871119Z",
+  "commitId": "ee3aa6d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix removes the nonblank-id trimming on `models.retrieve` and `models.delete`, percent-encodes the preserved bytes into the request path, and adds regression coverage that proves surrounding whitespace now survives while blank-only ids still fail locally.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/compatibility-core/scrutiny/reviews/embeddings-models-and-moderations.json",
+  "summary": "Reviewed the prior failure, both handoffs, both commit diffs, and the fix transcript skeleton. Commit `ee3aa6d` adequately addresses the original blocking issue: `src/resources/models.rs` now rejects only blank-only ids, preserves nonblank ids byte-for-byte via path-segment encoding on retrieve/delete, keeps list behavior unchanged, and `tests/models_contract_mock.rs` now asserts the preserved `%20`/`%09` request paths plus the existing local blank-id validation." 
+}

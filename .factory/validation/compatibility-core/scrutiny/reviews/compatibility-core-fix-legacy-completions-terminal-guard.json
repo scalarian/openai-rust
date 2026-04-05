@@ -1,0 +1,15 @@
+{
+  "featureId": "compatibility-core-fix-legacy-completions-terminal-guard",
+  "reviewedAt": "2026-04-05T21:10:00Z",
+  "commitId": "3c10ca5",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the original legacy completions surface commit and the fix commit. The new terminal guard closes the prior blocking gap: `CompletionAccumulator::finish()` now rejects `[DONE]`-only transcripts unless at least one completion payload was successfully parsed, while the existing streamed/non-streamed `text_completion` assembly path and `best_of` streaming restriction remain intact.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/compatibility-core/scrutiny/reviews/legacy-completions-compatibility-surface.json",
+  "summary": "Pass: the fix commit `3c10ca5` adequately resolves the prior blocking scrutiny finding. `src/resources/completions.rs` now tracks whether any completion payload was parsed before finalization, and `tests/completions_stream_contract.rs` adds a focused `[DONE]`-only regression test while preserving the existing shared `text_completion` shape and `best_of` streaming coverage."
+}

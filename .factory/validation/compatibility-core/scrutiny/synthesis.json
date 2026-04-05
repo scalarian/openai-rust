@@ -1,7 +1,7 @@
 {
   "milestone": "compatibility-core",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -21,49 +21,19 @@
   },
   "reviewsSummary": {
     "total": 3,
-    "passed": 0,
-    "failed": 3,
-    "failedFeatures": [
-      "chat-completions-compatibility-surface",
-      "legacy-completions-compatibility-surface",
-      "embeddings-models-and-moderations"
-    ]
+    "passed": 3,
+    "failed": 0,
+    "failedFeatures": []
   },
-  "blockingIssues": [
-    {
-      "featureId": "chat-completions-compatibility-surface",
-      "severity": "blocking",
-      "description": "`src/resources/chat.rs:91` buffers the entire SSE body before constructing `ChatCompletionStream`, so `stream=true` does not deliver incremental compatibility chunks while the request is in flight."
-    },
-    {
-      "featureId": "chat-completions-compatibility-surface",
-      "severity": "blocking",
-      "description": "`src/resources/chat.rs:693` treats `[DONE]` without any terminal `finish_reason` chunk as successful completion, allowing truncated chat-completions streams to pass as valid."
-    },
-    {
-      "featureId": "legacy-completions-compatibility-surface",
-      "severity": "blocking",
-      "description": "`src/resources/completions.rs:335` accepts a `[DONE]`-only transcript and fabricates an empty `text_completion` object instead of surfacing a parse/terminal-state error."
-    },
-    {
-      "featureId": "embeddings-models-and-moderations",
-      "severity": "blocking",
-      "description": "`src/resources/models.rs:97` trims surrounding whitespace from nonblank model ids before `retrieve`/`delete`, rewriting caller-supplied ids instead of preserving them byte-for-byte."
-    }
-  ],
+  "blockingIssues": [],
   "appliedUpdates": [
     {
       "target": "library",
-      "description": "Added Legacy Completions compatibility invariants to `.factory/library/api-surface.md`, including the shared `text_completion` stream/non-stream shape and the `best_of`+`stream` restriction.",
-      "sourceFeature": "legacy-completions-compatibility-surface"
-    },
-    {
-      "target": "library",
-      "description": "Documented the current query-serialization split between `responses` and the raw `append_query` helpers in `chat`/`conversations`, with guidance to prefer percent-encoded query serialization for new list/filter helpers.",
-      "sourceFeature": "chat-completions-compatibility-surface"
+      "description": "Added the chat-completions terminal-chunk invariant to `.factory/library/api-surface.md`, documenting that `[DONE]` alone is not sufficient without a real terminal `finish_reason` chunk.",
+      "sourceFeature": "compatibility-core-fix-chat-completions-streaming"
     }
   ],
   "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/compatibility-core/scrutiny/synthesis.round1.json"
 }

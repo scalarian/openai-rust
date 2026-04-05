@@ -19,6 +19,7 @@ High-level scope map for the crate. This file is for workers choosing where new 
 - Legacy Completions
 
 ### Compatibility invariants
+- Chat Completions streams require at least one terminal chunk with a real `finish_reason`; `[DONE]` alone is not sufficient proof of a valid terminal chat completion.
 - Legacy Completions streamed and non-streamed payloads are the same `text_completion` shape; `[DONE]` alone is not sufficient proof of a valid terminal completion payload.
 - Legacy Completions rejects `best_of` when `stream=true`; treat that combination as an invalid compatibility request.
 
