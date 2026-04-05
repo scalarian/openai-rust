@@ -11,6 +11,17 @@ pub struct OpenAIError {
     source: Option<Box<dyn Error + Send + Sync>>,
 }
 
+impl Clone for OpenAIError {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind.clone(),
+            message: self.message.clone(),
+            response: self.response.clone(),
+            source: None,
+        }
+    }
+}
+
 impl OpenAIError {
     /// Creates a new error with the given classification.
     pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
@@ -97,7 +108,7 @@ impl OpenAIError {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct ErrorResponseContext {
     status_code: Option<u16>,
     headers: BTreeMap<String, String>,

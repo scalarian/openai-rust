@@ -35,7 +35,7 @@ fn structured_outputs_parse_only_at_completion_boundaries() {
         "data: [DONE]\n\n"
     );
 
-    let stream = ResponseStream::from_sse_chunks(metadata, vec![transcript]).expect("stream");
+    let mut stream = ResponseStream::from_sse_chunks(metadata, vec![transcript]).expect("stream");
     let format = Some(ResponseTextConfig {
         format: Some(ResponseFormatTextConfig::JsonSchema(
             ResponseFormatTextJSONSchemaConfig {
@@ -88,7 +88,7 @@ fn malformed_json_and_refusals_fail_at_completion_boundary() {
         "data: {\"id\":\"resp_bad\",\"object\":\"response\",\"created_at\":1,\"status\":\"completed\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"{\\\"city\\\":\"}]}],\"usage\":{}}\n\n",
         "data: [DONE]\n\n"
     );
-    let malformed_stream = ResponseStream::from_sse_chunks(metadata.clone(), vec![malformed])
+    let mut malformed_stream = ResponseStream::from_sse_chunks(metadata.clone(), vec![malformed])
         .expect("malformed transcript still streams");
 
     let format = Some(ResponseTextConfig {
@@ -116,7 +116,7 @@ fn malformed_json_and_refusals_fail_at_completion_boundary() {
         "data: {\"id\":\"resp_refusal\",\"object\":\"response\",\"created_at\":1,\"status\":\"completed\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"refusal\",\"text\":\"No\"}]}],\"usage\":{}}\n\n",
         "data: [DONE]\n\n"
     );
-    let refusal_stream =
+    let mut refusal_stream =
         ResponseStream::from_sse_chunks(metadata, vec![refusal]).expect("refusal transcript");
     let refusal_error = refusal_stream
         .parse_final::<LocationAnswer>(

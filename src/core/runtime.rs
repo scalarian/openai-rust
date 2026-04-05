@@ -148,6 +148,7 @@ impl ClientRuntime {
         crate::core::transport::execute_unit(&request, &resolved_options)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn execute_text(
         &self,
         method: impl AsRef<str>,
@@ -159,6 +160,7 @@ impl ClientRuntime {
         crate::core::transport::execute_text(&request, &resolved_options)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn execute_text_with_body<B>(
         &self,
         method: impl AsRef<str>,

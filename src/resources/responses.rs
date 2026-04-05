@@ -1,15 +1,23 @@
 use std::{
     collections::{BTreeMap, VecDeque},
-    sync::Arc,
+    sync::{
+        Arc, Condvar, Mutex,
+        mpsc::{self, Receiver},
+    },
+    thread,
+    time::Duration,
 };
 
 use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::Value;
+use tokio::sync::watch;
 
 use crate::{
     OpenAIError,
     core::{
-        metadata::ResponseMetadata, request::RequestOptions, response::ApiResponse,
+        metadata::ResponseMetadata,
+        request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
+        response::ApiResponse,
         runtime::ClientRuntime,
     },
     error::{ApiErrorKind, ErrorKind},
@@ -77,13 +85,13 @@ impl Responses {
     /// Creates a streamed response transcript and exposes a deterministic state machine.
     pub fn stream(&self, params: ResponseCreateParams) -> Result<ResponseStream, OpenAIError> {
         let body = params.into_stream_request_body();
-        let response = self.runtime.execute_text_with_body(
-            "POST",
-            "/responses",
-            &body,
-            RequestOptions::default(),
-        )?;
-        ResponseStream::from_sse_chunks_with_resume(response.metadata, [response.output], None)
+        let request = self
+            .runtime
+            .prepare_json_request("POST", "/responses", &body)?;
+        let options = self
+            .runtime
+            .resolve_request_options(&RequestOptions::default())?;
+        ResponseStream::start_live(request, options, None)
     }
 
     /// Retrieves a stored response and recomputes the `output_text` helper.
@@ -116,14 +124,11 @@ impl Responses {
             &format!("/responses/{response_id}"),
             params.to_query_pairs(),
         );
-        let response = self
+        let request = self.runtime.prepare_request("GET", &path)?;
+        let options = self
             .runtime
-            .execute_text("GET", &path, RequestOptions::default())?;
-        ResponseStream::from_sse_chunks_with_resume(
-            response.metadata,
-            [response.output],
-            resume_after,
-        )
+            .resolve_request_options(&RequestOptions::default())?;
+        ResponseStream::start_live(request, options, resume_after)
     }
 
     /// Deletes a stored response and returns unit on success.
@@ -635,12 +640,13 @@ struct RecordedResponseEvent {
 }
 
 /// Eagerly parsed streamed Responses transcript with sync/async consumption helpers.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ResponseStream {
     metadata: ResponseMetadata,
     events: VecDeque<RecordedResponseEvent>,
     current_snapshot: Option<Response>,
     final_terminal: Option<ResponseStreamTerminal>,
+    live: Option<LiveStreamHandle>,
     aborted: bool,
 }
 
@@ -661,8 +667,15 @@ impl ResponseStream {
         if self.aborted {
             return None;
         }
+        if self.events.is_empty() {
+            self.fill_from_live();
+        }
         let recorded = self.events.pop_front()?;
         self.current_snapshot = recorded.snapshot_after_event;
+        self.drain_live_messages();
+        if self.final_terminal.is_none() {
+            self.poll_live_messages(Duration::from_millis(5));
+        }
         Some(recorded.event)
     }
 
@@ -673,6 +686,11 @@ impl ResponseStream {
     pub fn abort(&mut self) {
         self.aborted = true;
         self.events.clear();
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            let _ = live.receiver.try_recv();
+            live.join_worker();
+        }
     }
 
     pub fn terminal_state(&self) -> Option<&ResponseStreamTerminal> {
@@ -683,12 +701,25 @@ impl ResponseStream {
         &self.metadata
     }
 
-    pub fn final_response(&self) -> Result<&Response, OpenAIError> {
+    pub fn final_response(&mut self) -> Result<&Response, OpenAIError> {
         if self.aborted {
             return Err(OpenAIError::new(
                 ErrorKind::Transport,
                 "response stream was aborted before completion",
             ));
+        }
+
+        if let Some(live) = &self.live {
+            live.shared.wait_until_finished();
+            if let Some(error) = live.shared.error() {
+                return Err(error);
+            }
+        }
+        self.drain_live_messages();
+        if self.final_terminal.is_none() {
+            if let Some(live) = &self.live {
+                self.final_terminal = live.shared.terminal_cloned();
+            }
         }
 
         match self.final_terminal.as_ref() {
@@ -709,7 +740,7 @@ impl ResponseStream {
     }
 
     pub fn parse_final<T>(
-        &self,
+        &mut self,
         text: Option<ResponseTextConfig>,
         tools: &[FunctionTool],
     ) -> Result<ParsedResponse<T>, OpenAIError>
@@ -718,6 +749,153 @@ impl ResponseStream {
     {
         let response = self.final_response()?.clone();
         parse_response_output(response, text.and_then(|text| text.format), tools)
+    }
+
+    fn start_live(
+        request: PreparedRequest,
+        options: ResolvedRequestOptions,
+        starting_after: Option<u64>,
+    ) -> Result<Self, OpenAIError> {
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        let (abort_tx, abort_rx) = watch::channel(false);
+        let shared = Arc::new(LiveStreamShared::default());
+        let thread_shared = shared.clone();
+
+        let worker = thread::spawn(move || {
+            let runtime = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let error = OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to build streaming runtime: {error}"),
+                    )
+                    .with_source(error);
+                    let _ = startup_tx.send(Err(error.clone()));
+                    thread_shared.finish_with_error(error);
+                    return;
+                }
+            };
+
+            runtime.block_on(async move {
+                match crate::core::transport::execute_text_stream(&request, &options).await {
+                    Ok(response) => {
+                        let metadata = response.metadata.clone();
+                        let _ = startup_tx.send(Ok(metadata.clone()));
+                        let stream_events = event_tx.clone();
+                        if let Err(error) = consume_live_stream(
+                            response,
+                            starting_after,
+                            abort_rx,
+                            stream_events,
+                            thread_shared.clone(),
+                        )
+                        .await
+                        {
+                            thread_shared.finish_with_error(error.clone());
+                            let _ = event_tx.send(LiveStreamMessage::Error(error));
+                        }
+                    }
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error.clone()));
+                        thread_shared.finish_with_error(error);
+                    }
+                }
+            });
+        });
+
+        let metadata = startup_rx.recv().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("stream worker exited before startup completed: {error}"),
+            )
+        })??;
+
+        Ok(Self {
+            metadata,
+            events: VecDeque::new(),
+            current_snapshot: None,
+            final_terminal: None,
+            live: Some(LiveStreamHandle {
+                receiver: event_rx,
+                abort: abort_tx,
+                worker: Some(worker),
+                shared,
+            }),
+            aborted: false,
+        })
+    }
+
+    fn fill_from_live(&mut self) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+
+        let Some(message) = live.receiver.recv().ok() else {
+            if self.final_terminal.is_none() {
+                self.final_terminal = live.shared.terminal_cloned();
+            }
+            live.join_worker();
+            self.live = None;
+            return;
+        };
+        self.process_live_message(message);
+
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn drain_live_messages(&mut self) {
+        while let Some(live) = self.live.as_mut() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message),
+                Err(_) => break,
+            }
+        }
+    }
+
+    fn poll_live_messages(&mut self, timeout: Duration) {
+        let Some(live) = self.live.as_mut() else {
+            return;
+        };
+        if let Ok(message) = live.receiver.recv_timeout(timeout) {
+            self.process_live_message(message);
+            self.drain_live_messages();
+        }
+    }
+
+    fn process_live_message(&mut self, message: LiveStreamMessage) {
+        match message {
+            LiveStreamMessage::Event(recorded) => {
+                if let Some(terminal) = terminal_from_event(&recorded.event) {
+                    self.final_terminal = Some(terminal);
+                }
+                self.events.push_back(*recorded);
+            }
+            LiveStreamMessage::Finished => {
+                if let Some(live) = self.live.as_mut() {
+                    if self.final_terminal.is_none() {
+                        self.final_terminal = live.shared.terminal_cloned();
+                    }
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+            LiveStreamMessage::Error(error) => {
+                if let Some(live) = self.live.as_mut() {
+                    live.shared.finish_with_error(error);
+                    live.join_worker();
+                }
+                self.live = None;
+            }
+        }
     }
 
     pub(crate) fn from_sse_chunks_with_resume<I, B>(
@@ -741,6 +919,90 @@ impl ResponseStream {
         }
         state.finish(metadata)
     }
+}
+
+impl Drop for ResponseStream {
+    fn drop(&mut self) {
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            live.join_worker();
+        }
+    }
+}
+
+#[derive(Debug)]
+enum LiveStreamMessage {
+    Event(Box<RecordedResponseEvent>),
+    Finished,
+    Error(OpenAIError),
+}
+
+#[derive(Debug)]
+struct LiveStreamHandle {
+    receiver: Receiver<LiveStreamMessage>,
+    abort: watch::Sender<bool>,
+    worker: Option<thread::JoinHandle<()>>,
+    shared: Arc<LiveStreamShared>,
+}
+
+impl LiveStreamHandle {
+    fn join_worker(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct LiveStreamShared {
+    state: Mutex<LiveStreamSharedState>,
+    done: Condvar,
+}
+
+impl LiveStreamShared {
+    fn finish_with_terminal(&self, terminal: Option<ResponseStreamTerminal>) {
+        let mut state = self.state.lock().expect("live stream shared state");
+        state.terminal = terminal;
+        state.finished = true;
+        self.done.notify_all();
+    }
+
+    fn finish_with_error(&self, error: OpenAIError) {
+        let mut state = self.state.lock().expect("live stream shared state");
+        state.error = Some(error);
+        state.finished = true;
+        self.done.notify_all();
+    }
+
+    fn wait_until_finished(&self) {
+        let mut state = self.state.lock().expect("live stream shared state");
+        while !state.finished {
+            state = self.done.wait(state).expect("live stream shared state");
+        }
+    }
+
+    fn terminal_cloned(&self) -> Option<ResponseStreamTerminal> {
+        self.state
+            .lock()
+            .expect("live stream shared state")
+            .terminal
+            .clone()
+    }
+
+    fn error(&self) -> Option<OpenAIError> {
+        self.state
+            .lock()
+            .expect("live stream shared state")
+            .error
+            .clone()
+    }
+}
+
+#[derive(Debug, Default)]
+struct LiveStreamSharedState {
+    terminal: Option<ResponseStreamTerminal>,
+    error: Option<OpenAIError>,
+    finished: bool,
 }
 
 /// Public typed list envelope for `responses.input_items.list`.
@@ -1033,7 +1295,6 @@ struct StreamAccumulator {
     snapshot: Option<Response>,
     terminal: Option<ResponseStreamTerminal>,
     seen_done: bool,
-    ordinal: u64,
     starting_after: Option<u64>,
 }
 
@@ -1044,7 +1305,6 @@ impl StreamAccumulator {
             snapshot: None,
             terminal: None,
             seen_done: false,
-            ordinal: 0,
             starting_after,
         }
     }
@@ -1056,11 +1316,12 @@ impl StreamAccumulator {
         }
 
         let event_name = frame.event.unwrap_or_default();
+        let sequence_number = extract_sequence_number(&frame.data);
         let surfaced = self.apply_event(&event_name, &frame.data)?;
         let hidden = self
             .starting_after
-            .is_some_and(|starting_after| self.ordinal <= starting_after);
-        self.ordinal += 1;
+            .zip(sequence_number)
+            .is_some_and(|(starting_after, sequence_number)| sequence_number <= starting_after);
         if hidden {
             return Ok(());
         }
@@ -1092,6 +1353,7 @@ impl StreamAccumulator {
             events: self.visible_events,
             current_snapshot: None,
             final_terminal: self.terminal,
+            live: None,
             aborted: false,
         })
     }
@@ -1866,6 +2128,93 @@ fn get_content_mut<'a>(
         ));
     }
     Ok(content)
+}
+
+async fn consume_live_stream(
+    response: crate::core::transport::StreamingTextResponse,
+    starting_after: Option<u64>,
+    mut abort_rx: watch::Receiver<bool>,
+    event_tx: mpsc::Sender<LiveStreamMessage>,
+    shared: Arc<LiveStreamShared>,
+) -> Result<(), OpenAIError> {
+    let metadata = response.metadata.clone();
+    let mut response = response.response;
+    let mut parser = SseParser::default();
+    let mut state = StreamAccumulator::new(starting_after);
+
+    loop {
+        tokio::select! {
+            changed = abort_rx.changed() => {
+                if changed.is_ok() && *abort_rx.borrow() {
+                    shared.finish_with_terminal(None);
+                    let _ = event_tx.send(LiveStreamMessage::Finished);
+                    return Ok(());
+                }
+            }
+            chunk = response.chunk() => {
+                let chunk = chunk.map_err(map_live_transport_error)?;
+                let Some(chunk) = chunk else {
+                    break;
+                };
+                for frame in parser.push(chunk.as_ref())? {
+                    state.ingest_frame(frame)?;
+                    drain_visible_events(&mut state, &event_tx);
+                }
+            }
+        }
+    }
+
+    for frame in parser.finish()? {
+        state.ingest_frame(frame)?;
+        drain_visible_events(&mut state, &event_tx);
+    }
+    let finished = state.finish(metadata)?;
+    let terminal = finished.final_terminal.clone();
+    shared.finish_with_terminal(terminal);
+    let _ = event_tx.send(LiveStreamMessage::Finished);
+    Ok(())
+}
+
+fn drain_visible_events(state: &mut StreamAccumulator, event_tx: &mpsc::Sender<LiveStreamMessage>) {
+    while let Some(recorded) = state.visible_events.pop_front() {
+        if event_tx
+            .send(LiveStreamMessage::Event(Box::new(recorded)))
+            .is_err()
+        {
+            break;
+        }
+    }
+}
+
+fn extract_sequence_number(data: &str) -> Option<u64> {
+    serde_json::from_str::<Value>(data)
+        .ok()?
+        .get("sequence_number")?
+        .as_u64()
+}
+
+fn terminal_from_event(event: &ResponseStreamEvent) -> Option<ResponseStreamTerminal> {
+    match event {
+        ResponseStreamEvent::Completed { response } => {
+            Some(ResponseStreamTerminal::Completed(response.clone()))
+        }
+        ResponseStreamEvent::Failed { response } => {
+            Some(ResponseStreamTerminal::Failed(response.clone()))
+        }
+        ResponseStreamEvent::Incomplete { response } => {
+            Some(ResponseStreamTerminal::Incomplete(response.clone()))
+        }
+        _ => None,
+    }
+}
+
+fn map_live_transport_error(error: reqwest::Error) -> OpenAIError {
+    let kind = if error.is_timeout() {
+        ErrorKind::Timeout
+    } else {
+        ErrorKind::Transport
+    };
+    OpenAIError::new(kind, error.to_string()).with_source(error)
 }
 
 fn stream_parse_error(error_event: &str, error: serde_json::Error) -> OpenAIError {

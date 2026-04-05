@@ -6,8 +6,9 @@ use std::{
     time::Duration,
 };
 
-use reqwest::blocking::Client;
+use reqwest::{Client, Response as AsyncResponse, blocking::Client as BlockingClient};
 use serde::de::DeserializeOwned;
+use tokio::time::sleep;
 use url::Url;
 
 use crate::{
@@ -26,7 +27,7 @@ pub(crate) fn execute_json<T>(
 where
     T: DeserializeOwned,
 {
-    let client = build_client(options)?;
+    let client = build_blocking_client(options)?;
 
     let mut last_error = None;
     for attempt in 0..=options.max_retries {
@@ -57,7 +58,7 @@ pub(crate) fn execute_unit(
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ApiResponse<()>, OpenAIError> {
-    let client = build_client(options)?;
+    let client = build_blocking_client(options)?;
 
     let mut last_error = None;
     for attempt in 0..=options.max_retries {
@@ -84,11 +85,12 @@ pub(crate) fn execute_unit(
     }))
 }
 
+#[allow(dead_code)]
 pub(crate) fn execute_text(
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ApiResponse<String>, OpenAIError> {
-    let client = build_client(options)?;
+    let client = build_blocking_client(options)?;
 
     let mut last_error = None;
     for attempt in 0..=options.max_retries {
@@ -115,7 +117,56 @@ pub(crate) fn execute_text(
     }))
 }
 
-fn build_client(options: &ResolvedRequestOptions) -> Result<Client, OpenAIError> {
+pub(crate) struct StreamingTextResponse {
+    pub metadata: ResponseMetadata,
+    pub response: AsyncResponse,
+}
+
+pub(crate) async fn execute_text_stream(
+    request: &PreparedRequest,
+    options: &ResolvedRequestOptions,
+) -> Result<StreamingTextResponse, OpenAIError> {
+    let client = build_async_client(options)?;
+
+    let mut last_error = None;
+    for attempt in 0..=options.max_retries {
+        match execute_once_text_stream(&client, request).await {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                let should_retry = attempt < options.max_retries && should_retry(&error);
+                let retry_delay = retry_delay(&error, attempt);
+                last_error = Some(error);
+                if should_retry {
+                    sleep(retry_delay).await;
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Transport,
+            "shared transport exited without a response or error",
+        )
+    }))
+}
+
+fn build_blocking_client(options: &ResolvedRequestOptions) -> Result<BlockingClient, OpenAIError> {
+    BlockingClient::builder()
+        .timeout(options.timeout)
+        .build()
+        .map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("failed to build shared HTTP client: {error}"),
+            )
+            .with_source(error)
+        })
+}
+
+fn build_async_client(options: &ResolvedRequestOptions) -> Result<Client, OpenAIError> {
     Client::builder()
         .timeout(options.timeout)
         .build()
@@ -129,7 +180,7 @@ fn build_client(options: &ResolvedRequestOptions) -> Result<Client, OpenAIError>
 }
 
 fn execute_once_json<T>(
-    client: &Client,
+    client: &BlockingClient,
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ApiResponse<T>, OpenAIError>
@@ -155,7 +206,7 @@ where
 }
 
 fn execute_once_unit(
-    client: &Client,
+    client: &BlockingClient,
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ApiResponse<()>, OpenAIError> {
@@ -166,8 +217,9 @@ fn execute_once_unit(
     })
 }
 
+#[allow(dead_code)]
 fn execute_once_text(
-    client: &Client,
+    client: &BlockingClient,
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ApiResponse<String>, OpenAIError> {
@@ -195,7 +247,7 @@ struct ResponseBytes {
 }
 
 fn execute_once_bytes(
-    client: &Client,
+    client: &BlockingClient,
     request: &PreparedRequest,
     options: &ResolvedRequestOptions,
 ) -> Result<ResponseBytes, OpenAIError> {
@@ -247,6 +299,53 @@ fn execute_once_bytes(
             request_id,
         },
         body,
+    })
+}
+
+async fn execute_once_text_stream(
+    client: &Client,
+    request: &PreparedRequest,
+) -> Result<StreamingTextResponse, OpenAIError> {
+    let mut builder = client.request(parse_method(&request.method)?, &request.url);
+    for (name, value) in &request.headers {
+        builder = builder.header(name.as_str(), value.as_str());
+    }
+    if let Some(body) = &request.body {
+        builder = builder.body(body.clone());
+    }
+
+    let response = builder.send().await.map_err(map_transport_error)?;
+    let status = response.status();
+    let headers = normalize_headers(response.headers());
+    let request_id = headers.get("x-request-id").cloned();
+    let status_code = status.as_u16();
+
+    if !status.is_success() {
+        let body = response
+            .bytes()
+            .await
+            .map_err(map_transport_error)?
+            .to_vec();
+        let mut error = OpenAIError::new(
+            ErrorKind::Api(classify_status(status_code)),
+            format!("OpenAI API request failed with status {status_code}"),
+        )
+        .with_response_metadata(status_code, headers.clone(), request_id);
+
+        if let Ok(payload) = parse_api_error_payload(&body) {
+            error = error.with_api_error(payload);
+        }
+
+        return Err(error);
+    }
+
+    Ok(StreamingTextResponse {
+        metadata: ResponseMetadata {
+            status_code,
+            headers,
+            request_id,
+        },
+        response,
     })
 }
 

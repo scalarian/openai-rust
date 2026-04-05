@@ -1,4 +1,8 @@
-use openai_rust::helpers::sse::{SseFrame, SseParser};
+use openai_rust::{
+    OpenAI,
+    helpers::sse::{SseFrame, SseParser},
+    resources::responses::{ResponseRetrieveParams, ResponseStreamEvent},
+};
 
 mod support;
 
@@ -80,4 +84,65 @@ fn crlf_and_eof_boundaries_do_not_corrupt_sse_parsing() {
             },
         ]
     );
+}
+
+#[test]
+fn resume_uses_server_sequence_numbers() {
+    let transcript = concat!(
+        "event: response.created\n",
+        "data: {\"id\":\"resp_stream\",\"object\":\"response\",\"created_at\":1,\"status\":\"in_progress\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"\"}]}],\"usage\":{},\"sequence_number\":10}\n\n",
+        "event: response.output_text.delta\n",
+        "data: {\"output_index\":0,\"content_index\":0,\"delta\":\"Hello\",\"sequence_number\":11}\n\n",
+        "event: response.output_text.delta\n",
+        "data: {\"output_index\":0,\"content_index\":0,\"delta\":\" world\",\"sequence_number\":12}\n\n",
+        "event: response.completed\n",
+        "data: {\"id\":\"resp_stream\",\"object\":\"response\",\"created_at\":1,\"status\":\"completed\",\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello world\"}]}],\"usage\":{},\"sequence_number\":13}\n\n",
+        "data: [DONE]\n\n"
+    );
+    let server =
+        support::mock_http::MockHttpServer::spawn(sse_response(transcript)).expect("mock server");
+    let client = OpenAI::builder()
+        .api_key("sk-test")
+        .base_url(server.url())
+        .build();
+
+    let mut stream = client
+        .responses()
+        .resume_stream(
+            "resp_stream",
+            ResponseRetrieveParams {
+                starting_after: Some(10),
+                ..Default::default()
+            },
+        )
+        .expect("resume should succeed");
+
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::OutputTextDelta { ref delta, .. }) if delta == "Hello"
+    ));
+    assert_eq!(
+        stream
+            .final_response()
+            .expect("completed response")
+            .output_text(),
+        "Hello world"
+    );
+}
+
+fn sse_response(body: impl Into<Vec<u8>>) -> support::mock_http::ScriptedResponse {
+    let body = body.into();
+    support::mock_http::ScriptedResponse {
+        status_code: 200,
+        reason: "OK",
+        headers: vec![
+            (
+                String::from("content-type"),
+                String::from("text/event-stream"),
+            ),
+            (String::from("content-length"), body.len().to_string()),
+        ],
+        body,
+        ..Default::default()
+    }
 }
