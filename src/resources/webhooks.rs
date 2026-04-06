@@ -174,6 +174,27 @@ pub enum WebhookEvent {
 }
 
 impl WebhookEvent {
+    /// Returns the webhook event identifier emitted by the producer surface.
+    pub fn event_id(&self) -> &str {
+        match self {
+            Self::BatchCancelled(event)
+            | Self::BatchCompleted(event)
+            | Self::BatchExpired(event)
+            | Self::BatchFailed(event)
+            | Self::EvalRunCanceled(event)
+            | Self::EvalRunFailed(event)
+            | Self::EvalRunSucceeded(event)
+            | Self::FineTuningJobCancelled(event)
+            | Self::FineTuningJobFailed(event)
+            | Self::FineTuningJobSucceeded(event)
+            | Self::ResponseCancelled(event)
+            | Self::ResponseCompleted(event)
+            | Self::ResponseFailed(event)
+            | Self::ResponseIncomplete(event) => event.id.as_str(),
+            Self::RealtimeCallIncoming(event) => event.id.as_str(),
+        }
+    }
+
     pub fn event_type(&self) -> &'static str {
         match self {
             Self::BatchCancelled(_) => "batch.cancelled",
@@ -191,6 +212,27 @@ impl WebhookEvent {
             Self::ResponseCompleted(_) => "response.completed",
             Self::ResponseFailed(_) => "response.failed",
             Self::ResponseIncomplete(_) => "response.incomplete",
+        }
+    }
+
+    /// Returns the primary upstream resource identifier carried by the webhook payload.
+    pub fn resource_id(&self) -> &str {
+        match self {
+            Self::BatchCancelled(event)
+            | Self::BatchCompleted(event)
+            | Self::BatchExpired(event)
+            | Self::BatchFailed(event)
+            | Self::EvalRunCanceled(event)
+            | Self::EvalRunFailed(event)
+            | Self::EvalRunSucceeded(event)
+            | Self::FineTuningJobCancelled(event)
+            | Self::FineTuningJobFailed(event)
+            | Self::FineTuningJobSucceeded(event)
+            | Self::ResponseCancelled(event)
+            | Self::ResponseCompleted(event)
+            | Self::ResponseFailed(event)
+            | Self::ResponseIncomplete(event) => event.data.id.as_str(),
+            Self::RealtimeCallIncoming(event) => event.data.call_id.as_str(),
         }
     }
 }
