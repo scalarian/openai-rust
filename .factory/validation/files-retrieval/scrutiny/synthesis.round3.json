@@ -1,6 +1,6 @@
 {
   "milestone": "files-retrieval",
-  "round": 4,
+  "round": 3,
   "status": "pass",
   "validatorsRun": {
     "test": {
@@ -29,5 +29,5 @@
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": ".factory/validation/files-retrieval/scrutiny/synthesis.round3.json"
+  "previousRound": ".factory/validation/files-retrieval/scrutiny/synthesis.round2.json"
 }
