@@ -10,6 +10,7 @@ let _responses = client.responses();
 ```
 "#]
 
+#[cfg(feature = "blocking")]
 pub mod blocking;
 pub mod client;
 pub mod config;
