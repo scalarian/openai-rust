@@ -63,7 +63,7 @@ impl ResourceFamilies {
             audio: audio::Audio::new(runtime.clone()),
             files: files::Files::new(runtime.clone()),
             uploads: uploads::Uploads::new(runtime.clone()),
-            vector_stores: vector_stores::VectorStores::default(),
+            vector_stores: vector_stores::VectorStores::new(runtime.clone()),
             batches: batches::Batches,
             webhooks: webhooks::Webhooks,
             fine_tuning: fine_tuning::FineTuning,
