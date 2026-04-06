@@ -1,0 +1,50 @@
+{
+  "milestone": "files-retrieval",
+  "round": 2,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cargo test --all-features -- --test-threads=5",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cargo check --all-targets --all-features",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "failedFeatures": [
+      "files-retrieval-fix-vector-store-batch-upload-concurrency"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "files-retrieval-fix-vector-store-batch-upload-concurrency",
+      "file": "src/resources/vector_stores.rs",
+      "line": 597,
+      "severity": "blocking",
+      "description": "`upload_and_poll` now spawns one thread per file, but the `for worker in upload_workers` loop uses `worker.join()??`, so the helper returns immediately on the first upload error or panic. Any later handles are dropped without being joined, which leaves uploads running after the method has already failed and can create orphaned files in the background."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "path": ".factory/library/user-testing.md",
+      "description": "Documented that the shared mock HTTP harness is serialized, so concurrency-sensitive transport proofs need bespoke loopback servers in the owning test file.",
+      "sourceFeature": "files-retrieval-fix-vector-store-batch-upload-concurrency"
+    }
+  ],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [],
+  "previousRound": ".factory/validation/files-retrieval/scrutiny/synthesis.round1.json"
+}

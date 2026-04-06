@@ -1,28 +1,15 @@
 {
   "featureId": "files-retrieval-fix-vector-store-batch-upload-concurrency",
-  "reviewedAt": "2026-04-06T01:22:35Z",
-  "commitId": "5bf718210784bb2f117c34847271d96c6408172d",
+  "reviewedAt": "2026-04-06T01:36:59Z",
+  "commitId": "1eca8feea961a683976c1419b75b43ada73ca357",
   "transcriptSkeletonReviewed": true,
   "diffReviewed": true,
-  "status": "fail",
+  "status": "pass",
   "codeReview": {
-    "summary": "The fix does address the original scrutiny finding by starting the new file uploads concurrently and preserving merged file-id order before batch creation, but it is not safe to ship as written because the new worker-thread fan-out returns on the first upload error without joining the remaining workers, so the helper can report failure while detached upload threads continue mutating `/v1/files` in the background.",
-    "issues": [
-      {
-        "file": "src/resources/vector_stores.rs",
-        "line": 597,
-        "severity": "blocking",
-        "description": "`upload_and_poll` now spawns one thread per file, but the `for worker in upload_workers` loop uses `worker.join()??`, so the helper returns immediately on the first upload error or panic. Any later handles in `upload_workers` are then dropped without being joined, which leaves those upload threads running after the method has already failed. A caller can therefore receive an error while other `/v1/files` uploads are still completing in the background and creating orphaned files, which breaks the synchronous helper contract and makes error handling nondeterministic."
-      }
-    ]
+    "summary": "The latest fix now closes the prior blocking failure: `VectorStoreFileBatches::upload_and_poll` still uploads new files concurrently, but it now joins every spawned upload worker before returning and only surfaces an error after all worker handles have been collected. The merged `file_ids` order and existing empty-work/polling behavior remain intact, and the new regression test specifically proves the helper waits for a delayed sibling upload before returning a failed result.",
+    "issues": []
   },
-  "sharedStateObservations": [
-    {
-      "area": "knowledge",
-      "observation": "The shared mock HTTP harness only supports serialized request/response scripts, so concurrency-sensitive transport proofs currently require ad hoc loopback servers inside individual tests.",
-      "evidence": "`tests/support/mock_http.rs:62-90` accepts and serves one connection per scripted response in sequence, while this fix had to add a bespoke `ConcurrentUploadServer` at `tests/vector_store_file_batches_contract.rs:444-583` to prove overlapping uploads."
-    }
-  ],
-  "addressesFailureFrom": ".factory/validation/files-retrieval/scrutiny/reviews/vector-store-file-batches-and-top-level-batches.json",
-  "summary": "Reviewed the fix handoff, transcript skeleton, prior failed review, feature definitions, and both commit diffs (`241729dfe56200f6fb866a6be38bd5c8f6bc3587` and `5bf718210784bb2f117c34847271d96c6408172d`). The concurrency regression is fixed in the success path, but `src/resources/vector_stores.rs:579-603` introduces a new failure-path bug: the helper exits on the first failed worker without joining the remaining upload threads, so background `/v1/files` mutations can continue after the call has already returned an error."
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/files-retrieval/scrutiny/reviews/files-retrieval-fix-vector-store-batch-upload-concurrency.json",
+  "summary": "Reviewed the prior failing scrutiny report and synthesis, the latest handoff/transcript skeleton, the current implementation in `src/resources/vector_stores.rs`, and the added regression coverage in `tests/vector_store_file_batches_contract.rs`. The previously reported failure-path bug is fixed in commit `1eca8feea961a683976c1419b75b43ada73ca357`: the helper now joins all upload workers before surfacing the first error, so no evidence-backed blocking issue remains in this feature."
 }
