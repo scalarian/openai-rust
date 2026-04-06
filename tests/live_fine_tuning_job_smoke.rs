@@ -4,7 +4,7 @@ use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
     resources::{
         files::{FileCreateParams, FilePurpose, FileUpload, WaitForProcessingOptions},
-        fine_tuning::{FineTuningJobCreateParams, FineTuningJobListParams},
+        fine_tuning::{FineTuningJobCreateParams, FineTuningJobListParams, FineTuningJobStatus},
     },
 };
 
@@ -89,6 +89,11 @@ fn live_fine_tuning_job_smoke_proves_create_retrieve_list_cancel() {
         .cancel(&job_id)
         .expect("live fine-tuning job cancel should succeed");
     assert_eq!(cancelled.output.id, job_id);
+    assert_eq!(
+        cancelled.output.status,
+        FineTuningJobStatus::Cancelled,
+        "live fine-tuning cancel should return the cancelled job status"
+    );
 
     let events = client
         .fine_tuning()

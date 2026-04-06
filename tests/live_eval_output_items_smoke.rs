@@ -91,6 +91,7 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
     let output_item_id = listed.output.data[0].id.clone();
     assert_eq!(listed.output.data[0].eval_id, eval_id);
     assert_eq!(listed.output.data[0].run_id, run_id);
+    assert_live_output_item_fields(&listed.output.data[0]);
 
     let retrieved = client
         .evals()
@@ -101,6 +102,7 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
     assert_eq!(retrieved.output.id, output_item_id);
     assert_eq!(retrieved.output.eval_id, eval_id);
     assert_eq!(retrieved.output.run_id, run_id);
+    assert_live_output_item_fields(&retrieved.output);
 
     println!("live eval id: {eval_id}");
     println!("live eval run id: {run_id}");
@@ -128,5 +130,45 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
             deleted.request_id().unwrap_or("<missing>")
         ),
         Err(error) => println!("live eval cleanup could not delete eval {eval_id}: {error}"),
+    }
+}
+
+fn assert_live_output_item_fields(item: &openai_rust::resources::evals::EvalOutputItem) {
+    if let Some(result) = item.results.first() {
+        assert!(
+            !result.name.trim().is_empty(),
+            "live eval output-item grader results should expose a representative non-null name"
+        );
+    }
+
+    let sample = &item.sample;
+    let has_provenance = !sample.model.trim().is_empty()
+        || !sample.finish_reason.trim().is_empty()
+        || !sample.input.is_empty()
+        || !sample.output.is_empty()
+        || sample.error.is_some()
+        || !sample.extra.is_empty();
+    if has_provenance {
+        assert!(
+            !sample.model.trim().is_empty() || !sample.finish_reason.trim().is_empty(),
+            "live eval output-item sample provenance should expose a representative non-null model or finish_reason when present"
+        );
+    }
+
+    let usage = &sample.usage;
+    let has_usage = usage.total_tokens > 0
+        || usage.prompt_tokens > 0
+        || usage.completion_tokens > 0
+        || usage.cached_tokens > 0
+        || !usage.extra.is_empty();
+    if has_usage {
+        assert!(
+            usage.total_tokens >= usage.prompt_tokens,
+            "live eval output-item sample usage should keep total_tokens >= prompt_tokens when usage is present"
+        );
+        assert!(
+            usage.total_tokens >= usage.completion_tokens,
+            "live eval output-item sample usage should keep total_tokens >= completion_tokens when usage is present"
+        );
     }
 }
