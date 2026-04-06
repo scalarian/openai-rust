@@ -1,0 +1,40 @@
+name: Feature request
+description: Request a new SDK surface, coverage expansion, or ergonomic improvement.
+title: "[feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for concrete API coverage gaps or ergonomics improvements. Tie the request to a real integration need.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short name for the request.
+      placeholder: Add typed helpers for response background tasks
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do today that is awkward or unsupported?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_api
+    attributes:
+      label: Proposed shape
+      description: Sketch the request/response shape, method chain, or example call site if you have one.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds, raw HTTP wrappers, or other crates you evaluated.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to API docs, examples, or upstream endpoints are useful.

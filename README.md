@@ -1,30 +1,15 @@
 # openai-rust
 
-Clean-room Rust SDK for the OpenAI API. The crate is async-first, keeps `Responses` as the primary generation surface, and still ships compatibility helpers for Chat Completions and legacy Completions.
+Independent Rust SDK for the OpenAI API with Responses-first ergonomics, realtime support, and typed compatibility helpers.
+
+[![CI](https://github.com/scalarian/openai-rust/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scalarian/openai-rust/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 ## Quickstart
 
-### Validate the checkout
-
 ```sh
-cargo test --test readme_contract
-cargo check --examples --all-features
-cargo test --doc
+cargo add openai-rust
 ```
-
-### Dry-run the local onboarding flow
-
-These examples do not hit the network. They prove the public API shape from a clean checkout:
-
-```sh
-cargo run --example responses_quickstart
-cargo run --example responses_streaming
-cargo run --example structured_outputs
-```
-
-### First API call
-
-Set `OPENAI_API_KEY` in your shell before running a live request:
 
 ```rust,no_run
 use openai_rust::OpenAI;
@@ -45,53 +30,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-If you want a zero-cost sanity check before making a live call, use `client.prepare_request("GET", "/models")?` to confirm env-based configuration resolves correctly.
-
-## Supported surfaces
-
-The published surface is backed by concrete modules and examples in this repository:
-
-- Responses and structured outputs — `src/resources/responses.rs`, `examples/responses_quickstart.rs`, `examples/structured_outputs.rs`
-- Conversations — `src/resources/conversations.rs`, `examples/live_conversations_crud_smoke.rs`
-- Chat Completions compatibility — `src/resources/chat.rs`, `examples/chat_completions_migration.rs`
-- Legacy Completions compatibility — `src/resources/completions.rs`, `docs/migration-guide.md`
-- Embeddings, Models, Moderations — `src/resources/embeddings.rs`, `src/resources/models.rs`, `src/resources/moderations.rs`, `examples/embeddings.rs`
-- Images and Audio — `src/resources/images.rs`, `src/resources/audio.rs`, `docs/api-coverage.md`
-- Files, Uploads, and Vector Stores — `src/resources/files.rs`, `src/resources/uploads.rs`, `src/resources/vector_stores.rs`, `examples/upload_to_vector_store.rs`
-- Realtime GA — `src/realtime`, `docs/architecture-note.md`
-- Blocking facade — `src/blocking/mod.rs`
-
-## Migration from compatibility surfaces
-
-`Responses` is the preferred surface for new code. Compatibility namespaces remain available, but they are intentionally secondary:
-
-- `client.chat().completions()` stays available for chat-completions compatibility and stored chat-completion helpers.
-- `client.completions()` stays available for legacy `/v1/completions` workflows.
-- New structured output, modern streaming, and tool-heavy flows should start from `client.responses()`.
-
-See `docs/migration-guide.md` for a side-by-side migration walkthrough.
-
-## Examples
-
-Representative examples that compile with the shipped crate API:
-
-- `examples/responses_quickstart.rs`
-- `examples/responses_streaming.rs`
-- `examples/structured_outputs.rs`
-- `examples/request_metadata.rs`
-- `examples/embeddings.rs`
-- `examples/upload_to_vector_store.rs`
-- `examples/chat_completions_migration.rs`
-
-Run them with `cargo run --example <name>`.
-
-## Developer validation
-
-The docs and examples are validated with the same commands used by this feature:
+From a local checkout, validate the published surfaces with:
 
 ```sh
-cargo test --test readme_contract
-cargo test --test docs_contract
+cargo fmt --all --check
+cargo test --workspace
 cargo check --examples --all-features
 cargo test --doc
 ```
+
+If you want a zero-cost configuration check before making a live request, use `client.prepare_request("GET", "/models")?` to confirm env-based configuration resolves correctly.
+
+## Capability Overview
+
+- Responses-first request and streaming flows, including structured outputs and tool schemas.
+- Coverage for chat completions, legacy completions, embeddings, files, uploads, vector stores, images, audio, evals, fine-tuning, moderations, and webhooks.
+- Realtime session models plus an opt-in blocking facade for synchronous integrations.
+- Example-driven docs and contract tests that keep the published API aligned with the repository.
+
+## Start Here
+
+Choose the path that matches your job:
+
+- [Quickstart](docs/quickstart.md) for a fresh integration.
+- [Responses Guide](docs/responses-guide.md) for structured outputs, streaming, and tool-heavy flows.
+- [Migration Guide](docs/migration-guide.md) for chat-completions and legacy completions compatibility paths.
+- [Files and Vector Stores](docs/files-and-vector-stores.md) for uploads and retrieval workflows.
+- [Architecture Note](docs/architecture-note.md) for runtime, transport, and realtime notes.
+- [API Coverage](docs/api-coverage.md) and [Intentional Gaps](docs/intentional-gaps.md) for surface-level status.
+
+## Crate Map
+
+- `openai_rust::OpenAI`: client builder, environment-driven auth, and request preparation.
+- `openai_rust::resources`: typed REST surfaces for the API families exposed by the crate.
+- `openai_rust::realtime`: session, event, and state models for Realtime workflows.
+- `openai_rust::helpers`: multipart uploads, pagination, SSE, structured output, and webhook utilities.
+- `openai_rust::blocking`: feature-gated blocking facade for non-async callers.
+
+## Contributing and Releases
+
+- Start with [docs/maintenance.md](docs/maintenance.md) for validation commands and release-ready checks.
+- Use [SUPPORT.md](SUPPORT.md) to choose between bug reports, docs issues, feature requests, and usage questions.
+- Review [SECURITY.md](SECURITY.md) before reporting sensitive issues.
+- See [CHANGELOG.md](CHANGELOG.md) for release notes and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation expectations.
+- Maintainer: Chaitanya Mishra ([@staticpayload](https://github.com/staticpayload)).
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
+
+> [!WARNING]
+> This project is not an official OpenAI product. It is not affiliated with, endorsed by, or supported by OpenAI.

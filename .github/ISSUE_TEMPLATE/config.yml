@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support guide
+    url: https://github.com/scalarian/openai-rust/blob/main/SUPPORT.md
+    about: Start here for usage guidance and the right issue template.
+  - name: Security policy
+    url: https://github.com/scalarian/openai-rust/blob/main/SECURITY.md
+    about: Report vulnerabilities privately and avoid public disclosure.

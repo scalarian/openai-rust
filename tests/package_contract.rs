@@ -8,10 +8,12 @@ fn cargo_metadata_is_publish_ready_and_apache_licensed() {
     for expected in [
         "name = \"openai-rust\"",
         "version = \"0.1.0\"",
+        "authors = [\"Chaitanya Mishra (@staticpayload)\"]",
         "license = \"Apache-2.0\"",
         "repository = \"https://github.com/scalarian/openai-rust\"",
         "documentation = \"https://docs.rs/openai-rust\"",
         "homepage = \"https://github.com/scalarian/openai-rust\"",
+        "readme = \"README.md\"",
         "keywords = [\"openai\", \"api\", \"sdk\", \"responses\", \"rust\"]",
         "categories = [\"api-bindings\", \"asynchronous\"]",
     ] {
@@ -26,6 +28,10 @@ fn cargo_metadata_is_publish_ready_and_apache_licensed() {
     assert!(
         license.contains("Apache License") && license.contains("Version 2.0, January 2004"),
         "LICENSE should contain the Apache-2.0 text"
+    );
+    assert!(
+        !manifest.contains("support@openai.com"),
+        "Cargo.toml should not reference the OpenAI support mailbox"
     );
 }
 

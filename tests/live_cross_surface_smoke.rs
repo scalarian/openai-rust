@@ -1,3 +1,6 @@
+#[path = "support/cross_surface.rs"]
+mod cross_surface;
+
 use openai_rust::{
     OpenAI,
     realtime::{
@@ -173,9 +176,21 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
         ],
     };
 
+    let normalized = cross_surface::normalize_live_publish_ready_report(&report);
+    assert_eq!(
+        normalized,
+        cross_surface::expected_publish_ready_equivalence_baseline()
+    );
+
+    let paired = cross_surface::PairedCrossSurfaceReport {
+        mock_baseline: cross_surface::expected_publish_ready_equivalence_baseline(),
+        live_report: normalized,
+    };
+
     println!(
         "{}",
-        serde_json::to_string_pretty(&report).expect("serialize live cross-surface report")
+        serde_json::to_string_pretty(&paired)
+            .expect("serialize paired live cross-surface report")
     );
     println!(
         "live file cleanup delete request id: {}",

@@ -1,0 +1,26 @@
+name: Docs issue
+description: Report a documentation gap, incorrect example, or broken navigation path.
+title: "[docs] "
+labels:
+  - documentation
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: File path, section heading, or URL.
+      placeholder: docs/quickstart.md#first-live-request
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Be specific about the broken statement, command, or example.
+    validations:
+      required: true
+  - type: textarea
+    id: suggested_fix
+    attributes:
+      label: Suggested fix
+      description: If you know the correct wording or command, include it here.

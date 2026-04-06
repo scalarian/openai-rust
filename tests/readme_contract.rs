@@ -21,10 +21,12 @@ fn readme_exists_and_contains_publish_facing_sections() {
     for section in [
         "# openai-rust",
         "## Quickstart",
-        "## Supported surfaces",
-        "## Migration from compatibility surfaces",
-        "## Examples",
-        "## Developer validation",
+        "## Capability Overview",
+        "## Start Here",
+        "## Crate Map",
+        "## Contributing and Releases",
+        "## License",
+        "> [!WARNING]",
     ] {
         assert!(
             readme.contains(section),
@@ -33,7 +35,9 @@ fn readme_exists_and_contains_publish_facing_sections() {
     }
 
     for command in [
-        "cargo test --test readme_contract",
+        "cargo add openai-rust",
+        "cargo fmt --all --check",
+        "cargo test --workspace",
         "cargo check --examples --all-features",
         "cargo test --doc",
     ] {
@@ -42,6 +46,15 @@ fn readme_exists_and_contains_publish_facing_sections() {
             "README.md should document `{command}`"
         );
     }
+
+    assert!(
+        readme.contains("not an official OpenAI product"),
+        "README.md should include the non-affiliation warning"
+    );
+    assert!(
+        readme.contains("actions/workflows/ci.yml/badge.svg"),
+        "README.md should include the CI badge"
+    );
 }
 
 #[test]
