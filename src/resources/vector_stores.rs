@@ -405,13 +405,214 @@ impl VectorStoreFiles {
 /// Placeholder for the vector-store file-batches surface, implemented later in the milestone.
 #[derive(Clone, Debug)]
 pub struct VectorStoreFileBatches {
-    #[allow(dead_code)]
     runtime: Arc<ClientRuntime>,
 }
 
 impl VectorStoreFileBatches {
     pub(crate) fn new(runtime: Arc<ClientRuntime>) -> Self {
         Self { runtime }
+    }
+
+    /// Creates a vector-store file batch.
+    pub fn create(
+        &self,
+        vector_store_id: &str,
+        params: VectorStoreFileBatchCreateParams,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        let vector_store_id = encode_path_id(validate_path_id("vector_store_id", vector_store_id)?);
+        execute_beta_json_with_body(
+            &self.runtime,
+            "POST",
+            format!("/vector_stores/{vector_store_id}/file_batches"),
+            &params,
+            RequestOptions::default(),
+            Vec::new(),
+        )
+    }
+
+    /// Retrieves a vector-store file batch.
+    pub fn retrieve(
+        &self,
+        vector_store_id: &str,
+        batch_id: &str,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        self.retrieve_with_headers(vector_store_id, batch_id, Vec::new())
+    }
+
+    /// Cancels a vector-store file batch and returns the updated lifecycle resource.
+    pub fn cancel(
+        &self,
+        vector_store_id: &str,
+        batch_id: &str,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        let vector_store_id = encode_path_id(validate_path_id("vector_store_id", vector_store_id)?);
+        let batch_id = encode_path_id(validate_path_id("batch_id", batch_id)?);
+        execute_beta_json(
+            &self.runtime,
+            "POST",
+            format!("/vector_stores/{vector_store_id}/file_batches/{batch_id}/cancel"),
+            RequestOptions::default(),
+            Vec::new(),
+        )
+    }
+
+    /// Lists files that belong to a vector-store file batch.
+    pub fn list_files(
+        &self,
+        vector_store_id: &str,
+        batch_id: &str,
+        params: VectorStoreFileBatchListFilesParams,
+    ) -> Result<ApiResponse<VectorStoreFilesPage>, OpenAIError> {
+        let vector_store_id = encode_path_id(validate_path_id("vector_store_id", vector_store_id)?);
+        let batch_id = encode_path_id(validate_path_id("batch_id", batch_id)?);
+        let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+        if let Some(after) = params.after {
+            serializer.append_pair("after", &after);
+        }
+        if let Some(before) = params.before {
+            serializer.append_pair("before", &before);
+        }
+        if let Some(filter) = params.filter {
+            serializer.append_pair("filter", &filter);
+        }
+        if let Some(limit) = params.limit {
+            serializer.append_pair("limit", &limit.to_string());
+        }
+        if let Some(order) = params.order {
+            serializer.append_pair("order", &order);
+        }
+        let query = serializer.finish();
+        let path = if query.is_empty() {
+            format!("/vector_stores/{vector_store_id}/file_batches/{batch_id}/files")
+        } else {
+            format!("/vector_stores/{vector_store_id}/file_batches/{batch_id}/files?{query}")
+        };
+        execute_beta_json(
+            &self.runtime,
+            "GET",
+            path,
+            RequestOptions::default(),
+            Vec::new(),
+        )
+    }
+
+    /// Creates a vector-store file batch and polls it to a terminal state.
+    pub fn create_and_poll(
+        &self,
+        vector_store_id: &str,
+        params: VectorStoreFileBatchCreateParams,
+        options: VectorStoreFileBatchPollOptions,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        let created = self.create(vector_store_id, params)?;
+        self.poll(vector_store_id, &created.output.id, options)
+    }
+
+    /// Polls a vector-store file batch until it reaches a terminal state.
+    pub fn poll(
+        &self,
+        vector_store_id: &str,
+        batch_id: &str,
+        options: VectorStoreFileBatchPollOptions,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        let started = Instant::now();
+        let poll_interval_ms = options
+            .poll_interval
+            .map(|interval| interval.as_millis().to_string());
+
+        loop {
+            let mut extra_headers = vec![(
+                String::from("x-stainless-poll-helper"),
+                String::from("true"),
+            )];
+            if let Some(value) = &poll_interval_ms {
+                extra_headers.push((
+                    String::from("x-stainless-custom-poll-interval"),
+                    value.clone(),
+                ));
+            }
+
+            let response = self.retrieve_with_headers(vector_store_id, batch_id, extra_headers)?;
+            match response.output.status {
+                VectorStoreFileBatchStatus::InProgress => {
+                    let sleep_interval = options.poll_interval.unwrap_or_else(|| {
+                        response
+                            .header("openai-poll-after-ms")
+                            .and_then(|value| value.parse::<u64>().ok())
+                            .map(Duration::from_millis)
+                            .unwrap_or(DEFAULT_POLL_INTERVAL)
+                    });
+                    let elapsed = started.elapsed();
+                    if elapsed > options.max_wait || elapsed + sleep_interval > options.max_wait {
+                        return Err(OpenAIError::new(
+                            ErrorKind::Timeout,
+                            format!(
+                                "Giving up on waiting for vector store file batch {batch_id} to finish processing after {} milliseconds.",
+                                options.max_wait.as_millis()
+                            ),
+                        ));
+                    }
+                    thread::sleep(sleep_interval);
+                }
+                VectorStoreFileBatchStatus::Completed
+                | VectorStoreFileBatchStatus::Cancelled
+                | VectorStoreFileBatchStatus::Failed
+                | VectorStoreFileBatchStatus::Unknown => return Ok(response),
+            }
+        }
+    }
+
+    /// Uploads new files through the Files API, merges any existing file ids, then creates and polls the batch.
+    pub fn upload_and_poll(
+        &self,
+        vector_store_id: &str,
+        params: VectorStoreFileBatchUploadAndPollParams,
+        options: VectorStoreFileBatchPollOptions,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        if params.files.is_empty() {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                "No `files` provided to process. Use `create_and_poll` when you only have existing file ids.",
+            ));
+        }
+
+        let mut file_ids = params.file_ids;
+        let files = Files::new(self.runtime.clone());
+        for file in params.files {
+            let uploaded = files.create(FileCreateParams {
+                file,
+                purpose: FilePurpose::Assistants,
+                expires_after: None,
+            })?;
+            file_ids.push(uploaded.output.id);
+        }
+
+        self.create_and_poll(
+            vector_store_id,
+            VectorStoreFileBatchCreateParams {
+                attributes: None,
+                chunking_strategy: None,
+                file_ids,
+                files: Vec::new(),
+            },
+            options,
+        )
+    }
+
+    fn retrieve_with_headers(
+        &self,
+        vector_store_id: &str,
+        batch_id: &str,
+        extra_headers: Vec<(String, String)>,
+    ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        let vector_store_id = encode_path_id(validate_path_id("vector_store_id", vector_store_id)?);
+        let batch_id = encode_path_id(validate_path_id("batch_id", batch_id)?);
+        execute_beta_json(
+            &self.runtime,
+            "GET",
+            format!("/vector_stores/{vector_store_id}/file_batches/{batch_id}"),
+            RequestOptions::default(),
+            extra_headers,
+        )
     }
 }
 
@@ -510,6 +711,39 @@ pub struct VectorStoreFileListParams {
     pub order: Option<String>,
 }
 
+/// File-batch create body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct VectorStoreFileBatchCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking_strategy: Option<FileChunkingStrategy>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub file_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub files: Vec<VectorStoreFileBatchFile>,
+}
+
+/// One per-file entry for vector-store batch creation.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct VectorStoreFileBatchFile {
+    pub file_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking_strategy: Option<FileChunkingStrategy>,
+}
+
+/// File-batch list-files query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VectorStoreFileBatchListFilesParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub filter: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
 /// Polling options for vector-store file helpers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VectorStoreFilePollOptions {
@@ -526,12 +760,35 @@ impl Default for VectorStoreFilePollOptions {
     }
 }
 
+/// Polling options for vector-store file-batch helpers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VectorStoreFileBatchPollOptions {
+    pub poll_interval: Option<Duration>,
+    pub max_wait: Duration,
+}
+
+impl Default for VectorStoreFileBatchPollOptions {
+    fn default() -> Self {
+        Self {
+            poll_interval: None,
+            max_wait: Duration::from_secs(30 * 60),
+        }
+    }
+}
+
 /// Upload helper parameters for vector-store files.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorStoreFileUploadParams {
     pub file: FileUpload,
     pub attributes: Option<Value>,
     pub chunking_strategy: Option<FileChunkingStrategy>,
+}
+
+/// Upload-and-poll helper parameters for vector-store file batches.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct VectorStoreFileBatchUploadAndPollParams {
+    pub files: Vec<FileUpload>,
+    pub file_ids: Vec<String>,
 }
 
 /// Shared file chunking strategy type for vector stores and vector-store files.
@@ -586,6 +843,19 @@ pub enum VectorStoreFileStatus {
     Unknown,
 }
 
+/// Vector-store file batch status.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VectorStoreFileBatchStatus {
+    InProgress,
+    Completed,
+    Cancelled,
+    Failed,
+    #[default]
+    #[serde(other)]
+    Unknown,
+}
+
 /// Typed vector-store resource.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct VectorStore {
@@ -627,6 +897,23 @@ pub struct VectorStoreFileCounts {
     pub cancelled: u64,
     #[serde(default)]
     pub total: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Vector-store file batch resource.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct VectorStoreFileBatch {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub created_at: u64,
+    #[serde(default)]
+    pub file_counts: VectorStoreFileCounts,
+    pub status: VectorStoreFileBatchStatus,
+    #[serde(default)]
+    pub vector_store_id: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

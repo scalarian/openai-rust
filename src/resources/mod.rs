@@ -64,7 +64,7 @@ impl ResourceFamilies {
             files: files::Files::new(runtime.clone()),
             uploads: uploads::Uploads::new(runtime.clone()),
             vector_stores: vector_stores::VectorStores::new(runtime.clone()),
-            batches: batches::Batches,
+            batches: batches::Batches::new(runtime.clone()),
             webhooks: webhooks::Webhooks,
             fine_tuning: fine_tuning::FineTuning,
             evals: evals::Evals,
