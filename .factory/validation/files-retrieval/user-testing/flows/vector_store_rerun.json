@@ -1,0 +1,63 @@
+{
+  "groupId": "vector_store_rerun",
+  "surface": "mocked cargo validation",
+  "testedAt": "2026-04-06T02:16:56.628596+00:00",
+  "isolation": {
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "milestone": "files-retrieval",
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/files-retrieval/user-testing/target/vector_store_rerun"
+  },
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-FILES-006",
+      "title": "Vector store endpoints automatically opt into the retrieval beta contract",
+      "status": "pass",
+      "evidence": {
+        "commandLogs": [
+          "files-retrieval/vector_store_rerun/vector_store_contract_mock_list_and_search_preserve_distinct_page_contracts.log"
+        ],
+        "observedTests": [
+          "list_and_search_preserve_distinct_page_contracts"
+        ],
+        "observation": "The rerun test passes and its recorded assertions directly check that the top-level vector-store list request to `/v1/vector_stores?...` and the top-level vector-store search request to `/v1/vector_stores/vs_123/search` both carry `openai-beta: assistants=v2`, closing the previously missing direct proof for list/search header injection."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FILES-009",
+      "title": "Vector store file polling helpers respect caller or server poll intervals and preserve failure visibility",
+      "status": "pass",
+      "evidence": {
+        "commandLogs": [
+          "files-retrieval/vector_store_rerun/vector_store_files_contract_polling_helpers_respect_explicit_and_server_intervals.log"
+        ],
+        "observedTests": [
+          "polling_helpers_respect_explicit_and_server_intervals"
+        ],
+        "observation": "The rerun test passes and directly asserts `x-stainless-poll-helper: true`, `x-stainless-custom-poll-interval: 5` for explicit polling, header-driven delay behavior when only `openai-poll-after-ms` is present, and that `poll(...)`/`create_and_poll(...)` return terminal `failed` and `cancelled` vector-store file objects intact for caller inspection."
+      },
+      "issues": null
+    }
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/files-retrieval/user-testing/target/vector_store_rerun cargo test --test vector_store_contract_mock list_and_search_preserve_distinct_page_contracts -- --exact --nocapture",
+      "exitCode": 0,
+      "logPath": "files-retrieval/vector_store_rerun/vector_store_contract_mock_list_and_search_preserve_distinct_page_contracts.log",
+      "observation": "Passed the exact rerun for list/search vector-store contract coverage."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/files-retrieval/user-testing/target/vector_store_rerun cargo test --test vector_store_files_contract polling_helpers_respect_explicit_and_server_intervals -- --exact --nocapture",
+      "exitCode": 0,
+      "logPath": "files-retrieval/vector_store_rerun/vector_store_files_contract_polling_helpers_respect_explicit_and_server_intervals.log",
+      "observation": "Passed the exact rerun for vector-store file polling helper coverage."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Re-ran the two still-relevant vector-store proofs successfully. VAL-FILES-006 now has direct list/search beta-header proof, and VAL-FILES-009 now has direct polling-helper proof for explicit/server intervals plus visible failed and cancelled terminal states."
+}

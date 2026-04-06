@@ -1,45 +1,21 @@
 {
   "milestone": "files-retrieval",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
-    "total": 21,
-    "passed": 19,
+    "total": 2,
+    "passed": 2,
     "failed": 0,
-    "blocked": 2
+    "blocked": 0
   },
   "passedAssertions": [
-    "VAL-FILES-001",
-    "VAL-FILES-002",
-    "VAL-FILES-003",
-    "VAL-FILES-004",
-    "VAL-FILES-005",
-    "VAL-FILES-007",
-    "VAL-FILES-008",
-    "VAL-FILES-010",
-    "VAL-FILES-011",
-    "VAL-FILES-012",
-    "VAL-FILES-013",
-    "VAL-FILES-014",
-    "VAL-FILES-015",
-    "VAL-FILES-016",
-    "VAL-FILES-017",
-    "VAL-FILES-018",
-    "VAL-FILES-019",
-    "VAL-FILES-020",
-    "VAL-FILES-021"
+    "VAL-FILES-006",
+    "VAL-FILES-009"
   ],
   "failedAssertions": [],
-  "blockedAssertions": [
-    {
-      "id": "VAL-FILES-006",
-      "blockedBy": "`crud_and_errors` proves `openai-beta: assistants=v2` on create/retrieve/update/delete routes, but the observed list/search test only proves route and payload shape; it does not directly assert beta-header injection for list or search, so the full assertion is not directly proven by cargo output plus inspected test coverage."
-    },
-    {
-      "id": "VAL-FILES-009",
-      "blockedBy": "The passing polling-helper test directly proves poll-helper headers and explicit/server-driven interval handling, but it only exercises `in_progress -> completed` flows and does not directly prove that failed or cancelled terminal states remain visible to the caller."
-    }
-  ],
+  "blockedAssertions": [],
   "appliedUpdates": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/files-retrieval/user-testing/synthesis.round1.json",
+  "testedAt": "2026-04-06T02:18:10.285643+00:00",
+  "notes": "Re-ran only the previously blocked vector-store assertions after the proof-gap fix feature landed. Both assertions now have direct passing mocked cargo evidence."
 }
