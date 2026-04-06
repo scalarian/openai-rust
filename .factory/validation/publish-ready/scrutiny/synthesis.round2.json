@@ -1,7 +1,7 @@
 {
   "milestone": "publish-ready",
-  "round": 3,
-  "status": "pass",
+  "round": 2,
+  "status": "fail",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,12 +20,20 @@
     }
   },
   "reviewsSummary": {
-    "total": 1,
+    "total": 2,
     "passed": 1,
-    "failed": 0,
-    "failedFeatures": []
+    "failed": 1,
+    "failedFeatures": [
+      "publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap"
+    ]
   },
-  "blockingIssues": [],
+  "blockingIssues": [
+    {
+      "featureId": "publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap",
+      "severity": "blocking",
+      "description": "The rerun fixes the mocked REST-to-Realtime websocket-hop gap for VAL-CROSS-009, but the paired mock/live equivalence proof still fabricates realtime `event_ordering` from the surface name instead of deriving it from observed live report data, so VAL-CROSS-004 remains unproven."
+    }
+  ],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
@@ -35,6 +43,11 @@
       "isSystemic": true
     }
   ],
-  "rejectedObservations": [],
-  "previousRound": ".factory/validation/publish-ready/scrutiny/synthesis.round2.json"
+  "rejectedObservations": [
+    {
+      "observation": "The `sdk-surface-worker` skill should explicitly mention tiny combined REST+websocket local harnesses for proof-only cross-surface fixes.",
+      "reason": "Overlaps the prior round's broader sdk-surface-worker guidance recommendation about proof-only cross-surface helper guidance, so I did not add a duplicate recommendation."
+    }
+  ],
+  "previousRound": ".factory/validation/publish-ready/scrutiny/synthesis.round1.json"
 }

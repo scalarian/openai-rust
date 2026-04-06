@@ -1,28 +1,15 @@
 {
   "featureId": "publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap",
-  "reviewedAt": "2026-04-06T11:49:59Z",
-  "commitId": "433c961774c66ee5476f10dad85d5bd1acd56ca0",
+  "reviewedAt": "2026-04-06T12:20:48Z",
+  "commitId": "486d73f2714a75f180573307ede4b0b66c192b21",
   "transcriptSkeletonReviewed": true,
   "diffReviewed": true,
-  "status": "fail",
+  "status": "pass",
   "codeReview": {
-    "summary": "The fix closes the mocked REST-to-Realtime websocket-hop gap for VAL-CROSS-009, but the paired mock/live equivalence proof for VAL-CROSS-004 still synthesizes the live realtime event ordering instead of deriving it from observed live report data.",
-    "issues": [
-      {
-        "file": "tests/support/cross_surface.rs",
-        "line": 107,
-        "severity": "blocking",
-        "description": "The live-side normalization fabricates `event_ordering` from the surface name (`normalize_event_ordering(&surface)`) instead of reading any ordering evidence from the live report, while `tests/live_cross_surface_smoke.rs` only records `surface`, `status_class`, `request_id`, and `terminal_interpretation` for the paired output. Because the realtime live report never carries observed ordering data, the paired mock/live report can still claim `[\"rest.client_secrets.create\", \"ws.session.created\", \"ws.close\"]` even if the live proof stops short of demonstrating that ordering, so VAL-CROSS-004 is not fully closed."
-      }
-    ]
+    "summary": "Pass: the remaining blocking issue is fixed at current HEAD. The rerun live smoke now records explicit `request_metadata` plus the observed realtime `event_ordering`, `normalize_live_publish_ready_report` consumes those report fields, and the new regression proves the normalizer preserves observed ordering instead of collapsing it back to the old synthetic baseline.",
+    "issues": []
   },
-  "sharedStateObservations": [
-    {
-      "area": "skills",
-      "observation": "The `sdk-surface-worker` skill still does not explicitly call out that proof-only cross-surface fixes may need a tiny combined REST+websocket local harness even when no production runtime change is required.",
-      "evidence": "/Users/staticpayload/Mainframe/openai-rust/.factory/skills/sdk-surface-worker/SKILL.md:17-18,25-30 describe proof-only validation-gap work but do not mention combined REST+websocket local harnesses; /Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-06T11-20-34-951Z__publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap__8e117048-9a92-4442-b5ba-6382b9f98a98.json:75-76 records the same missing guidance in `suggestedChanges`."
-    }
-  ],
+  "sharedStateObservations": [],
   "addressesFailureFrom": ".factory/validation/publish-ready/scrutiny/reviews/cross-surface-integration-harnesses.json",
-  "summary": "Fail: the fix successfully adds a real mocked websocket bootstrap hop for VAL-CROSS-009, but VAL-CROSS-004 remains incomplete because the paired live report hardcodes realtime event ordering instead of proving it from observed live report data."
+  "summary": "Pass: commit `486d73f` closes the prior blocking scrutiny issue. `tests/live_cross_surface_smoke.rs` now emits the observed realtime ordering in the paired live report, `tests/support/cross_surface.rs` normalizes from that recorded field, and `tests/cross_surface_contract.rs` adds a focused regression showing extra live ordering events are preserved rather than synthesized from the surface name."
 }
