@@ -1028,10 +1028,27 @@ fn append_query(path: &str, pairs: Vec<(String, String)>) -> String {
 
     let query = pairs
         .into_iter()
-        .map(|(key, value)| format!("{key}={value}"))
+        .map(|(key, value)| format!("{}={}", percent_encode(&key), percent_encode(&value)))
         .collect::<Vec<_>>()
         .join("&");
     format!("{path}?{query}")
+}
+
+fn percent_encode(value: &str) -> String {
+    fn is_unreserved(byte: u8) -> bool {
+        matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~')
+    }
+
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        if is_unreserved(byte) {
+            encoded.push(byte as char);
+        } else {
+            encoded.push('%');
+            encoded.push_str(&format!("{:02X}", byte));
+        }
+    }
+    encoded
 }
 
 fn map_live_transport_error(error: reqwest::Error) -> OpenAIError {

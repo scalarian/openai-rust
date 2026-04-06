@@ -25,9 +25,9 @@ fn stored_messages_list_preserves_cursor_ordering_and_termination() {
         .list(
             "chatcmpl_store",
             openai_rust::resources::chat::StoredChatCompletionMessagesListParams {
-                after: Some(String::from("msg_0")),
+                after: Some(String::from("msg 0/seed?cursor=true")),
                 limit: Some(2),
-                order: Some(String::from("asc")),
+                order: Some(String::from("asc&stable")),
             },
         )
         .unwrap();
@@ -36,7 +36,7 @@ fn stored_messages_list_preserves_cursor_ordering_and_termination() {
     assert_eq!(first_request.method, "GET");
     assert_eq!(
         first_request.path,
-        "/v1/chat/completions/chatcmpl_store/messages?after=msg_0&limit=2&order=asc"
+        "/v1/chat/completions/chatcmpl_store/messages?after=msg%200%2Fseed%3Fcursor%3Dtrue&limit=2&order=asc%26stable"
     );
     assert_eq!(first_page.output().data.len(), 2);
     assert_eq!(first_page.output().data[0].id.as_deref(), Some("msg_1"));
@@ -52,7 +52,7 @@ fn stored_messages_list_preserves_cursor_ordering_and_termination() {
             openai_rust::resources::chat::StoredChatCompletionMessagesListParams {
                 after: first_page.output().next_after().map(str::to_string),
                 limit: Some(2),
-                order: Some(String::from("desc")),
+                order: Some(String::from("desc?final=false")),
             },
         )
         .unwrap();
@@ -60,7 +60,7 @@ fn stored_messages_list_preserves_cursor_ordering_and_termination() {
     let second_request = server.captured_request().expect("captured second request");
     assert_eq!(
         second_request.path,
-        "/v1/chat/completions/chatcmpl_store/messages?after=msg_2&limit=2&order=desc"
+        "/v1/chat/completions/chatcmpl_store/messages?after=msg_2&limit=2&order=desc%3Ffinal%3Dfalse"
     );
     assert_eq!(second_page.output().data.len(), 0);
     assert_eq!(second_page.output().first_id, None);
