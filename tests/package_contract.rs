@@ -52,17 +52,17 @@ fn publish_filters_exclude_local_only_material() {
         );
     }
 
-    for forbidden in [
-        "exclude = [",
-        "\".factory/**\"",
-        "\"references/**\"",
-        "\"creds.txt\"",
-    ] {
+    for forbidden in ["exclude = [", "\"references/**\"", "\"creds.txt\""] {
         assert!(
             manifest.contains(forbidden),
             "Cargo.toml should exclude `{forbidden}`"
         );
     }
+
+    assert!(
+        !manifest.contains(".factory"),
+        "Cargo.toml should not carry internal factory-specific packaging rules"
+    );
 }
 
 fn repo_root() -> &'static Path {

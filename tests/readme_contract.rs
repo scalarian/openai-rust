@@ -86,8 +86,6 @@ fn readme_fenced_snippets_and_commands_validate_against_real_markdown_locations(
                         &command,
                         &CargoPackageMetadata::read(repo_root().join("Cargo.toml")),
                         &ExampleCommandValidation::from_repo_root(repo_root()),
-                        &fs::read_to_string(repo_root().join(".factory/services.yaml"))
-                            .expect("services manifest should exist"),
                     );
                 }
             }

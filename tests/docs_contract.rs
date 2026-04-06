@@ -140,8 +140,6 @@ fn docs_fenced_snippets_and_commands_validate_against_real_markdown_locations() 
     ];
     let package = CargoPackageMetadata::read(root.join("Cargo.toml"));
     let examples = ExampleCommandValidation::from_repo_root(&root);
-    let services = fs::read_to_string(root.join(".factory/services.yaml"))
-        .expect("services manifest should exist");
     let mut seen_locations = BTreeSet::new();
 
     for relative in docs {
@@ -159,7 +157,7 @@ fn docs_fenced_snippets_and_commands_validate_against_real_markdown_locations() 
                 FencedBlockLanguage::Shell => {
                     for command in extract_command_lines(&block) {
                         seen_locations.insert(command.location());
-                        validate_command_line(&command, &package, &examples, &services);
+                        validate_command_line(&command, &package, &examples);
                     }
                 }
                 FencedBlockLanguage::Other(_) => {}

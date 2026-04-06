@@ -263,7 +263,6 @@ pub fn validate_command_line(
     command: &MarkdownCommandLine,
     package: &CargoPackageMetadata,
     examples: &ExampleCommandValidation,
-    services_manifest: &str,
 ) {
     if let Some(example_name) = command.command.strip_prefix("cargo run --example ") {
         let example_name = example_name.trim();
@@ -309,9 +308,6 @@ pub fn validate_command_line(
                 | "cargo clippy --all-targets --all-features -- -D warnings"
                 | "RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features"
         )
-        || services_manifest
-            .lines()
-            .any(|line| line.trim_end().ends_with(&command.command))
     {
         return;
     }

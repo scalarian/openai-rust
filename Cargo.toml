@@ -13,7 +13,6 @@ readme = "README.md"
 keywords = ["openai", "api", "sdk", "responses", "rust"]
 categories = ["api-bindings", "asynchronous"]
 exclude = [
-    ".factory/**",
     "references/**",
     "creds.txt",
 ]
