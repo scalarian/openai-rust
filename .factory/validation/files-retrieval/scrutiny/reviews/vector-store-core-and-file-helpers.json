@@ -1,0 +1,22 @@
+{
+  "featureId": "vector-store-core-and-file-helpers",
+  "reviewedAt": "2026-04-06T00:49:34.260500Z",
+  "commitId": "84a253c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The vector-store CRUD/search/list and file CRUD/content/polling surface mostly matches the requested contract, but the upload helpers violate the SDK's local-validation invariant by performing a real file upload before validating the target vector-store id.",
+    "issues": [
+      {
+        "file": "src/resources/vector_stores.rs",
+        "line": 356,
+        "severity": "blocking",
+        "description": "`VectorStoreFiles::upload` calls `Files::create(...)` at lines 361-365 before any `validate_path_id(\"vector_store_id\", ...)` check, then only validates the vector-store id indirectly when `self.create(...)` runs. A blank/invalid `vector_store_id` therefore uploads a new assistants-purpose file and only then returns a local validation error, leaving an orphaned file and causing side effects for a request that the architecture says should fail locally on deterministic blank path identifiers. `upload_and_poll` inherits the same bug because it delegates to `upload` first."
+      }
+    ]
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed the feature handoff, transcript skeleton, sdk-surface-worker procedure, and commit 84a253c. The family wiring, beta-header routing, typed list/search semantics, and polling behavior are present, but the review fails because the vector-store upload helpers can mutate remote state before rejecting an invalid vector-store id."
+}

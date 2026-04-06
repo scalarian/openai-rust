@@ -48,6 +48,9 @@ High-level scope map for the crate. This file is for workers choosing where new 
 - Batches
 - Webhooks
 
+### Files/Uploads wire-shape note
+- `files.create` and `uploads.create` both expose `expires_after`, but their wire shapes are not interchangeable: Files multipart form data uses bracketed fields like `expires_after[anchor]` and `expires_after[seconds]`, while Uploads create accepts a JSON object body. Do not reuse the same serializer across both surfaces.
+
 ## Advanced Platform Surfaces
 - Fine-tuning
 - Evals
