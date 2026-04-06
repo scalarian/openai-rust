@@ -2,6 +2,7 @@
 
 pub mod client;
 pub mod events;
+pub mod state;
 
 pub use client::{
     Calls as RealtimeCalls, PreparedRealtimeWsTarget, Realtime, RealtimeAuth,
@@ -15,3 +16,4 @@ pub use events::{
     RealtimeErrorInfo, RealtimeOutputModality, RealtimeServerEvent, RealtimeSessionConfig,
     RealtimeSessionType, decode_server_event, decode_server_event_text,
 };
+pub use state::{RealtimeAudioBufferState, RealtimeEventState, RealtimeResponseState};

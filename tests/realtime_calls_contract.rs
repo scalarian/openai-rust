@@ -3,7 +3,7 @@ use openai_rust::{
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeOutputModality,
-        RealtimeSessionConfig, RealtimeSessionType, RealtimeSessionTTL,
+        RealtimeSessionConfig, RealtimeSessionTTL, RealtimeSessionType,
     },
 };
 use serde_json::json;
@@ -65,7 +65,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         .unwrap();
     assert_eq!(secret.output().client_secret.value, "ek_test_123");
     assert_eq!(secret.output().client_secret.expires_at, 1_740_000_000);
-    assert_eq!(secret.output().session.session_type, RealtimeSessionType::Realtime);
+    assert_eq!(
+        secret.output().session.session_type,
+        RealtimeSessionType::Realtime
+    );
     assert_eq!(
         secret.output().session.output_modalities,
         Some(vec![RealtimeOutputModality::Text])
@@ -94,7 +97,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
             }),
         })
         .unwrap();
-    assert_eq!(String::from_utf8_lossy(sdp_with_session.output()), sdp_answer);
+    assert_eq!(
+        String::from_utf8_lossy(sdp_with_session.output()),
+        sdp_answer
+    );
 
     client
         .realtime()
@@ -144,7 +150,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(client_secret_body["expires_after"]["anchor"], "created_at");
     assert_eq!(client_secret_body["expires_after"]["seconds"], 60);
     assert_eq!(client_secret_body["session"]["type"], "realtime");
-    assert_eq!(client_secret_body["session"]["output_modalities"][0], "text");
+    assert_eq!(
+        client_secret_body["session"]["output_modalities"][0],
+        "text"
+    );
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
     assert_eq!(
@@ -217,7 +226,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
 fn json_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![
-            (String::from("content-type"), String::from("application/json")),
+            (
+                String::from("content-type"),
+                String::from("application/json"),
+            ),
             (String::from("content-length"), body.len().to_string()),
         ],
         body: body.into_bytes(),
@@ -228,7 +240,10 @@ fn json_response(body: String) -> mock_http::ScriptedResponse {
 fn sdp_response(body: String) -> mock_http::ScriptedResponse {
     mock_http::ScriptedResponse {
         headers: vec![
-            (String::from("content-type"), String::from("application/sdp")),
+            (
+                String::from("content-type"),
+                String::from("application/sdp"),
+            ),
             (String::from("content-length"), body.len().to_string()),
         ],
         body: body.into_bytes(),

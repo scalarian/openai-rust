@@ -235,8 +235,18 @@ impl Realtime {
         &self,
         options: RealtimeConnectOptions,
     ) -> Result<PreparedRealtimeWsTarget, OpenAIError> {
-        if options.model.as_deref().unwrap_or_default().trim().is_empty()
-            && options.call_id.as_deref().unwrap_or_default().trim().is_empty()
+        if options
+            .model
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+            && options
+                .call_id
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
         {
             return Err(OpenAIError::new(
                 ErrorKind::Validation,
@@ -275,7 +285,11 @@ impl Realtime {
         path.push_str("/realtime");
         url.set_path(&path);
         url.set_query(None);
-        if let Some(model) = options.model.as_ref().filter(|value| !value.trim().is_empty()) {
+        if let Some(model) = options
+            .model
+            .as_ref()
+            .filter(|value| !value.trim().is_empty())
+        {
             url.query_pairs_mut().append_pair("model", model);
         }
         if let Some(call_id) = options
@@ -287,7 +301,9 @@ impl Realtime {
         }
 
         let mut headers = resolved.headers();
-        let auth = options.auth.unwrap_or_else(|| RealtimeAuth::api_key(resolved.api_key));
+        let auth = options
+            .auth
+            .unwrap_or_else(|| RealtimeAuth::api_key(resolved.api_key));
         headers.insert(
             String::from("authorization"),
             format!("Bearer {}", auth.token()),
@@ -411,7 +427,10 @@ impl Calls {
         params: RealtimeCallAcceptParams,
     ) -> Result<ApiResponse<()>, OpenAIError> {
         self.execute_unit_json(
-            format!("/realtime/calls/{}/accept", encode_path_id(validate_path_id("call_id", call_id)?)),
+            format!(
+                "/realtime/calls/{}/accept",
+                encode_path_id(validate_path_id("call_id", call_id)?)
+            ),
             &params,
         )
     }
@@ -431,7 +450,10 @@ impl Calls {
         params: RealtimeCallReferParams,
     ) -> Result<ApiResponse<()>, OpenAIError> {
         self.execute_unit_json(
-            format!("/realtime/calls/{}/refer", encode_path_id(validate_path_id("call_id", call_id)?)),
+            format!(
+                "/realtime/calls/{}/refer",
+                encode_path_id(validate_path_id("call_id", call_id)?)
+            ),
             &params,
         )
     }
@@ -442,7 +464,10 @@ impl Calls {
         params: RealtimeCallRejectParams,
     ) -> Result<ApiResponse<()>, OpenAIError> {
         self.execute_unit_json(
-            format!("/realtime/calls/{}/reject", encode_path_id(validate_path_id("call_id", call_id)?)),
+            format!(
+                "/realtime/calls/{}/reject",
+                encode_path_id(validate_path_id("call_id", call_id)?)
+            ),
             &params,
         )
     }
@@ -474,17 +499,13 @@ pub struct RealtimeConnection {
 
 impl RealtimeConnection {
     async fn connect(target: PreparedRealtimeWsTarget) -> Result<Self, OpenAIError> {
-        let mut request = target
-            .url
-            .as_str()
-            .into_client_request()
-            .map_err(|error| {
-                OpenAIError::new(
-                    ErrorKind::Configuration,
-                    format!("failed to build Realtime websocket request: {error}"),
-                )
-                .with_source(error)
-            })?;
+        let mut request = target.url.as_str().into_client_request().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Configuration,
+                format!("failed to build Realtime websocket request: {error}"),
+            )
+            .with_source(error)
+        })?;
         for (name, value) in &target.headers {
             request.headers_mut().insert(
                 reqwest::header::HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
@@ -650,13 +671,16 @@ impl RealtimeConnection {
                     ));
                 }
                 Message::Ping(payload) => {
-                    self.socket.send(Message::Pong(payload)).await.map_err(|error| {
-                        OpenAIError::new(
-                            ErrorKind::Transport,
-                            format!("failed to reply to Realtime bootstrap ping: {error}"),
-                        )
-                        .with_source(error)
-                    })?;
+                    self.socket
+                        .send(Message::Pong(payload))
+                        .await
+                        .map_err(|error| {
+                            OpenAIError::new(
+                                ErrorKind::Transport,
+                                format!("failed to reply to Realtime bootstrap ping: {error}"),
+                            )
+                            .with_source(error)
+                        })?;
                 }
                 Message::Binary(_) | Message::Pong(_) | Message::Frame(_) => {}
             }

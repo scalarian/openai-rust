@@ -197,12 +197,14 @@ async fn bootstrap_and_clean_close() {
     ));
 
     connection
-        .send(RealtimeClientEvent::conversation_item_create(
-            RealtimeConversationItem::user_message(vec![
-                RealtimeConversationMessageContentPart::input_text("Hello from the client."),
-            ]),
+        .send(
+            RealtimeClientEvent::conversation_item_create(RealtimeConversationItem::user_message(
+                vec![RealtimeConversationMessageContentPart::input_text(
+                    "Hello from the client.",
+                )],
+            ))
+            .with_previous_item_id("root"),
         )
-        .with_previous_item_id("root"))
         .await
         .unwrap();
 

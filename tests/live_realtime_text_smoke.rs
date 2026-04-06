@@ -15,10 +15,8 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
     let client_secret = tokio::task::spawn_blocking({
         let client = client.clone();
         move || {
-            client
-                .realtime()
-                .client_secrets()
-                .create(openai_rust::realtime::RealtimeClientSecretCreateParams {
+            client.realtime().client_secrets().create(
+                openai_rust::realtime::RealtimeClientSecretCreateParams {
                     expires_after: Some(openai_rust::realtime::RealtimeSessionTTL {
                         anchor: String::from("created_at"),
                         seconds: 60,
@@ -31,7 +29,8 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
                         )),
                         ..Default::default()
                     }),
-                })
+                },
+            )
         }
     })
     .await
@@ -91,20 +90,21 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
         match event.expect("session.update event should decode") {
             RealtimeServerEvent::SessionUpdated { .. } => break,
             RealtimeServerEvent::Error { error, .. } => {
-                panic!("session.update returned a live realtime error: {}", error.message)
+                panic!(
+                    "session.update returned a live realtime error: {}",
+                    error.message
+                )
             }
             _ => {}
         }
     }
 
     connection
-        .send(
-            RealtimeClientEvent::conversation_item_create(RealtimeConversationItem::user_message(
-                vec![RealtimeConversationMessageContentPart::input_text(
-                    "Reply with exactly hi.",
-                )],
-            )),
-        )
+        .send(RealtimeClientEvent::conversation_item_create(
+            RealtimeConversationItem::user_message(vec![
+                RealtimeConversationMessageContentPart::input_text("Reply with exactly hi."),
+            ]),
+        ))
         .await
         .expect("conversation.item.create should send");
     connection
@@ -154,7 +154,10 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
 
     connection.close().await.expect("clean websocket close");
 
-    assert!(saw_output_text, "expected at least one GA output_text completion event");
+    assert!(
+        saw_output_text,
+        "expected at least one GA output_text completion event"
+    );
     assert!(saw_response_done, "expected a terminal response.done event");
     assert!(
         !text.trim().is_empty(),
@@ -162,6 +165,9 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
     );
 
     println!("live realtime client-secret request id: {request_id}");
-    println!("live realtime session id: {}", connection.session_id().unwrap_or("unknown"));
+    println!(
+        "live realtime session id: {}",
+        connection.session_id().unwrap_or("unknown")
+    );
     println!("live realtime final text: {}", text.trim());
 }
