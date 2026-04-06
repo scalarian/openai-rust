@@ -1,5 +1,5 @@
 [package]
-name = "openai-rust"
+name = "scalarian-openai-rust"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -7,7 +7,7 @@ description = "Independent Rust SDK for the OpenAI API with Responses-first ergo
 authors = ["Chaitanya Mishra (@staticpayload)"]
 license = "Apache-2.0"
 repository = "https://github.com/scalarian/openai-rust"
-documentation = "https://docs.rs/openai-rust"
+documentation = "https://docs.rs/scalarian-openai-rust"
 homepage = "https://github.com/scalarian/openai-rust"
 readme = "README.md"
 keywords = ["openai", "api", "sdk", "responses", "rust"]

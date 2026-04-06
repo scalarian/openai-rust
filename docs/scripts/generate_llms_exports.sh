@@ -10,7 +10,7 @@ full_path="docs/llms-full.txt"
 cat > "$compact_path" <<'EOF'
 # openai-rust / llms.txt
 
-openai-rust is an independent Rust SDK for the OpenAI API. The crate is async-first, treats Responses as the primary surface, and also ships compatibility helpers for chat completions and legacy completions.
+openai-rust is an independent Rust SDK for the OpenAI API. The package is published on crates.io as `scalarian-openai-rust`, while the Rust crate import path remains `openai_rust`.
 
 ## Canonical entry points
 

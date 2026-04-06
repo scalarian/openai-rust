@@ -8,7 +8,7 @@ Independent Rust SDK for the OpenAI API with Responses-first ergonomics, realtim
 ## Quickstart
 
 ```sh
-cargo add openai-rust
+cargo add scalarian-openai-rust
 ```
 
 ```rust,no_run
