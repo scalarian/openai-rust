@@ -1,6 +1,6 @@
 {
   "milestone": "publish-ready",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "validatorsRun": {
     "test": {
@@ -20,63 +20,34 @@
     }
   },
   "reviewsSummary": {
-    "total": 3,
+    "total": 2,
     "passed": 1,
-    "failed": 2,
+    "failed": 1,
     "failedFeatures": [
-      "cross-surface-integration-harnesses",
-      "documentation-examples-and-guides"
+      "publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap"
     ]
   },
   "blockingIssues": [
     {
-      "featureId": "cross-surface-integration-harnesses",
+      "featureId": "publish-ready-fix-cross-surface-equivalence-and-realtime-bootstrap",
       "severity": "blocking",
-      "description": "The live cross-surface smoke emits only a live report and cleanup line, but the feature requirement for VAL-CROSS-004 calls for a paired mock/live equivalence proof with normalized assertions over request metadata, status class, and terminal-state interpretation."
-    },
-    {
-      "featureId": "cross-surface-integration-harnesses",
-      "severity": "blocking",
-      "description": "The mocked REST-to-Realtime bootstrap coverage stops at `prepare_ws_target` plus header/URL assertions and never traverses a mocked websocket hop, leaving the mock side of VAL-CROSS-009 uncovered."
-    },
-    {
-      "featureId": "documentation-examples-and-guides",
-      "severity": "blocking",
-      "description": "`tests/readme_contract.rs` checks headings, commands, and representative API-shaped fixtures, but it does not compile or otherwise validate the actual README code snippets or supported-surface claims, so README.md can drift without failing the contract."
-    },
-    {
-      "featureId": "documentation-examples-and-guides",
-      "severity": "blocking",
-      "description": "`tests/docs_contract.rs` mostly existence-checks files and string content; it does not compile or execute the published Markdown snippets and commands promised as mechanically validated guide coverage."
+      "description": "The rerun fixes the mocked REST-to-Realtime websocket-hop gap for VAL-CROSS-009, but the paired mock/live equivalence proof still fabricates realtime `event_ordering` from the surface name instead of deriving it from observed live report data, so VAL-CROSS-004 remains unproven."
     }
   ],
-  "appliedUpdates": [
-    {
-      "target": "library",
-      "description": "Added a publish-validation note to `.factory/library/user-testing.md` recording that Cargo ignores `exclude` when `include` is set, and that workers should verify the final package contents with `cargo package --list`.",
-      "sourceFeature": "package-metadata-and-publish-readiness"
-    }
-  ],
+  "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
-      "target": "sdk-surface-worker skill",
-      "suggestion": "Clarify whether proof-only cross-surface work may add a tiny production helper when stronger contract harnesses expose a consumer ergonomics gap, rather than framing runtime changes only as defect fixes.",
-      "evidence": "The review for `cross-surface-integration-harnesses` found the current `sdk-surface-worker` guidance leaves this case ambiguous while the worker handoff suggested small helper additions such as webhook routing accessors.",
-      "isSystemic": false
-    },
-    {
       "target": "sdk-publish-worker skill",
-      "suggestion": "When a feature claims documentation is mechanically validated, require extraction, compilation, or execution of the actual README/docs snippets and commands instead of proxy string checks or stand-in API fixtures.",
-      "evidence": "The `documentation-examples-and-guides` review found `tests/readme_contract.rs` and `tests/docs_contract.rs` only validate headings, string presence, and representative types rather than the published Markdown snippets and commands, despite AGENTS guidance that docs/examples/package validation is a hard requirement.",
+      "suggestion": "Add explicit Exec Mode guidance for satisfying the required brainstorming step without an approval loop, so workers can comply procedurally while still executing publish-facing doc validation autonomously.",
+      "evidence": "The review for `publish-ready-fix-markdown-snippet-and-command-validation` passed on substance but still recorded a procedural deviation because `sdk-publish-worker` requires brainstorming in a mode with no user approval loop.",
       "isSystemic": true
-    },
-    {
-      "target": "sdk-publish-worker skill",
-      "suggestion": "Clarify that `.factory/init.sh` is a bash script and should be invoked directly rather than through `python3`.",
-      "evidence": "The `package-metadata-and-publish-readiness` transcript skeleton shows an initial `python3 .factory/init.sh` attempt even though `.factory/init.sh` has a bash shebang, and the worker handoff recorded that startup ambiguity as a skill deviation.",
-      "isSystemic": false
     }
   ],
-  "rejectedObservations": [],
-  "previousRound": null
+  "rejectedObservations": [
+    {
+      "observation": "The `sdk-surface-worker` skill should explicitly mention tiny combined REST+websocket local harnesses for proof-only cross-surface fixes.",
+      "reason": "Overlaps the prior round's broader sdk-surface-worker guidance recommendation about proof-only cross-surface helper guidance, so I did not add a duplicate recommendation."
+    }
+  ],
+  "previousRound": ".factory/validation/publish-ready/scrutiny/synthesis.round1.json"
 }

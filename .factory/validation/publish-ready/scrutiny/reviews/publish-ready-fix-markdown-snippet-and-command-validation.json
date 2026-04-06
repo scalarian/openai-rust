@@ -1,0 +1,21 @@
+{
+  "featureId": "publish-ready-fix-markdown-snippet-and-command-validation",
+  "reviewedAt": "2026-04-06T11:48:37Z",
+  "commitId": "20027f3",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix closes the original scrutiny gap. The new markdown support extracts fenced blocks, links, and command lines directly from the shipped Markdown, the README/docs contract tests compile extracted Rust snippets and validate extracted shell commands against real repo metadata, and failure messages now carry Markdown source locations instead of pointing at proxy fixtures.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The publish-worker procedure still lacks explicit Exec Mode guidance for satisfying the required brainstorming step without an approval loop, so workers keep recording procedural deviations even when the implementation work is correct.",
+      "evidence": "`/Users/staticpayload/Mainframe/openai-rust/.factory/skills/sdk-publish-worker/SKILL.md:16,24-28` requires brainstorming before public doc changes, while `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-06T11-38-36-250Z__publish-ready-fix-markdown-snippet-and-command-validation__88167033-3997-4be0-b985-ec134449ee7a.json:78-86` records `followedProcedure=false` because Exec Mode had no approval loop."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/publish-ready/scrutiny/reviews/documentation-examples-and-guides.json",
+  "summary": "Pass. I reviewed the prior failed scrutiny report, the fix feature metadata, the worker transcript skeleton, the handoff, and commit `20027f3`. The fix now validates the actual fenced snippets and commands from `README.md` and the docs guides, and its assertion paths report real Markdown source locations. I found no remaining blocking issues or regressions in this fix."
+}
