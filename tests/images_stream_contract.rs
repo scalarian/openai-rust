@@ -238,6 +238,61 @@ fn image_stream_yields_incremental_generation_events_before_terminal_tail_arrive
 }
 
 #[test]
+fn image_edit_stream_yields_incremental_partial_events_before_terminal_tail_arrives() {
+    let server = IncrementalSseServer::spawn(
+        concat!(
+            "event: image_edit.partial_image\n",
+            "data: {\"type\":\"image_edit.partial_image\",\"partial_image_index\":1,\"b64_json\":\"ZWRpdC1wYXJ0aWFs\",\"created_at\":1818181818,\"background\":\"opaque\",\"output_format\":\"jpeg\",\"quality\":\"medium\",\"size\":\"1024x1536\"}\n\n"
+        ),
+        concat!(
+            "event: image_edit.completed\n",
+            "data: {\"type\":\"image_edit.completed\",\"b64_json\":\"ZWRpdC1maW5hbA==\",\"created_at\":1818181819,\"background\":\"opaque\",\"output_format\":\"jpeg\",\"quality\":\"medium\",\"size\":\"1024x1536\",\"usage\":{\"input_tokens\":5,\"input_tokens_details\":{\"text_tokens\":3,\"image_tokens\":2},\"output_tokens\":18,\"total_tokens\":23}}\n\n",
+            "data: [DONE]\n\n"
+        ),
+        Duration::from_millis(400),
+    )
+    .expect("incremental image edit server");
+    let client = OpenAI::builder()
+        .api_key("sk-test")
+        .base_url(server.url())
+        .build();
+
+    let started = Instant::now();
+    let mut stream = client
+        .images()
+        .edit_stream(openai_rust::resources::images::ImageEditParams {
+            images: vec![openai_rust::resources::images::ImageInput::new(
+                "edit-source.png",
+                "image/png",
+                vec![1, 3, 3, 7],
+            )],
+            prompt: String::from("Add soft reflections"),
+            partial_images: Some(2),
+            output_format: Some(String::from("jpeg")),
+            ..Default::default()
+        })
+        .expect("stream should start");
+
+    assert!(matches!(
+        stream.next_event(),
+        Some(openai_rust::resources::images::ImageEditStreamEvent::PartialImage(ref event))
+            if event.b64_json == "ZWRpdC1wYXJ0aWFs"
+    ));
+    assert!(
+        started.elapsed() < Duration::from_millis(250),
+        "expected partial image before delayed tail, got {:?}",
+        started.elapsed()
+    );
+
+    assert!(matches!(
+        stream.next_event(),
+        Some(openai_rust::resources::images::ImageEditStreamEvent::Completed(ref event))
+            if event.b64_json == "ZWRpdC1maW5hbA=="
+    ));
+    assert_eq!(stream.final_completed().unwrap().usage.total_tokens, 23);
+}
+
+#[test]
 fn image_edit_stream_rejects_eof_truncated_transcripts_without_completed_event() {
     let body = concat!(
         "event: image_edit.partial_image\n",
