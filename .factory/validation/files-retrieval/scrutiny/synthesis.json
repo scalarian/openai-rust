@@ -1,6 +1,6 @@
 {
   "milestone": "files-retrieval",
-  "round": 1,
+  "round": 2,
   "status": "fail",
   "validatorsRun": {
     "test": {
@@ -20,70 +20,31 @@
     }
   },
   "reviewsSummary": {
-    "total": 4,
-    "passed": 1,
-    "failed": 3,
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
     "failedFeatures": [
-      "files-and-uploads-surface",
-      "vector-store-core-and-file-helpers",
-      "vector-store-file-batches-and-top-level-batches"
+      "files-retrieval-fix-vector-store-batch-upload-concurrency"
     ]
   },
   "blockingIssues": [
     {
-      "featureId": "files-and-uploads-surface",
-      "file": "src/resources/files.rs",
-      "line": 189,
-      "severity": "blocking",
-      "description": "`Files::create` serializes `expires_after` as a JSON string multipart field instead of the required bracketed multipart fields (`expires_after[anchor]` and `expires_after[seconds]`), so callers using expiration would send the wrong wire shape."
-    },
-    {
-      "featureId": "files-and-uploads-surface",
-      "file": "src/resources/uploads.rs",
-      "line": 135,
-      "severity": "blocking",
-      "description": "`UploadCreateParams` and `UploadChunkedParams` reuse `FilePurpose`, exposing purposes such as `user_data` and `evals` even though the current Uploads API only documents `assistants`, `batch`, `fine-tune`, and `vision` as valid upload purposes."
-    },
-    {
-      "featureId": "vector-store-core-and-file-helpers",
+      "featureId": "files-retrieval-fix-vector-store-batch-upload-concurrency",
       "file": "src/resources/vector_stores.rs",
-      "line": 356,
+      "line": 597,
       "severity": "blocking",
-      "description": "`VectorStoreFiles::upload` uploads through `Files::create(...)` before validating `vector_store_id`, so a blank or invalid vector-store id can still create an orphaned file before the helper returns a local validation error; `upload_and_poll` inherits the same side effect."
-    },
-    {
-      "featureId": "vector-store-file-batches-and-top-level-batches",
-      "file": "src/resources/vector_stores.rs",
-      "line": 580,
-      "severity": "blocking",
-      "description": "`VectorStoreFileBatches::upload_and_poll` uploads new files sequentially with a plain `for` loop, but VAL-FILES-013 requires concurrent uploads before batch creation and polling."
-    }
-  ],
-  "nonBlockingIssues": [
-    {
-      "featureId": "files-and-uploads-surface",
-      "file": "src/resources/uploads.rs",
-      "line": 205,
-      "severity": "non_blocking",
-      "description": "`UploadStatus` has no unknown fallback, so additive server statuses would currently become parse failures instead of preserving forward compatibility."
+      "description": "`upload_and_poll` now spawns one thread per file, but the `for worker in upload_workers` loop uses `worker.join()??`, so the helper returns immediately on the first upload error or panic. Any later handles are dropped without being joined, which leaves uploads running after the method has already failed and can create orphaned files in the background."
     }
   ],
   "appliedUpdates": [
     {
       "target": "library",
-      "path": ".factory/library/api-surface.md",
-      "description": "Documented that Files and Uploads expose `expires_after` through different wire shapes so workers do not reuse the wrong serializer across the two surfaces.",
-      "sourceFeature": "files-and-uploads-surface"
+      "path": ".factory/library/user-testing.md",
+      "description": "Documented that the shared mock HTTP harness is serialized, so concurrency-sensitive transport proofs need bespoke loopback servers in the owning test file.",
+      "sourceFeature": "files-retrieval-fix-vector-store-batch-upload-concurrency"
     }
   ],
-  "suggestedGuidanceUpdates": [
-    {
-      "target": "skills",
-      "suggestion": "Clarify the `sdk-surface-worker` requirement for `brainstorming` versus an equivalent design-note artifact when adding new public surface ergonomics, including where that evidence should appear in the transcript or handoff.",
-      "evidence": "The `webhook-verification-helpers` review found the public webhook surface matched the code contract but its transcript skeleton and handoff did not capture the `brainstorming` or chosen-vs-rejected design note that the skill currently requires.",
-      "isSystemic": false
-    }
-  ],
+  "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": null
+  "previousRound": ".factory/validation/files-retrieval/scrutiny/synthesis.round1.json"
 }

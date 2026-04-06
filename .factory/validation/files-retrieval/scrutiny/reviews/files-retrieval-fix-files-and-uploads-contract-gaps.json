@@ -1,0 +1,15 @@
+{
+  "featureId": "files-retrieval-fix-files-and-uploads-contract-gaps",
+  "reviewedAt": "2026-04-06T01:21:20Z",
+  "commitId": "bf25c8c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The fix directly closes each prior scrutiny finding: Files multipart creation now emits bracketed `expires_after` fields, Uploads create/chunked helpers use an uploads-specific purpose enum limited to documented values, and upload status parsing preserves unknown server values instead of failing deserialization. The updated contract tests cover the corrected Files wire shape, the narrowed Uploads purpose surface, and the unknown-status fallback, so the original failures are adequately addressed.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": ".factory/validation/files-retrieval/scrutiny/reviews/files-and-uploads-surface.json",
+  "summary": "Review passed. I examined the original failed review, the fix feature metadata/handoff/transcript skeleton, the relevant commit diffs, and the current Files/Uploads code and tests. The fix resolves all three prior scrutiny findings without introducing any new scoped issues, and I did not identify any additional shared-state gaps during this review."
+}

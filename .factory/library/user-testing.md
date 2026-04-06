@@ -14,6 +14,7 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 
 ## Validation Strategy
 - Broad coverage should come from mocked HTTP/WebSocket tests, transcript fixtures, multipart inspection, and parser/unit tests.
+- The shared mock HTTP harness is serialized rather than concurrency-aware; transport proofs that need overlapping requests currently require a bespoke loopback server in the owning test file.
 - Live coverage should prove end-to-end auth, request shaping, metadata capture, and a budget-capped set of representative real API flows.
 - Documentation and packaging are part of the validation surface: examples, README snippets, docs guides, and `cargo package` outputs must validate mechanically.
 
