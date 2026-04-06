@@ -238,8 +238,8 @@ impl OpenAIBuilder {
         let runtime = Arc::new(ClientRuntime::new(self.config.with_env_defaults()));
         OpenAI {
             runtime: runtime.clone(),
-            resources: ResourceFamilies::new(runtime),
-            realtime: Realtime,
+            resources: ResourceFamilies::new(runtime.clone()),
+            realtime: Realtime::new(runtime.clone()),
         }
     }
 }
