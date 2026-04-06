@@ -1,0 +1,34 @@
+{
+  "featureId": "documentation-examples-and-guides",
+  "reviewedAt": "2026-04-06T10:28:04Z",
+  "commitId": "3c4782f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The new README, docs notes, and representative examples largely match the shipped crate surface, but the feature does not actually deliver the promised mechanical validation for the published documentation. The added contract tests validate file presence and selected strings, then construct separate API-shaped fixtures, but they do not compile or extract the real README/docs snippets or map all documented claims back to concrete source locations.",
+    "issues": [
+      {
+        "file": "tests/readme_contract.rs",
+        "line": 20,
+        "severity": "blocking",
+        "description": "The README contract never validates the actual README snippets or supported-surface claims. Lines 20-42 only assert that headings and command strings exist, and lines 49-134 build separate representative types instead of compiling the code blocks at README.md:9, README.md:19, and README.md:29 or resolving the Supported surfaces section at README.md:50 onward. This leaves the published README free to drift without failing the test, which does not satisfy the feature's requirement that README snippets/commands be mechanically validated against the shipped API."
+      },
+      {
+        "file": "tests/docs_contract.rs",
+        "line": 7,
+        "severity": "blocking",
+        "description": "The docs contract only existence-checks several guides (`docs/responses-guide.md`, `docs/files-and-vector-stores.md`, and `docs/architecture-note.md` at lines 7-11) and then performs string containment checks on a subset of files (lines 33-98). It never compiles the Rust snippets in docs/quickstart.md:31, docs/responses-guide.md:7, docs/migration-guide.md:16 and :40, or docs/files-and-vector-stores.md:7 and :27, nor does it execute or fixture-check the documented shell commands. Because the feature promises mechanically validated guides and snippets, this leaves a blocking coverage gap."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The publish-worker skill should make README/docs snippet extraction or compilation mandatory when a feature claims documentation is mechanically validated. Right now the skill only lists snippet validation as a 'good first move,' which leaves room for proxy tests that check strings instead of the published snippets themselves.",
+      "evidence": "AGENTS.md:38 says docs/examples/package validation is a hard requirement, but sdk-publish-worker/SKILL.md:25-28 only suggests README/docs snippet validation as an optional first move. In this feature, tests/readme_contract.rs:20-42 and tests/docs_contract.rs:33-98 use presence/string checks instead of validating the actual Markdown snippets."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail. I reviewed the feature metadata, handoff, transcript skeleton, commit 3c4782f, README/docs/example files, and the added contract tests. The docs content and examples are broadly aligned with the crate API, but the implementation does not fulfill the feature's core requirement for mechanical validation of the published README and docs snippets; the added tests only verify presence/string content and proxy API shapes rather than the real Markdown snippets and commands."
+}

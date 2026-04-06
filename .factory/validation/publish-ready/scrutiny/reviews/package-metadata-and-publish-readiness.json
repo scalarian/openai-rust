@@ -1,0 +1,26 @@
+{
+  "featureId": "package-metadata-and-publish-readiness",
+  "reviewedAt": "2026-04-06T10:25:48Z",
+  "commitId": "c1e828a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Commit c1e828a fulfills the feature requirements: Cargo publish metadata is now concrete and Apache-2.0 licensed, the repository-root LICENSE file is present, and the final packaged artifact excludes local-only material such as `references/**`, `.factory/**`, and `creds.txt` while still containing publish-facing sources, docs, examples, benches, README, and LICENSE.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The publish-worker startup guidance should explicitly say that `.factory/init.sh` is a bash script that must be invoked directly rather than via `python3`; the current wording allowed an avoidable interpreter mistake.",
+      "evidence": "Transcript skeleton for worker session `71a38f2d-61a9-48ab-816e-b173807aeafe` shows an initial `Execute` call of `python3 \"/Users/staticpayload/Mainframe/openai-rust/.factory/init.sh\"`, and the handoff marks `skillFeedback.followedProcedure=false` with a suggested change to clarify the script invocation. `/Users/staticpayload/Mainframe/openai-rust/.factory/init.sh:1` has a bash shebang (`#!/usr/bin/env bash`)."
+    },
+    {
+      "area": "knowledge",
+      "observation": "Publish-readiness guidance is missing a note that Cargo ignores `exclude` when `include` is present for package filtering, which forced this worker to discover the behavior by trial during `cargo package --list` iteration.",
+      "evidence": "The transcript skeleton shows the worker first trying an include-driven package contract, then reporting that `cargo package --list` still included `references/**`, then explicitly noting that Cargo warned `exclude` is ignored when `include` is present before switching to an exclude-only manifest. This behavior is not documented in `AGENTS.md`, `.factory/library/user-testing.md`, or `sdk-publish-worker/SKILL.md`."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. I reviewed the feature metadata, worker handoff, transcript skeleton, commit diff, and the packaged artifact contents under `target/package/openai-rust-0.1.0`. I found no blocking or non-blocking implementation issues for the publish-readiness requirements. I recorded two shared-state observations: clarify direct invocation of `.factory/init.sh`, and document Cargo's `include`/`exclude` packaging interaction for future publish workers."
+}

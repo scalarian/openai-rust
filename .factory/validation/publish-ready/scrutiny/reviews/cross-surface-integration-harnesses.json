@@ -1,0 +1,34 @@
+{
+  "featureId": "cross-surface-integration-harnesses",
+  "reviewedAt": "2026-04-06T10:27:30Z",
+  "commitId": "20ef6a0362d98a60e928cb4cc14b4d4226fd2f54",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds substantial cross-surface harness coverage, but it does not fully implement the required mock/live equivalence proof and its mocked Realtime bootstrap coverage stops before the websocket hop.",
+    "issues": [
+      {
+        "file": "tests/live_cross_surface_smoke.rs",
+        "line": 30,
+        "severity": "blocking",
+        "description": "VAL-CROSS-004 requires a paired mock/live contract harness with normalized assertions, but this test only emits a live `CrossSurfaceReport` and cleanup line. The companion mock harness in `tests/cross_surface_contract.rs` performs standalone assertions at lines 40/114/303/403 and never produces the same normalized report shape or compares mock vs live outcomes, so the feature does not actually verify mock/live equivalence for request metadata, status class, or terminal-state interpretation."
+      },
+      {
+        "file": "tests/cross_surface_contract.rs",
+        "line": 303,
+        "severity": "blocking",
+        "description": "The mocked REST-to-Realtime bootstrap test stops at `prepare_ws_target` plus header/url assertions. It never opens a mocked websocket session or exercises a typed failure/success path across the websocket hop, even though VAL-CROSS-009 calls for a mock REST-and-WebSocket integration test. As written, the mocked half of the REST\u2192Realtime bootstrap contract remains uncovered."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The `sdk-surface-worker` skill does not explicitly say that proof-only cross-surface work may legitimately need a tiny production helper when a stronger contract harness exposes a consumer-ergonomics gap, even if no transport/runtime defect is found.",
+      "evidence": "/Users/staticpayload/Mainframe/openai-rust/.factory/skills/sdk-surface-worker/SKILL.md:17,25 frame proof-only work as assertion-first and runtime changes only when stronger proof exposes a real defect; /Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-06T10-01-43-842Z__cross-surface-integration-harnesses__72e89088-4dbd-4e2c-8530-1c40ba010755.json:129-132 records the same gap in `suggestedChanges` for small helpers like webhook routing accessors."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the new harnesses cover many cross-surface behaviors, but they do not satisfy the required paired mock/live equivalence proof for VAL-CROSS-004, and the mocked REST-to-Realtime coverage does not traverse the websocket hop required by VAL-CROSS-009."
+}

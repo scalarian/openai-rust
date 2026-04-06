@@ -17,6 +17,7 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 - The shared mock HTTP harness is serialized rather than concurrency-aware; transport proofs that need overlapping requests currently require a bespoke loopback server in the owning test file.
 - Live coverage should prove end-to-end auth, request shaping, metadata capture, and a budget-capped set of representative real API flows.
 - Documentation and packaging are part of the validation surface: examples, README snippets, docs guides, and `cargo package` outputs must validate mechanically.
+- Observed on `2026-04-06`: when `Cargo.toml` sets `include`, Cargo ignores `exclude` for package filtering, so publish-hygiene validation must rely on the final chosen manifest strategy and verify it with `cargo package --list` rather than assuming both keys compose.
 - Observed on `2026-04-06`: `VAL-REALTIME-006` is not directly covered by the committed `realtime_*` test binaries; validating structured realtime `error` recovery currently requires an isolated temporary cargo probe that opens a local websocket, injects an `error` event, and then proves a later request still completes on the same connection.
 
 ## Validation Concurrency
