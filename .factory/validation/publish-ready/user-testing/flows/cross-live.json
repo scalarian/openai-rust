@@ -1,0 +1,206 @@
+{
+  "groupId": "cross-live",
+  "testedAt": "2026-04-06T12:32:23.029764+00:00",
+  "isolation": {
+    "milestone": "publish-ready",
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/cross-live",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/publish-ready/cross-live",
+    "flowReportPath": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/flows/cross-live.json",
+    "openaiBaseUrlCleared": true
+  },
+  "assertionsTested": [
+    "VAL-CROSS-001",
+    "VAL-CROSS-004"
+  ],
+  "passedAssertions": [
+    "VAL-CROSS-001",
+    "VAL-CROSS-004"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "commands": [
+    {
+      "command": "export CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/cross-live\" && set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && cargo test --test live_cross_surface_smoke -- --ignored --nocapture",
+      "workingDirectory": "/Users/staticpayload/Mainframe/openai-rust",
+      "exitCode": 0,
+      "outputLog": "publish-ready/cross-live/live-cross-surface-smoke.log",
+      "surfacedRequestIds": [
+        "req_b0385b5d486f41f2b7755e457923c9c1"
+      ],
+      "notes": [
+        "The command output included a paired normalized mock/live cross-surface report.",
+        "The harness surfaced the cleanup delete request id exactly and reported request_id presence for the primary live flows."
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-001",
+      "title": "Env-Loaded Client Reaches Multiple Subsystems Without Per-Endpoint Reconfiguration",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run the ignored live cross-surface smoke with creds sourced in-shell, CARGO_TARGET_DIR isolated, and OPENAI_BASE_URL unset.",
+          "expected": "An env-only client reaches multiple live subsystems without per-endpoint reconfiguration.",
+          "observed": "The smoke passed and the live report marked responses.create, chat.completions.create, and files.create as success with request_id:present and completed/ready_or_processing terminal states."
+        }
+      ],
+      "evidence": {
+        "log": "publish-ready/cross-live/live-cross-surface-smoke.log",
+        "summary": "publish-ready/cross-live/live-cross-surface-summary.json",
+        "pairedLiveReport": {
+          "entries": [
+            {
+              "surface": "responses.create",
+              "status_class": "success",
+              "request_metadata_shape": "request_id:present",
+              "terminal_state": "completed",
+              "event_ordering": []
+            },
+            {
+              "surface": "chat.completions.create",
+              "status_class": "success",
+              "request_metadata_shape": "request_id:present",
+              "terminal_state": "completed",
+              "event_ordering": []
+            },
+            {
+              "surface": "files.create",
+              "status_class": "success",
+              "request_metadata_shape": "request_id:present",
+              "terminal_state": "ready_or_processing",
+              "event_ordering": []
+            },
+            {
+              "surface": "realtime.client_secrets.create + ws bootstrap",
+              "status_class": "success",
+              "request_metadata_shape": "request_id:present",
+              "terminal_state": "session_created",
+              "event_ordering": [
+                "rest.client_secrets.create",
+                "ws.session.created",
+                "ws.close"
+              ]
+            }
+          ]
+        },
+        "surfacedRequestIds": [
+          "req_b0385b5d486f41f2b7755e457923c9c1"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Mocked and Live Runs Agree on Shared Transport Contracts",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect the paired normalized report printed by the live smoke.",
+          "expected": "The live report matches the publish-ready mock baseline for shared transport contract shape.",
+          "observed": "mock_baseline and live_report matched exactly for responses.create, chat.completions.create, files.create, and realtime.client_secrets.create + ws bootstrap, including request_id:present metadata shape and realtime event ordering."
+        }
+      ],
+      "evidence": {
+        "log": "publish-ready/cross-live/live-cross-surface-smoke.log",
+        "summary": "publish-ready/cross-live/live-cross-surface-summary.json",
+        "pairedReport": {
+          "mock_baseline": {
+            "entries": [
+              {
+                "surface": "responses.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "completed",
+                "event_ordering": []
+              },
+              {
+                "surface": "chat.completions.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "completed",
+                "event_ordering": []
+              },
+              {
+                "surface": "files.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "ready_or_processing",
+                "event_ordering": []
+              },
+              {
+                "surface": "realtime.client_secrets.create + ws bootstrap",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "session_created",
+                "event_ordering": [
+                  "rest.client_secrets.create",
+                  "ws.session.created",
+                  "ws.close"
+                ]
+              }
+            ]
+          },
+          "live_report": {
+            "entries": [
+              {
+                "surface": "responses.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "completed",
+                "event_ordering": []
+              },
+              {
+                "surface": "chat.completions.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "completed",
+                "event_ordering": []
+              },
+              {
+                "surface": "files.create",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "ready_or_processing",
+                "event_ordering": []
+              },
+              {
+                "surface": "realtime.client_secrets.create + ws bootstrap",
+                "status_class": "success",
+                "request_metadata_shape": "request_id:present",
+                "terminal_state": "session_created",
+                "event_ordering": [
+                  "rest.client_secrets.create",
+                  "ws.session.created",
+                  "ws.close"
+                ]
+              }
+            ]
+          }
+        },
+        "surfacedRequestIds": [
+          "req_b0385b5d486f41f2b7755e457923c9c1"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The live smoke normalizes the main per-surface request IDs to request_id:present before printing, so the command output only exposed the cleanup delete request id exactly.",
+      "resolved": false,
+      "resolution": null,
+      "affectedAssertions": [
+        "VAL-CROSS-001",
+        "VAL-CROSS-004"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 2 assertions with cargo live_cross_surface_smoke: both passed. The env-only smoke succeeded with OPENAI_BASE_URL cleared, the normalized live report matched the publish-ready mock baseline, and the command output surfaced cleanup request id req_b0385b5d486f41f2b7755e457923c9c1."
+}

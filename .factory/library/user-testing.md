@@ -49,7 +49,7 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 ## Flow Validator Guidance: Mocked cargo validation
 - Work from the repository root: `/Users/staticpayload/Mainframe/openai-rust`.
 - Treat the Rust crate API as the user surface; validate behavior only through cargo-driven tests and their observable output.
-- Stay inside the assigned assertion set and the existing core-foundation tests (`core_config`, `core_headers`, `core_timeout`, `core_retry`, `core_errors`, `core_response_meta`).
+- Stay inside the assigned assertion set and the relevant contract binaries or harnesses for that milestone (for publish-ready this includes `cross_surface_contract`, `upload_to_downstream_contract`, and other explicitly assigned cargo test targets).
 - Do not edit source files or `.factory` state from the flow validator; only write the assigned flow report and evidence artifacts.
 - Use an isolated `CARGO_TARGET_DIR` under `.factory/validation/<milestone>/user-testing/target/<group>` for each flow report to avoid cargo lock contention between concurrent validators.
 - Safe concurrency boundary: mocked cargo validators may run in parallel up to the global ceiling of 4 because they only compile/run isolated test binaries against loopback mocks and do not require shared mutable app state beyond Cargo build artifacts.
@@ -66,3 +66,12 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 - Capture the command, exit code, resolved default-host proof from output, and any surfaced request ID.
 - Advanced-platform entitlement-aware live smokes are embedded as ignored tests inside `tests/containers_contract.rs`, `tests/skills_contract.rs`, and `tests/videos_contract.rs` rather than separate `tests/live_*.rs` binaries.
 - Observed on `2026-04-06`: the staged project credentials successfully reached the containers, skills, and videos entitlement-aware live smokes without hitting skip paths, and each surface printed live request IDs.
+- Observed on `2026-04-06`: `tests/live_cross_surface_smoke.rs` normalizes the main per-surface request IDs to `request_id:present` in its paired report and only prints the cleanup file-delete request ID verbatim, so publish-ready evidence should preserve both the paired normalized report and the explicitly surfaced cleanup request ID.
+
+## Flow Validator Guidance: Packaging/docs validation
+- Work from the repository root: `/Users/staticpayload/Mainframe/openai-rust`.
+- Validate only through published-facing commands and cargo-native harnesses such as `cargo test --test readme_contract`, `cargo test --test docs_contract`, `cargo test --doc`, `cargo check --examples --all-features`, `cargo metadata`, `cargo package --allow-dirty`, and `cargo package --list` when assigned.
+- Use an isolated `CARGO_TARGET_DIR` under `.factory/validation/<milestone>/user-testing/target/<group>` for commands that compile or test so doc/example validators do not contend with other cargo jobs.
+- Treat `README.md`, `docs/*.md`, `Cargo.toml`, and the package file list as the user-visible surface; do not edit repository files from the flow validator.
+- Safe concurrency boundary: packaging/docs validators may run in parallel up to the global ceiling of 2 when they cover disjoint assertion groups, but avoid launching more than one `cargo package` command at a time because it rewrites `target/package`.
+- Evidence should tie each assertion back to the exact command output, validated snippet/report location, or package-list observation that proves the published artifact is correct.

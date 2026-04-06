@@ -1,0 +1,303 @@
+{
+  "groupId": "docs-build",
+  "testedAt": "2026-04-06T12:34:16.148450+00:00",
+  "isolation": {
+    "milestone": "publish-ready",
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "cargoTargetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/publish-ready/docs-build"
+  },
+  "toolsUsed": ["cargo", "filesystem"],
+  "assertionsTested": [
+    "VAL-DOCS-003",
+    "VAL-DOCS-004",
+    "VAL-DOCS-006",
+    "VAL-DOCS-007",
+    "VAL-CROSS-007"
+  ],
+  "passedAssertions": [
+    "VAL-DOCS-003",
+    "VAL-DOCS-004",
+    "VAL-DOCS-006",
+    "VAL-DOCS-007",
+    "VAL-CROSS-007"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" RUSTDOCFLAGS=\"-D warnings\" cargo doc --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --no-deps --all-features",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-003"],
+      "log": "publish-ready/docs-build/cargo-doc.log",
+      "observation": "Rustdoc completed successfully with warnings denied and generated the openai_rust index under the isolated docs-build target directory."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --doc",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-003"],
+      "log": "publish-ready/docs-build/cargo-test-doc.log",
+      "observation": "Doc-tests passed; cargo reported 1 doctest from src/lib.rs succeeded with 0 failures."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo check --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --examples --all-features",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/cargo-check-examples.log",
+      "observation": "All example targets compiled successfully under --all-features."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example responses_quickstart",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-responses_quickstart.log",
+      "observation": "Example ran and printed env-based client configuration with the Responses quickstart model."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example responses_streaming",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-responses_streaming.log",
+      "observation": "Example streamed a synthetic response transcript and printed created/delta/done/completed events plus terminal output."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example structured_outputs",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-structured_outputs.log",
+      "observation": "Example ran and printed the configured JSON-schema structured output plus strict tool count."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example request_metadata",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-request_metadata.log",
+      "observation": "Example ran and exposed status code, x-request-id, and content-type through the public response metadata surface."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example embeddings",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004"],
+      "log": "publish-ready/docs-build/example-embeddings.log",
+      "observation": "Example ran and printed the embedding model, requested dimensions, and explicit float encoding."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example upload_to_vector_store",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-upload_to_vector_store.log",
+      "observation": "Example ran and constructed the upload/vector-store flow parameters with current public types."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo run --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --example chat_completions_migration",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/example-chat_completions_migration.log",
+      "observation": "Example ran and printed compatibility chat, legacy completions, and preferred Responses models using the current public API."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test docs_contract -- --nocapture",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-004", "VAL-CROSS-007"],
+      "log": "publish-ready/docs-build/cargo-test-docs_contract.log",
+      "observation": "The docs_contract target passed 3/3 tests, confirming guide/example files exist, commands in published markdown point at current examples, and fenced snippets validate against real markdown locations."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test package_contract -- --nocapture",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-006", "VAL-DOCS-007"],
+      "log": "publish-ready/docs-build/cargo-test-package_contract.log",
+      "observation": "The package_contract target passed 2/2 tests, proving publish metadata is populated and local-only material is excluded by manifest rules."
+    },
+    {
+      "command": "cargo metadata --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --format-version 1 --no-deps",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-006"],
+      "log": "publish-ready/docs-build/cargo-metadata.json",
+      "observation": "Cargo metadata reported package name openai-rust version 0.1.0 with Apache-2.0 licensing, repository/docs/homepage URLs, keywords, and categories."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo package --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --allow-dirty",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-007"],
+      "log": "publish-ready/docs-build/cargo-package-allow-dirty.log",
+      "observation": "cargo package succeeded, packaging 183 files (1.3 MiB / 217.2 KiB compressed) and verifying the packaged crate builds cleanly."
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/publish-ready/user-testing/target/docs-build\" cargo package --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --list",
+      "exitCode": 0,
+      "assertions": ["VAL-DOCS-007"],
+      "log": "publish-ready/docs-build/cargo-package-list.log",
+      "observation": "The package file list included publish-facing assets such as README.md, LICENSE, docs/*.md, examples/*.rs, src/**, and tests/**, while omitting creds.txt, references/**, and .factory/**."
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-DOCS-003",
+      "title": "Public Rustdoc Builds Cleanly for Exported Entry Points",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Build rustdoc with warnings denied",
+          "expected": "cargo doc --no-deps --all-features succeeds with no rustdoc warnings",
+          "observed": "Succeeded and generated the openai_rust docs index in the isolated target directory."
+        },
+        {
+          "action": "Run doctests",
+          "expected": "Exported documentation examples compile or run cleanly",
+          "observed": "cargo test --doc passed with 1 doctest from src/lib.rs and 0 failures."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "publish-ready/docs-build/cargo-doc.log",
+          "publish-ready/docs-build/cargo-test-doc.log"
+        ],
+        "sourceReferences": ["src/lib.rs"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DOCS-004",
+      "title": "Repository Examples Compile and Use Current API Shapes",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Compile all repository examples",
+          "expected": "Every file under examples/ compiles under the declared feature set",
+          "observed": "cargo check --examples --all-features succeeded."
+        },
+        {
+          "action": "Run representative example binaries",
+          "expected": "Core capability examples execute against the current public API shapes",
+          "observed": "responses_quickstart, responses_streaming, structured_outputs, request_metadata, embeddings, upload_to_vector_store, and chat_completions_migration each built and ran successfully."
+        },
+        {
+          "action": "Validate published markdown references",
+          "expected": "Guides point at current example commands and files",
+          "observed": "docs_contract passed 3 tests covering guide/example existence, command references, and fenced snippet validation."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "publish-ready/docs-build/cargo-check-examples.log",
+          "publish-ready/docs-build/example-responses_quickstart.log",
+          "publish-ready/docs-build/example-responses_streaming.log",
+          "publish-ready/docs-build/example-structured_outputs.log",
+          "publish-ready/docs-build/example-request_metadata.log",
+          "publish-ready/docs-build/example-embeddings.log",
+          "publish-ready/docs-build/example-upload_to_vector_store.log",
+          "publish-ready/docs-build/example-chat_completions_migration.log",
+          "publish-ready/docs-build/cargo-test-docs_contract.log"
+        ],
+        "exampleFiles": [
+          "examples/responses_quickstart.rs",
+          "examples/responses_streaming.rs",
+          "examples/structured_outputs.rs",
+          "examples/request_metadata.rs",
+          "examples/embeddings.rs",
+          "examples/upload_to_vector_store.rs",
+          "examples/chat_completions_migration.rs"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DOCS-006",
+      "title": "Cargo Metadata Is Publish-Ready and Apache-2.0 Correct",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect cargo metadata",
+          "expected": "Package metadata exposes publish-ready name/version/license/repository/docs/homepage/keywords/categories",
+          "observed": "cargo metadata returned openai-rust 0.1.0 with Apache-2.0 licensing plus repository, documentation, homepage, keywords, and categories fields."
+        },
+        {
+          "action": "Run package contract checks",
+          "expected": "Manifest and root license file satisfy the publish-ready contract",
+          "observed": "package_contract passed both metadata and Apache-2.0 license checks."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "publish-ready/docs-build/cargo-metadata.json",
+          "publish-ready/docs-build/cargo-test-package_contract.log"
+        ],
+        "manifestFiles": ["Cargo.toml", "LICENSE"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-DOCS-007",
+      "title": "cargo package Produces a Clean Publish Artifact",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Create a local package artifact",
+          "expected": "cargo package --allow-dirty succeeds and verifies the packaged crate",
+          "observed": "cargo package succeeded, packaged 183 files, and verified the crate build from the packaged source tree."
+        },
+        {
+          "action": "Inspect packaged file list",
+          "expected": "Publish-facing assets are present and secrets/local-only material are absent",
+          "observed": "cargo package --list showed README.md, LICENSE, docs/*.md, examples/*.rs, src/**, and tests/** while omitting creds.txt, references/**, and .factory/**."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "publish-ready/docs-build/cargo-package-allow-dirty.log",
+          "publish-ready/docs-build/cargo-package-list.log",
+          "publish-ready/docs-build/cargo-test-package_contract.log"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "title": "Published Examples Match the Shipped Cross-Area API Surface",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Compile all examples",
+          "expected": "Published examples use only shipped API symbols and feature flags",
+          "observed": "cargo check --examples --all-features succeeded across the entire examples directory."
+        },
+        {
+          "action": "Run cross-area representative examples",
+          "expected": "Env-based client construction, streaming, structured outputs, request metadata, upload flows, and compatibility migration examples execute against the actual public API",
+          "observed": "The responses_quickstart, responses_streaming, structured_outputs, request_metadata, upload_to_vector_store, and chat_completions_migration binaries all executed successfully and printed the expected public-surface outputs."
+        },
+        {
+          "action": "Validate guide/example linkage",
+          "expected": "Published guides reference the same concrete example files and commands that compile/run",
+          "observed": "docs_contract passed, including checks for quickstart/maintenance/api-coverage references to the shipped examples."
+        }
+      ],
+      "evidence": {
+        "logs": [
+          "publish-ready/docs-build/cargo-check-examples.log",
+          "publish-ready/docs-build/example-responses_quickstart.log",
+          "publish-ready/docs-build/example-responses_streaming.log",
+          "publish-ready/docs-build/example-structured_outputs.log",
+          "publish-ready/docs-build/example-request_metadata.log",
+          "publish-ready/docs-build/example-upload_to_vector_store.log",
+          "publish-ready/docs-build/example-chat_completions_migration.log",
+          "publish-ready/docs-build/cargo-test-docs_contract.log"
+        ],
+        "guideReferences": [
+          "docs/quickstart.md",
+          "docs/responses-guide.md",
+          "docs/files-and-vector-stores.md",
+          "docs/migration-guide.md",
+          "docs/maintenance.md",
+          "docs/api-coverage.md"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 5 assigned publish-ready packaging/docs assertions through cargo-native validation. All 5 passed: rustdoc/doctests were clean, published examples compiled and representative examples ran successfully, manifest metadata was publish-ready and Apache-2.0 correct, and cargo package produced a clean artifact without creds.txt, references/**, or .factory/**."
+}
