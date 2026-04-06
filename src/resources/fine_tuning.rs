@@ -877,6 +877,13 @@ pub struct FineTuningCheckpointPermissionDeleteResponse {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FineTuningGrader {
+    LabelModel {
+        input: Vec<FineTuningGraderMessage>,
+        labels: Vec<String>,
+        model: String,
+        name: String,
+        passing_labels: Vec<String>,
+    },
     StringCheck {
         input: String,
         name: String,
