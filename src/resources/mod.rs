@@ -68,7 +68,7 @@ impl ResourceFamilies {
             webhooks: webhooks::Webhooks::new(runtime.clone()),
             fine_tuning: fine_tuning::FineTuning::new(runtime.clone()),
             evals: evals::Evals::new(runtime.clone()),
-            containers: containers::Containers,
+            containers: containers::Containers::new(runtime.clone()),
             skills: skills::Skills,
             videos: videos::Videos,
         }
