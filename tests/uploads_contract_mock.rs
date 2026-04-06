@@ -6,8 +6,10 @@ mod multipart_support;
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
-        files::{FileExpiresAfter, FilePurpose, FileStatus},
-        uploads::{UploadCompleteParams, UploadCreateParams, UploadPartInput, UploadStatus},
+        files::{FileExpiresAfter, FileStatus},
+        uploads::{
+            UploadCompleteParams, UploadCreateParams, UploadPartInput, UploadPurpose, UploadStatus,
+        },
     },
 };
 use serde_json::json;
@@ -50,7 +52,7 @@ fn lifecycle_and_chunking() {
             bytes: 12,
             filename: String::from("parts.jsonl"),
             mime_type: String::from("application/jsonl"),
-            purpose: FilePurpose::Assistants,
+            purpose: UploadPurpose::Assistants,
             expires_after: Some(FileExpiresAfter {
                 anchor: String::from("created_at"),
                 seconds: 3600,
@@ -129,6 +131,15 @@ fn lifecycle_and_chunking() {
         .add_part(" ", UploadPartInput::default())
         .unwrap_err();
     assert!(matches!(error.kind, ErrorKind::Validation));
+
+    let unknown_status = serde_json::from_str::<openai_rust::resources::uploads::Upload>(
+        &upload_payload("upload-unknown", "future_status", None),
+    )
+    .unwrap();
+    assert_eq!(
+        unknown_status.status,
+        UploadStatus::Unknown(String::from("future_status"))
+    );
 }
 
 fn client(base_url: &str) -> OpenAI {

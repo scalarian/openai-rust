@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 use crate::{
@@ -8,9 +8,7 @@ use crate::{
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     error::ErrorKind,
     helpers::multipart::{MultipartBuilder, MultipartFile},
-    resources::files::{
-        FileExpiresAfter, FileObject, FilePurpose, encode_path_id, validate_path_id,
-    },
+    resources::files::{FileExpiresAfter, FileObject, encode_path_id, validate_path_id},
 };
 
 /// Default chunk size for chunked uploads (64 MiB).
@@ -132,9 +130,39 @@ pub struct UploadCreateParams {
     pub bytes: u64,
     pub filename: String,
     pub mime_type: String,
-    pub purpose: FilePurpose,
+    pub purpose: UploadPurpose,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_after: Option<FileExpiresAfter>,
+}
+
+/// Upload creation purpose enum limited to the documented upload API values.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum UploadPurpose {
+    #[serde(rename = "assistants")]
+    Assistants,
+    #[serde(rename = "batch")]
+    Batch,
+    #[serde(rename = "fine-tune")]
+    FineTune,
+    #[serde(rename = "vision")]
+    Vision,
+}
+
+impl UploadPurpose {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Assistants => "assistants",
+            Self::Batch => "batch",
+            Self::FineTune => "fine-tune",
+            Self::Vision => "vision",
+        }
+    }
+}
+
+impl std::fmt::Display for UploadPurpose {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Upload part input for multipart `/parts` creation.
@@ -191,7 +219,7 @@ pub struct Upload {
     #[serde(default)]
     pub filename: String,
     #[serde(default)]
-    pub purpose: Option<FilePurpose>,
+    pub purpose: Option<UploadPurpose>,
     pub status: UploadStatus,
     #[serde(default)]
     pub file: Option<FileObject>,
@@ -200,14 +228,45 @@ pub struct Upload {
 }
 
 /// Upload lifecycle status.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum UploadStatus {
     #[default]
     Pending,
     Completed,
     Cancelled,
     Expired,
+    Unknown(String),
+}
+
+impl Serialize for UploadStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match self {
+            Self::Pending => "pending",
+            Self::Completed => "completed",
+            Self::Cancelled => "cancelled",
+            Self::Expired => "expired",
+            Self::Unknown(value) => value,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for UploadStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "pending" => Self::Pending,
+            "completed" => Self::Completed,
+            "cancelled" => Self::Cancelled,
+            "expired" => Self::Expired,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Upload part object.
@@ -240,7 +299,7 @@ pub enum ChunkedUploadSource {
 pub struct UploadChunkedParams {
     pub source: ChunkedUploadSource,
     pub mime_type: String,
-    pub purpose: FilePurpose,
+    pub purpose: UploadPurpose,
     pub part_size: Option<usize>,
     pub md5: Option<String>,
 }

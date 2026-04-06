@@ -47,11 +47,8 @@ fn create_preserves_multipart_semantics() {
     let boundary = content_type.split("boundary=").nth(1).unwrap();
     let multipart = multipart_support::parse_multipart(&request.body, boundary).unwrap();
     assert_text_part(&multipart, "purpose", "fine-tune");
-    assert_text_part(
-        &multipart,
-        "expires_after",
-        r#"{"anchor":"created_at","seconds":3600}"#,
-    );
+    assert_text_part(&multipart, "expires_after[anchor]", "created_at");
+    assert_text_part(&multipart, "expires_after[seconds]", "3600");
     let file_part = multipart
         .parts
         .iter()

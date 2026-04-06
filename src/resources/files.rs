@@ -185,10 +185,8 @@ impl FileCreateParams {
         builder.add_file("file", self.file.to_multipart_file());
         builder.add_text("purpose", self.purpose.to_string());
         if let Some(expires_after) = self.expires_after {
-            builder.add_text(
-                "expires_after",
-                serde_json::to_string(&expires_after).unwrap_or_else(|_| String::from("{}")),
-            );
+            builder.add_text("expires_after[anchor]", expires_after.anchor);
+            builder.add_text("expires_after[seconds]", expires_after.seconds.to_string());
         }
         builder.build()
     }

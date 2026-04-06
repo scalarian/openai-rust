@@ -11,10 +11,7 @@ use std::{
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::{
-        files::FilePurpose,
-        uploads::{ChunkedUploadSource, UploadChunkedParams, UploadStatus},
-    },
+    resources::uploads::{ChunkedUploadSource, UploadChunkedParams, UploadPurpose, UploadStatus},
 };
 use serde_json::json;
 
@@ -50,7 +47,7 @@ fn chunked_helper_preserves_path_and_in_memory_semantics() {
         .upload_file_chunked(UploadChunkedParams {
             source: ChunkedUploadSource::Path(path.clone()),
             mime_type: String::from("text/plain"),
-            purpose: FilePurpose::UserData,
+            purpose: UploadPurpose::Batch,
             part_size: Some(3),
             md5: Some(String::from("path-md5")),
         })
@@ -66,7 +63,7 @@ fn chunked_helper_preserves_path_and_in_memory_semantics() {
                 byte_length: Some(6),
             },
             mime_type: String::from("application/octet-stream"),
-            purpose: FilePurpose::Assistants,
+            purpose: UploadPurpose::Assistants,
             part_size: Some(4),
             md5: None,
         })
@@ -80,7 +77,7 @@ fn chunked_helper_preserves_path_and_in_memory_semantics() {
             "bytes": 6,
             "filename": path.file_name().unwrap().to_string_lossy(),
             "mime_type": "text/plain",
-            "purpose": "user_data"
+            "purpose": "batch"
         })
     );
     assert_part_body(&requests[1], b"abc");
@@ -115,7 +112,7 @@ fn chunked_helper_preserves_path_and_in_memory_semantics() {
                 byte_length: Some(3),
             },
             mime_type: String::from("application/octet-stream"),
-            purpose: FilePurpose::Assistants,
+            purpose: UploadPurpose::Assistants,
             part_size: Some(2),
             md5: None,
         })
@@ -131,7 +128,7 @@ fn chunked_helper_preserves_path_and_in_memory_semantics() {
                 byte_length: None,
             },
             mime_type: String::from("application/octet-stream"),
-            purpose: FilePurpose::Assistants,
+            purpose: UploadPurpose::Assistants,
             part_size: Some(2),
             md5: None,
         })
