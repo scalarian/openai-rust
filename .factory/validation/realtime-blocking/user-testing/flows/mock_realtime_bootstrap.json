@@ -1,0 +1,157 @@
+{
+  "groupId": "mock_realtime_bootstrap",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-REALTIME-001",
+      "title": "Client secret creation returns ephemeral auth and effective session",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes",
+          "observation": "The mocked POST /v1/realtime/client_secrets request included expires_after.anchor=created_at, expires_after.seconds=60, session.type=realtime, and session.output_modalities=[text]. The decoded result exposed client_secret.value=ek_test_123, client_secret.expires_at=1740000000, session.type=realtime, and session.output_modalities=[text]."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_calls_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-002",
+      "title": "WebSocket connect builds the correct Realtime target and auth inputs",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "websocket_target_builds_ws_urls_and_safe_auth_inputs",
+          "observation": "prepare_ws_target produced wss://example.openai.invalid/v1/realtime?model=gpt-realtime-mini for model sessions and wss://example.openai.invalid/v1/realtime?call_id=call_123 for call joins, used Authorization: Bearer sk_server for server-key auth and Authorization: Bearer ek_test_secret / ek_consumer_secret for client-secret auth, preserved org/project/user-agent headers for consumer auth, rejected default auth without a server key as a configuration error, and rejected missing model/call_id as a validation error."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_connection_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-003",
+      "title": "Session update round-trips effective GA session state",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "bootstrap_and_clean_close",
+          "observation": "The client sent a session.update event whose serialized session included instructions=\"\" and output_modalities=[text]. The mock server responded with session.updated, and the decoded event preserved session.id=sess_123 and instructions=\"\" as the effective session state."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_connection_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-004",
+      "title": "Conversation item creation preserves ordering and server acknowledgment",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "bootstrap_and_clean_close",
+          "observation": "The client sent conversation.item.create with previous_item_id=root and a user message item. The server observed previous_item_id=root, returned conversation.item.created, and the decoded event preserved previous_item_id=root with item.id=item_123."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_connection_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-008",
+      "title": "Realtime call creation helper chooses SDP vs multipart correctly",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes",
+          "observation": "The first POST /v1/realtime/calls used Content-Type: application/sdp, Accept: application/sdp, and body 'v=0\\r\\n' when only sdp was provided. The second POST /v1/realtime/calls used multipart with exactly two parts named sdp and session when session config was supplied, and both responses returned the SDP answer bytes unchanged."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_calls_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-009",
+      "title": "Call control helpers hit the correct routes and guard path params",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes",
+          "observation": "The mocked helpers posted to /v1/realtime/calls/call_accept/accept, /call_hangup/hangup, /call_refer/refer, and /call_reject/reject. The accept request used Accept: */*, hangup sent an empty body, refer serialized target_uri=sip:agent@example.com, reject serialized status_code=486, and hangup with a blank call_id failed locally with ErrorKind::Validation before sending a request."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_calls_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-010",
+      "title": "GA event names follow the current published surface, not stale beta aliases",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "ga_event_names_are_canonical_and_beta_aliases_stay_non_primary",
+          "observation": "decode_server_event treated response.output_text.delta and response.output_text.done as first-class GA events, decoded output_audio_buffer.started as a first-class lifecycle event, and decoded the stale beta alias response.text.delta as RealtimeServerEvent::Unknown rather than a canonical GA event."
+        },
+        {
+          "test": "output_audio_done_decodes_as_a_first_class_lifecycle_event",
+          "observation": "decode_server_event decoded response.output_audio.done into RealtimeServerEvent::OutputAudioDone with the expected ids and indices, confirming GA audio completion event support on the current surface."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_decode_contract.txt"
+      ]
+    },
+    {
+      "id": "VAL-REALTIME-011",
+      "title": "Connection Bootstrap Surfaces Session Creation and Clean Shutdown",
+      "status": "pass",
+      "reasons": [
+        {
+          "test": "bootstrap_and_clean_close",
+          "observation": "Opening the mocked Realtime connection produced session_id=sess_123 before user traffic, next_event decoded session.created with session.id=sess_123, and connection.close() caused the server to receive a close frame while the client observed next_event() == None afterward without hanging."
+        }
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_connection_contract.txt"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_realtime_bootstrap\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test realtime_connection_contract -- --nocapture",
+      "exitCode": 0,
+      "tests": [
+        "websocket_target_builds_ws_urls_and_safe_auth_inputs",
+        "bootstrap_and_clean_close"
+      ],
+      "evidence": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_connection_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_realtime_bootstrap\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test realtime_calls_contract -- --nocapture",
+      "exitCode": 0,
+      "tests": [
+        "client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes"
+      ],
+      "evidence": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_calls_contract.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_realtime_bootstrap\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test realtime_decode_contract -- --nocapture",
+      "exitCode": 0,
+      "tests": [
+        "output_audio_done_decodes_as_a_first_class_lifecycle_event",
+        "ga_event_names_are_canonical_and_beta_aliases_stay_non_primary",
+        "output_item_events_derive_item_id_from_the_nested_item_payload"
+      ],
+      "evidence": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_bootstrap/realtime_decode_contract.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 8 assigned realtime bootstrap assertions passed via the 3 specified mocked cargo validation commands; each command exited 0 and the named tests matched the expected bootstrap, call-route, and decode-contract behaviors."
+}

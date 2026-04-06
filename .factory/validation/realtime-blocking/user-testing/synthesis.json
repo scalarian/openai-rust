@@ -1,0 +1,40 @@
+{
+  "milestone": "realtime-blocking",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CORE-018",
+    "VAL-CROSS-005",
+    "VAL-REALTIME-001",
+    "VAL-REALTIME-002",
+    "VAL-REALTIME-003",
+    "VAL-REALTIME-004",
+    "VAL-REALTIME-005",
+    "VAL-REALTIME-006",
+    "VAL-REALTIME-007",
+    "VAL-REALTIME-008",
+    "VAL-REALTIME-009",
+    "VAL-REALTIME-010",
+    "VAL-REALTIME-011",
+    "VAL-REALTIME-012",
+    "VAL-REALTIME-013",
+    "VAL-REALTIME-014",
+    "VAL-REALTIME-015"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Recorded that VAL-REALTIME-006 currently needs an isolated temporary cargo probe because the existing realtime_* test binaries do not directly exercise structured error-event recovery on the same websocket connection.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}

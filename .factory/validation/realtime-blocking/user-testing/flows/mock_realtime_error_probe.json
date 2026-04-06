@@ -1,0 +1,28 @@
+{
+  "groupId": "mock_realtime_error_probe",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-REALTIME-006",
+      "title": "Error events stay structured and non-fatal",
+      "status": "pass",
+      "reason": "The exact assigned cargo probe exited 0 and printed `structured realtime error preserved message/code/param/event_id and same connection recovered with final text: Recovered`, confirming the probe observed a structured realtime error and then completed a later valid request on the same connection.",
+      "evidence": {
+        "commandOutput": "realtime-blocking/mock_realtime_error_probe/cargo-run-output.txt"
+      }
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_realtime_error_probe\" cargo run --manifest-path \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_realtime_error_probe/project/Cargo.toml\" --quiet",
+      "exitCode": 0,
+      "observed": "Probe completed successfully and reported preserved structured realtime error fields plus same-connection recovery with final text `Recovered`."
+    }
+  ],
+  "toolsUsed": [
+    "cargo"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "VAL-REALTIME-006 passed: the exact mocked cargo probe preserved structured realtime error details and a subsequent valid request on the same connection completed successfully."
+}

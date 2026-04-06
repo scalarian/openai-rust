@@ -1,0 +1,43 @@
+{
+  "groupId": "mock_blocking",
+  "surface": "mocked cargo validation",
+  "assertions": [
+    {
+      "id": "VAL-CORE-018",
+      "status": "pass",
+      "reason": "`cargo check` succeeded with default features, `cargo check --features blocking` also succeeded, and `cargo test --features blocking --test core_blocking -- --nocapture` passed `blocking_responses_create_matches_async_results_and_metadata` plus `blocking_stream_consumption_matches_async_terminal_output`, showing the blocking facade is opt-in and matches async parsed results, metadata, and stream behavior."
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "status": "pass",
+      "reason": "`cargo test --features blocking --test core_blocking -- --nocapture` passed `blocking_responses_create_matches_async_results_and_metadata`, `blocking_stream_consumption_matches_async_terminal_output`, and `blocking_chunked_upload_matches_async_request_sequence`, covering representative create, stream, and chunked upload flows with matching async/blocking request shapes, metadata, and final outputs."
+    }
+  ],
+  "commands": [
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_blocking\" cargo check --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\"",
+      "exitCode": 0,
+      "observation": "Default-feature cargo check completed successfully and finished the dev profile build for `openai-rust`, establishing the baseline crate surface builds cleanly without enabling `blocking`.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_blocking/01-cargo-check-default.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_blocking\" cargo check --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --features blocking",
+      "exitCode": 0,
+      "observation": "Feature-enabled cargo check completed successfully and finished the dev profile build for `openai-rust`, confirming the crate also compiles when the `blocking` facade is turned on.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_blocking/02-cargo-check-blocking.txt"
+    },
+    {
+      "command": "env CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/realtime-blocking/user-testing/target/mock_blocking\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --features blocking --test core_blocking -- --nocapture",
+      "exitCode": 0,
+      "observation": "`core_blocking` ran 3 tests and all passed: `blocking_responses_create_matches_async_results_and_metadata`, `blocking_stream_consumption_matches_async_terminal_output`, and `blocking_chunked_upload_matches_async_request_sequence`; these outputs directly exercise blocking parity for create, stream, metadata, and upload request sequencing.",
+      "evidencePath": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/realtime-blocking/mock_blocking/03-cargo-test-core-blocking.txt"
+    }
+  ],
+  "toolsUsed": [
+    "cargo check",
+    "cargo test"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 3 required cargo commands succeeded. VAL-CORE-018 and VAL-CROSS-005 both passed based on successful default/blocking build matrix checks and the 3 passing `core_blocking` parity tests for create, stream, and chunked upload flows."
+}
