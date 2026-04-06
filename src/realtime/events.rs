@@ -373,6 +373,13 @@ pub enum RealtimeServerEvent {
         content_index: usize,
         delta: String,
     },
+    OutputAudioDone {
+        event_id: String,
+        response_id: String,
+        item_id: String,
+        output_index: usize,
+        content_index: usize,
+    },
     OutputAudioTranscriptDelta {
         event_id: String,
         response_id: String,
@@ -474,6 +481,7 @@ impl RealtimeServerEvent {
             Self::ResponseContentPartAdded { .. } => "response.content_part.added",
             Self::ResponseContentPartDone { .. } => "response.content_part.done",
             Self::OutputAudioDelta { .. } => "response.output_audio.delta",
+            Self::OutputAudioDone { .. } => "response.output_audio.done",
             Self::OutputAudioTranscriptDelta { .. } => "response.output_audio_transcript.delta",
             Self::OutputAudioTranscriptDone { .. } => "response.output_audio_transcript.done",
             Self::FunctionCallArgumentsDelta { .. } => "response.function_call_arguments.delta",
@@ -608,6 +616,13 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
             output_index: required_usize(object, "output_index")?,
             content_index: required_usize(object, "content_index")?,
             delta: required_string(object, "delta")?,
+        }),
+        "response.output_audio.done" => Ok(RealtimeServerEvent::OutputAudioDone {
+            event_id: required_string(object, "event_id")?,
+            response_id: required_string(object, "response_id")?,
+            item_id: required_string(object, "item_id")?,
+            output_index: required_usize(object, "output_index")?,
+            content_index: required_usize(object, "content_index")?,
         }),
         "response.output_audio_transcript.delta" => {
             Ok(RealtimeServerEvent::OutputAudioTranscriptDelta {

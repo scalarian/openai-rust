@@ -266,6 +266,7 @@ impl RealtimeEventState {
                 part.audio.get_or_insert_with(String::new).push_str(delta);
                 self.current_response_mut()?.sync_response();
             }
+            RealtimeServerEvent::OutputAudioDone { .. } => {}
             RealtimeServerEvent::OutputAudioTranscriptDelta {
                 output_index,
                 content_index,

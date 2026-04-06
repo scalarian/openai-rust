@@ -68,6 +68,33 @@ fn ga_event_names_are_canonical_and_beta_aliases_stay_non_primary() {
 }
 
 #[test]
+fn output_audio_done_decodes_as_a_first_class_lifecycle_event() {
+    let done = decode_server_event(&json!({
+        "type": "response.output_audio.done",
+        "event_id": "evt_audio_done",
+        "response_id": "resp_123",
+        "item_id": "item_123",
+        "output_index": 0,
+        "content_index": 0
+    }))
+    .expect("response.output_audio.done should decode");
+    assert!(matches!(
+        done,
+        RealtimeServerEvent::OutputAudioDone {
+            ref event_id,
+            ref response_id,
+            ref item_id,
+            output_index,
+            content_index,
+        } if event_id == "evt_audio_done"
+            && response_id == "resp_123"
+            && item_id == "item_123"
+            && output_index == 0
+            && content_index == 0
+    ));
+}
+
+#[test]
 fn output_item_events_derive_item_id_from_the_nested_item_payload() {
     let item_added = decode_server_event(&json!({
         "type": "response.output_item.added",

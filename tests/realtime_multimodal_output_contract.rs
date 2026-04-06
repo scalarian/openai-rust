@@ -70,6 +70,14 @@ fn output_items_reconcile_at_response_done() {
             "delta": "spoken"
         }),
         json!({
+            "type": "response.output_audio.done",
+            "event_id": "evt_audio_done",
+            "response_id": "resp_mm",
+            "item_id": "msg_1",
+            "output_index": 0,
+            "content_index": 0
+        }),
+        json!({
             "type": "response.output_audio_transcript.done",
             "event_id": "evt_audio_tx_done",
             "response_id": "resp_mm",
@@ -133,6 +141,9 @@ fn output_items_reconcile_at_response_done() {
 
     for payload in transcript {
         let event = decode_server_event(&payload).expect("event should decode");
+        if payload["type"] == json!("response.output_audio.done") {
+            assert_eq!(event.event_type(), "response.output_audio.done");
+        }
         state.apply(&event).expect("event should apply");
     }
 
