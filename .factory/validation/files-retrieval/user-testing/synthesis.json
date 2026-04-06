@@ -1,0 +1,45 @@
+{
+  "milestone": "files-retrieval",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 21,
+    "passed": 19,
+    "failed": 0,
+    "blocked": 2
+  },
+  "passedAssertions": [
+    "VAL-FILES-001",
+    "VAL-FILES-002",
+    "VAL-FILES-003",
+    "VAL-FILES-004",
+    "VAL-FILES-005",
+    "VAL-FILES-007",
+    "VAL-FILES-008",
+    "VAL-FILES-010",
+    "VAL-FILES-011",
+    "VAL-FILES-012",
+    "VAL-FILES-013",
+    "VAL-FILES-014",
+    "VAL-FILES-015",
+    "VAL-FILES-016",
+    "VAL-FILES-017",
+    "VAL-FILES-018",
+    "VAL-FILES-019",
+    "VAL-FILES-020",
+    "VAL-FILES-021"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [
+    {
+      "id": "VAL-FILES-006",
+      "blockedBy": "`crud_and_errors` proves `openai-beta: assistants=v2` on create/retrieve/update/delete routes, but the observed list/search test only proves route and payload shape; it does not directly assert beta-header injection for list or search, so the full assertion is not directly proven by cargo output plus inspected test coverage."
+    },
+    {
+      "id": "VAL-FILES-009",
+      "blockedBy": "The passing polling-helper test directly proves poll-helper headers and explicit/server-driven interval handling, but it only exercises `in_progress -> completed` flows and does not directly prove that failed or cancelled terminal states remain visible to the caller."
+    }
+  ],
+  "appliedUpdates": [],
+  "previousRound": null
+}

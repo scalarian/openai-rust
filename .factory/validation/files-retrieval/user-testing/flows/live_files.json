@@ -1,0 +1,74 @@
+{
+  "groupId": "live_files",
+  "surface": "live API validation",
+  "assertions": [
+    {
+      "id": "VAL-FILES-001",
+      "title": "File creation preserves multipart upload semantics",
+      "status": "blocked",
+      "requestIds": [
+        "req_d4cc42eacfcb453591adfd2960b4768a"
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/files-retrieval/live_files/live_files_smoke.log"
+      ],
+      "observed": "The required live smoke passed and printed a real file id plus a create request id after creating a file.",
+      "issues": "The captured live output does not expose multipart wire details or optional expires_after handling, so the full multipart-upload contract is not directly proven by this run."
+    },
+    {
+      "id": "VAL-FILES-003",
+      "title": "File content and file-processing helpers preserve retrieval behavior",
+      "status": "blocked",
+      "requestIds": [
+        "req_cef44e5503ca40749b9974c815846e72"
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/files-retrieval/live_files/live_files_smoke.log"
+      ],
+      "observed": "The required live smoke passed and printed a file-content request id after retrieving file content successfully.",
+      "issues": "The live output does not directly show the binary payload bytes or exercise the wait_for_processing polling helper, so the assigned assertion is not fully proven by this run."
+    },
+    {
+      "id": "VAL-FILES-020",
+      "title": "File Retrieve and Delete Preserve Metadata and Deletion Semantics",
+      "status": "blocked",
+      "requestIds": [
+        "req_f55ca66aba424f5cae4f2e2d96266ccb",
+        "req_db1479c27de04dd1b96e86da4cd8ed00"
+      ],
+      "evidence": [
+        "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/files-retrieval/live_files/live_files_smoke.log"
+      ],
+      "observed": "The required live smoke passed and printed real retrieve and delete request ids for the created file.",
+      "issues": "The captured output does not directly prove local empty-id rejection or stable metadata-field preservation, so the full retrieve/delete contract is not directly established from this log alone."
+    }
+  ],
+  "commands": [
+    {
+      "command": "set -a && . ./creds.txt && set +a && unset OPENAI_BASE_URL && cargo test --test live_files_smoke -- --ignored --nocapture",
+      "workingDirectory": "/Users/staticpayload/Mainframe/openai-rust",
+      "env": {
+        "CARGO_TARGET_DIR": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/files-retrieval/user-testing/target/live_files"
+      },
+      "exitCode": 0,
+      "stdoutStderr": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/files-retrieval/live_files/live_files_smoke.log"
+    }
+  ],
+  "toolsUsed": [
+    "Read",
+    "LS",
+    "Execute"
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "description": "The single live smoke run is narrower than the assigned assertion scopes, so multipart wire details, wait_for_processing polling, empty-id guards, and metadata-field stability are not directly observable in the captured output.",
+      "affectedAssertions": [
+        "VAL-FILES-001",
+        "VAL-FILES-003",
+        "VAL-FILES-020"
+      ]
+    }
+  ],
+  "summary": "Ran the required live cargo smoke successfully and captured request IDs, but VAL-FILES-001, VAL-FILES-003, and VAL-FILES-020 remain blocked because the live output does not directly prove the full contract scope for those assertions."
+}
