@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{
@@ -645,10 +645,10 @@ impl<'de> Deserialize<'de> for EvalRunOutputTextFormat {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EvalRunStatus {
     Queued,
-    Running,
-    Succeeded,
+    InProgress,
+    Completed,
     Failed,
-    Cancelled,
+    Canceled,
     Unknown(String),
 }
 
@@ -656,12 +656,21 @@ impl EvalRunStatus {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Queued => "queued",
-            Self::Running => "running",
-            Self::Succeeded => "succeeded",
+            Self::InProgress => "in_progress",
+            Self::Completed => "completed",
             Self::Failed => "failed",
-            Self::Cancelled => "cancelled",
+            Self::Canceled => "canceled",
             Self::Unknown(value) => value.as_str(),
         }
+    }
+}
+
+impl Serialize for EvalRunStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -679,10 +688,10 @@ impl<'de> Deserialize<'de> for EvalRunStatus {
         let value = String::deserialize(deserializer)?;
         Ok(match value.as_str() {
             "queued" => Self::Queued,
-            "running" => Self::Running,
-            "succeeded" => Self::Succeeded,
+            "in_progress" | "running" => Self::InProgress,
+            "completed" | "succeeded" => Self::Completed,
             "failed" => Self::Failed,
-            "cancelled" => Self::Cancelled,
+            "canceled" | "cancelled" => Self::Canceled,
             _ => Self::Unknown(value),
         })
     }
@@ -765,9 +774,9 @@ pub struct EvalRun {
     pub model: Option<String>,
     #[serde(default)]
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub per_model_usage: Vec<EvalRunPerModelUsage>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub per_testing_criteria_results: Vec<EvalRunTestingCriteriaResult>,
     #[serde(default)]
     pub report_url: Option<String>,
@@ -825,6 +834,22 @@ pub struct EvalRunDeleteResponse {
     pub run_id: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_null_default_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<Vec<T>>::deserialize(deserializer).map(Option::unwrap_or_default)
+}
+
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
 }
 
 /// Output item list params.
@@ -970,7 +995,7 @@ pub struct EvalOutputItem {
     pub results: Vec<EvalOutputItemResult>,
     #[serde(default)]
     pub run_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub sample: EvalOutputItemSample,
     #[serde(default)]
     pub status: EvalOutputItemStatus,

@@ -17,18 +17,14 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
         json_response(run_payload(
             "run_comp",
             completions_data_source(),
-            "running",
+            "in_progress",
         )),
         json_response(run_list_payload()),
         json_response(
             json!({"object": "eval.run.deleted", "deleted": true, "run_id": "run_jsonl"})
                 .to_string(),
         ),
-        json_response(run_payload(
-            "run_resp",
-            responses_data_source(),
-            "cancelled",
-        )),
+        json_response(run_payload("run_resp", responses_data_source(), "canceled")),
     ])
     .unwrap();
     let client = client(&server.url());
@@ -97,7 +93,7 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
         .runs()
         .retrieve("eval_123", "run_comp")
         .unwrap();
-    assert_eq!(retrieved.output.status, EvalRunStatus::Running);
+    assert_eq!(retrieved.output.status, EvalRunStatus::InProgress);
     match &retrieved.output.data_source {
         EvalRunDataSource::Completions { source, .. } => {
             assert!(matches!(
@@ -148,7 +144,11 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
         .runs()
         .cancel("eval_123", "run_resp")
         .unwrap();
-    assert_eq!(cancelled.output.status, EvalRunStatus::Cancelled);
+    assert_eq!(cancelled.output.status, EvalRunStatus::Canceled);
+    assert_eq!(
+        serde_json::to_string(&cancelled.output.status).unwrap(),
+        "\"canceled\""
+    );
 
     let requests = server.captured_requests(5).unwrap();
     assert_eq!(requests[0].path, "/v1/evals/eval_123/runs");
@@ -263,8 +263,8 @@ fn run_list_payload() -> String {
         "object": "list",
         "data": [
             serde_json::from_str::<serde_json::Value>(&run_payload("run_resp", responses_data_source(), "queued")).unwrap(),
-            serde_json::from_str::<serde_json::Value>(&run_payload("run_comp", completions_data_source(), "running")).unwrap(),
-            serde_json::from_str::<serde_json::Value>(&run_payload("run_jsonl", jsonl_data_source(), "succeeded")).unwrap()
+            serde_json::from_str::<serde_json::Value>(&run_payload("run_comp", completions_data_source(), "in_progress")).unwrap(),
+            serde_json::from_str::<serde_json::Value>(&run_payload("run_jsonl", jsonl_data_source(), "completed")).unwrap()
         ],
         "has_more": true
     }).to_string()
