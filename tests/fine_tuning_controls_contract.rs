@@ -15,6 +15,7 @@ use serde_json::json;
 fn method_variants_and_job_controls_remain_distinct() {
     let server = mock_http::MockHttpServer::spawn_sequence(vec![
         json_response(job_payload("ftjob_supervised", "queued")),
+        json_response(job_payload("ftjob_dpo", "queued")),
         json_response(job_payload("ftjob_reinforcement", "queued")),
         json_response(events_payload()),
         json_response(job_payload("ftjob_pause", "paused")),
@@ -45,6 +46,30 @@ fn method_variants_and_job_controls_remain_distinct() {
         })
         .unwrap();
     assert_eq!(supervised.output.id, "ftjob_supervised");
+
+    let dpo = client
+        .fine_tuning()
+        .jobs()
+        .create(FineTuningJobCreateParams {
+            model: String::from("gpt-4o-mini"),
+            training_file: String::from("file-dpo"),
+            method: Some(FineTuningMethod::Dpo(FineTuningMethodConfig {
+                dpo: Some(openai_rust::resources::fine_tuning::FineTuningDpoMethod {
+                    hyperparameters: Some(
+                        openai_rust::resources::fine_tuning::FineTuningDpoHyperparameters {
+                            beta: Some(AutoOrNumber::Number(3)),
+                            n_epochs: Some(AutoOrNumber::Auto),
+                            learning_rate_multiplier: Some(AutoOrNumber::Number(2)),
+                            ..Default::default()
+                        },
+                    ),
+                }),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(dpo.output.id, "ftjob_dpo");
 
     let reinforcement = client
         .fine_tuning()
@@ -104,19 +129,20 @@ fn method_variants_and_job_controls_remain_distinct() {
         .unwrap();
     assert_eq!(resumed.output.status.as_str(), "running");
 
-    let requests = server.captured_requests(5).unwrap();
+    let requests = server.captured_requests(6).unwrap();
     assert_eq!(requests[0].path, "/v1/fine_tuning/jobs");
     assert_eq!(requests[1].path, "/v1/fine_tuning/jobs");
+    assert_eq!(requests[2].path, "/v1/fine_tuning/jobs");
     assert_eq!(
-        requests[2].path,
+        requests[3].path,
         "/v1/fine_tuning/jobs/ftjob_reinforcement/events?after=evt_000&limit=2"
     );
     assert_eq!(
-        requests[3].path,
+        requests[4].path,
         "/v1/fine_tuning/jobs/ftjob_reinforcement/pause"
     );
     assert_eq!(
-        requests[4].path,
+        requests[5].path,
         "/v1/fine_tuning/jobs/ftjob_reinforcement/resume"
     );
 
@@ -131,7 +157,22 @@ fn method_variants_and_job_controls_remain_distinct() {
         json!("auto")
     );
 
-    let reinforcement_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    let dpo_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(dpo_body["method"]["type"], json!("dpo"));
+    assert_eq!(
+        dpo_body["method"]["dpo"]["hyperparameters"]["beta"],
+        json!(3)
+    );
+    assert_eq!(
+        dpo_body["method"]["dpo"]["hyperparameters"]["n_epochs"],
+        json!("auto")
+    );
+    assert_eq!(
+        dpo_body["method"]["dpo"]["hyperparameters"]["learning_rate_multiplier"],
+        json!(2)
+    );
+
+    let reinforcement_body: serde_json::Value = serde_json::from_slice(&requests[2].body).unwrap();
     assert_eq!(reinforcement_body["method"]["type"], json!("reinforcement"));
     assert_eq!(
         reinforcement_body["method"]["reinforcement"]["grader"]["type"],

@@ -81,6 +81,7 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
         checkpoints.output.data[0].fine_tuned_model_checkpoint,
         "ft:gpt-4o-mini:org:weather:checkpoint"
     );
+    assert_eq!(checkpoints.output.data[0].step_number, 4);
     assert_eq!(checkpoints.output.data[0].metrics.train_loss, Some(0.42));
     assert_eq!(
         checkpoints.output.data[0]
