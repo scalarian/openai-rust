@@ -215,6 +215,12 @@ impl OpenAIBuilder {
         self
     }
 
+    /// Sets a default webhook secret for signature verification helpers.
+    pub fn webhook_secret(mut self, webhook_secret: impl Into<String>) -> Self {
+        self.config.webhook_secret = Some(webhook_secret.into());
+        self
+    }
+
     /// Sets a client-level timeout budget.
     pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
         self.config.timeout = Some(timeout);

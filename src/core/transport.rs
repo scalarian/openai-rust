@@ -645,9 +645,11 @@ fn should_retry(error: &OpenAIError) -> bool {
         | ErrorKind::Api(ApiErrorKind::RateLimit)
         | ErrorKind::Api(ApiErrorKind::Server) => true,
         ErrorKind::Api(ApiErrorKind::Other(408)) => true,
-        ErrorKind::Api(_) | ErrorKind::Configuration | ErrorKind::Validation | ErrorKind::Parse => {
-            false
-        }
+        ErrorKind::Api(_)
+        | ErrorKind::Configuration
+        | ErrorKind::Validation
+        | ErrorKind::WebhookSignature
+        | ErrorKind::Parse => false,
     }
 }
 

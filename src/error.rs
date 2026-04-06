@@ -135,6 +135,8 @@ pub enum ErrorKind {
     Configuration,
     /// Client-side request validation failure.
     Validation,
+    /// Webhook signature validation failure.
+    WebhookSignature,
     /// Transport-level failure.
     Transport,
     /// API-status failure.

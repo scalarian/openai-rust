@@ -11,6 +11,7 @@ pub const OPENAI_API_KEY_ENV: &str = "OPENAI_API_KEY";
 pub const OPENAI_BASE_URL_ENV: &str = "OPENAI_BASE_URL";
 pub const OPENAI_ORG_ID_ENV: &str = "OPENAI_ORG_ID";
 pub const OPENAI_PROJECT_ID_ENV: &str = "OPENAI_PROJECT_ID";
+pub const OPENAI_WEBHOOK_SECRET_ENV: &str = "OPENAI_WEBHOOK_SECRET";
 
 /// Shared immutable client configuration scaffold.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -25,6 +26,8 @@ pub struct ClientConfig {
     pub project: Option<String>,
     /// Optional custom user-agent value.
     pub user_agent: Option<String>,
+    /// Optional webhook secret for signature verification helpers.
+    pub webhook_secret: Option<String>,
     /// Optional client-level timeout override.
     pub timeout: Option<Duration>,
     /// Optional retry-budget override.
@@ -52,6 +55,7 @@ impl ClientConfig {
             organization: env::var(OPENAI_ORG_ID_ENV).ok(),
             project: env::var(OPENAI_PROJECT_ID_ENV).ok(),
             user_agent: None,
+            webhook_secret: env::var(OPENAI_WEBHOOK_SECRET_ENV).ok(),
             timeout: None,
             max_retries: None,
         }
@@ -66,6 +70,7 @@ impl ClientConfig {
             organization: self.organization.clone().or(env_config.organization),
             project: self.project.clone().or(env_config.project),
             user_agent: self.user_agent.clone(),
+            webhook_secret: self.webhook_secret.clone().or(env_config.webhook_secret),
             timeout: self.timeout,
             max_retries: self.max_retries,
         }
