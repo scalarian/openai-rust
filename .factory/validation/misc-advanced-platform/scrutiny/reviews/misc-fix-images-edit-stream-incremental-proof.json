@@ -1,0 +1,15 @@
+{
+  "featureId": "misc-fix-images-edit-stream-incremental-proof",
+  "reviewedAt": "2026-04-06T06:13:32Z",
+  "commitId": "780785fc039bdb97eb939b31e3a1fe5a29f999a4",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature does what the mission asked: `tests/images_stream_contract.rs` now adds an explicit delayed-tail `edit_stream` regression that mirrors the existing generation timing proof. The new test uses `IncrementalSseServer` to emit `image_edit.partial_image` immediately, delays the `image_edit.completed` tail by 400ms, asserts the partial event is observable before 250ms, and then confirms `final_completed()` still reconciles only after the terminal completed event. That closes the prior non-blocking coverage gap without changing the runtime `edit_stream` implementation or weakening the completed-event guard enforced in `src/resources/images.rs`.",
+    "issues": []
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Pass: reviewed the transcript skeleton and commit `780785f`, confirmed the new delayed-tail `edit_stream` regression in `tests/images_stream_contract.rs` explicitly proves incremental partial-image delivery before the terminal completion chunk, and found the requested coverage gap resolved with terminal completed-event behavior unchanged."
+}
