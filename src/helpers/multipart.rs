@@ -81,7 +81,8 @@ impl MultipartBuilder {
     pub fn build(self) -> MultipartPayload {
         static NEXT_BOUNDARY: AtomicU64 = AtomicU64::new(1);
         let boundary = format!(
-            "openai-rust-boundary-{}",
+            "{}-boundary-{}",
+            env!("CARGO_PKG_NAME"),
             NEXT_BOUNDARY.fetch_add(1, Ordering::Relaxed)
         );
         let mut body = Vec::new();

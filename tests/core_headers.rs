@@ -84,7 +84,7 @@ fn user_agent_defaults_and_overrides() {
     let default_user_agent = default_capture.headers.get("user-agent").cloned().unwrap();
     assert_eq!(
         default_user_agent,
-        format!("openai-rust/{}", env!("CARGO_PKG_VERSION"))
+        format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     );
 
     let custom_server =
@@ -104,7 +104,8 @@ fn user_agent_defaults_and_overrides() {
     assert_eq!(
         custom_user_agent,
         format!(
-            "integration-suite/1.0 openai-rust/{}",
+            "integration-suite/1.0 {}/{}",
+            env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION")
         )
     );

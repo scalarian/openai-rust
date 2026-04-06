@@ -10,7 +10,7 @@ fn live_embeddings_smoke_captures_request_id() {
         .embeddings()
         .create(openai_rust::resources::embeddings::EmbeddingCreateParams {
             model: String::from("text-embedding-3-small"),
-            input: json!("hello from openai-rust"),
+            input: json!("hello from scalarian-openai-rust"),
             ..Default::default()
         })
         .expect("live embeddings request should succeed");

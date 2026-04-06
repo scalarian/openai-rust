@@ -12,7 +12,7 @@ use support::markdown::{
 fn readme_sections_links_and_claims_resolve_from_the_published_markdown() {
     let readme = fs::read_to_string(repo_root().join("README.md")).expect("README.md should exist");
     for section in [
-        "# openai-rust",
+        "# scalarian-openai-rust",
         "## Quickstart",
         "## Capability Overview",
         "## Start Here",
@@ -48,6 +48,12 @@ fn readme_sections_links_and_claims_resolve_from_the_published_markdown() {
     assert!(
         readme.contains("actions/workflows/ci.yml/badge.svg"),
         "README.md should include the CI badge"
+    );
+    assert!(
+        readme.contains(
+            "Published package: `scalarian-openai-rust`. Rust import path: `openai_rust`."
+        ),
+        "README.md should distinguish the published package name from the Rust import path"
     );
 
     for exported_surface in [

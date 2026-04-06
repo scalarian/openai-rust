@@ -150,7 +150,7 @@ fn temp_fixture_path() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("openai-rust-upload-{unique}.txt"))
+    std::env::temp_dir().join(format!("{}-upload-{unique}.txt", env!("CARGO_PKG_NAME")))
 }
 
 fn assert_part_body(request: &mock_http::CapturedRequest, expected: &[u8]) {

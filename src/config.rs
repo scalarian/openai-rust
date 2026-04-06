@@ -163,7 +163,7 @@ pub(crate) fn normalize_base_url(input: &str) -> Result<String, OpenAIError> {
 }
 
 pub(crate) fn build_user_agent(custom: Option<&str>) -> String {
-    let default = format!("openai-rust/{}", env!("CARGO_PKG_VERSION"));
+    let default = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     match normalize_optional(custom) {
         Some(custom) => format!("{custom} {default}"),
         None => default,

@@ -101,7 +101,9 @@ fn websocket_target_builds_ws_urls_and_safe_auth_inputs() {
             .get("user-agent")
             .map(String::as_str),
         Some(concat!(
-            "consumer-app/1.0 openai-rust/",
+            "consumer-app/1.0 ",
+            env!("CARGO_PKG_NAME"),
+            "/",
             env!("CARGO_PKG_VERSION")
         ))
     );

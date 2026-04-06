@@ -1,6 +1,6 @@
-# openai-rust / llms.txt
+# scalarian-openai-rust / llms.txt
 
-openai-rust is an independent Rust SDK for the OpenAI API. The package is published on crates.io as `scalarian-openai-rust`, while the Rust crate import path remains `openai_rust`.
+`scalarian-openai-rust` is an independent Rust SDK for the OpenAI API. The GitHub repository is `scalarian/openai-rust`, while the Rust crate import path remains `openai_rust`.
 
 ## Canonical entry points
 

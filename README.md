@@ -1,6 +1,7 @@
-# openai-rust
+# scalarian-openai-rust
 
 Independent Rust SDK for the OpenAI API with Responses-first ergonomics, realtime support, and typed compatibility helpers.
+Published package: `scalarian-openai-rust`. Rust import path: `openai_rust`.
 
 [![CI](https://github.com/scalarian/openai-rust/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scalarian/openai-rust/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
