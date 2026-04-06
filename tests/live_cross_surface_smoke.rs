@@ -189,8 +189,7 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
 
     println!(
         "{}",
-        serde_json::to_string_pretty(&paired)
-            .expect("serialize paired live cross-surface report")
+        serde_json::to_string_pretty(&paired).expect("serialize paired live cross-surface report")
     );
     println!(
         "live file cleanup delete request id: {}",

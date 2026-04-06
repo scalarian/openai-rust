@@ -1,7 +1,7 @@
-#[path = "support/mock_http.rs"]
-mod mock_http;
 #[path = "support/cross_surface.rs"]
 mod cross_surface;
+#[path = "support/mock_http.rs"]
+mod mock_http;
 
 use std::{
     collections::BTreeMap,
@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::SinkExt;
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
@@ -449,10 +449,13 @@ fn verified_webhook_fixtures_preserve_event_and_resource_identifiers_for_routing
     assert!(matches!(batch_event, WebhookEvent::BatchCompleted(_)));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mock_cross_surface_report_matches_publish_ready_equivalence_baseline() {
-    let report = mock_publish_ready_equivalence_report().await;
-    assert_eq!(report, cross_surface::expected_publish_ready_equivalence_baseline());
+#[test]
+fn mock_cross_surface_report_matches_publish_ready_equivalence_baseline() {
+    let report = mock_publish_ready_equivalence_report();
+    assert_eq!(
+        report,
+        cross_surface::expected_publish_ready_equivalence_baseline()
+    );
     println!(
         "{}",
         serde_json::to_string_pretty(&report).expect("serialize mock cross-surface report")
@@ -728,7 +731,7 @@ fn now_seconds() -> i64 {
         .as_secs() as i64
 }
 
-async fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCrossSurfaceReport {
+fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCrossSurfaceReport {
     let surface_server = mock_http::MockHttpServer::spawn_sequence(vec![
         json_response(response_payload(
             "resp_publish_ready",
@@ -815,7 +818,7 @@ async fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCro
         );
     }
 
-    let realtime_trace = mock_realtime_bootstrap_trace().await;
+    let realtime_trace = mock_realtime_bootstrap_trace();
 
     cross_surface::NormalizedCrossSurfaceReport {
         entries: vec![
@@ -830,9 +833,7 @@ async fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCro
                 "chat.completions.create",
                 "success",
                 metadata_shape(chat.request_id()),
-                normalize_chat_finish_reason(
-                    chat.output.choices[0].finish_reason.as_deref(),
-                ),
+                normalize_chat_finish_reason(chat.output.choices[0].finish_reason.as_deref()),
                 Vec::<String>::new(),
             ),
             cross_surface::normalized_entry(
@@ -853,9 +854,9 @@ async fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCro
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn rest_configuration_bootstraps_realtime_through_websocket_hop() {
-    let trace = mock_realtime_bootstrap_trace().await;
+#[test]
+fn rest_configuration_bootstraps_realtime_through_websocket_hop() {
+    let trace = mock_realtime_bootstrap_trace();
     assert_eq!(trace.rest_request.path, "/v1/realtime/client_secrets");
     assert_eq!(
         trace
@@ -919,9 +920,14 @@ async fn rest_configuration_bootstraps_realtime_through_websocket_hop() {
     );
 }
 
-async fn mock_realtime_bootstrap_trace() -> MockRealtimeBootstrapTrace {
-    let harness = MockRealtimeBootstrapHarness::spawn()
-        .await
+fn mock_realtime_bootstrap_trace() -> MockRealtimeBootstrapTrace {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let harness = runtime
+        .block_on(MockRealtimeBootstrapHarness::spawn())
         .expect("spawn realtime bootstrap harness");
     let client = with_env_result(
         &[
@@ -949,34 +955,36 @@ async fn mock_realtime_bootstrap_trace() -> MockRealtimeBootstrapTrace {
         .expect("mock realtime client secret should succeed");
     assert_eq!(secret.request_id(), Some("req_realtime_secret"));
 
-    let mut connection = client
-        .realtime()
-        .connect(RealtimeConnectOptions {
-            model: Some(String::from("gpt-realtime-mini")),
-            auth: Some(RealtimeAuth::client_secret(
-                secret.output.client_secret.value.clone(),
-            )),
-            ..Default::default()
-        })
-        .await
-        .expect("mock realtime websocket should connect");
+    runtime.block_on(async {
+        let mut connection = client
+            .realtime()
+            .connect(RealtimeConnectOptions {
+                model: Some(String::from("gpt-realtime-mini")),
+                auth: Some(RealtimeAuth::client_secret(
+                    secret.output.client_secret.value.clone(),
+                )),
+                ..Default::default()
+            })
+            .await
+            .expect("mock realtime websocket should connect");
 
-    let bootstrap = connection
-        .next_event()
-        .await
-        .expect("expected mock realtime bootstrap event")
-        .expect("mock realtime bootstrap should decode");
-    assert!(matches!(
-        bootstrap,
-        RealtimeServerEvent::SessionCreated { .. }
-    ));
-    connection
-        .close()
-        .await
-        .expect("mock realtime close should succeed");
-    assert!(connection.next_event().await.is_none());
+        let bootstrap = connection
+            .next_event()
+            .await
+            .expect("expected mock realtime bootstrap event")
+            .expect("mock realtime bootstrap should decode");
+        assert!(matches!(
+            bootstrap,
+            RealtimeServerEvent::SessionCreated { .. }
+        ));
+        connection
+            .close()
+            .await
+            .expect("mock realtime close should succeed");
+        assert!(connection.next_event().await.is_none());
+    });
 
-    harness.finish(String::from("req_realtime_secret")).await
+    runtime.block_on(harness.finish(String::from("req_realtime_secret")))
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1008,7 +1016,8 @@ impl MockRealtimeBootstrapHarness {
         let (trace_tx, trace_rx) = oneshot::channel();
         let worker = tokio::spawn(async move {
             let trace = async {
-                let (mut rest_stream, _) = listener.accept().await.map_err(|error| error.to_string())?;
+                let (mut rest_stream, _) =
+                    listener.accept().await.map_err(|error| error.to_string())?;
                 let rest_request = read_async_http_request(&mut rest_stream).await?;
                 let secret_response = serde_json::to_vec(&json!({
                     "client_secret": {
@@ -1025,8 +1034,14 @@ impl MockRealtimeBootstrapHarness {
                     &mut rest_stream,
                     "200 OK",
                     vec![
-                        (String::from("content-type"), String::from("application/json")),
-                        (String::from("content-length"), secret_response.len().to_string()),
+                        (
+                            String::from("content-type"),
+                            String::from("application/json"),
+                        ),
+                        (
+                            String::from("content-length"),
+                            secret_response.len().to_string(),
+                        ),
                         (
                             String::from("x-request-id"),
                             String::from("req_realtime_secret"),
@@ -1035,28 +1050,35 @@ impl MockRealtimeBootstrapHarness {
                     &secret_response,
                 )
                 .await?;
+                rest_stream
+                    .shutdown()
+                    .await
+                    .map_err(|error| error.to_string())?;
 
                 let captured_ws = std::sync::Arc::new(Mutex::new(None::<CapturedWsHandshake>));
                 let captured_ws_for_accept = captured_ws.clone();
                 let (ws_stream, _) = listener.accept().await.map_err(|error| error.to_string())?;
-                let mut socket = accept_hdr_async(ws_stream, move |request: &WsRequest, response: WsResponse| {
-                    let mut headers = BTreeMap::new();
-                    for (name, value) in request.headers() {
-                        headers.insert(
-                            name.as_str().to_ascii_lowercase(),
-                            value.to_str().unwrap_or_default().to_string(),
-                        );
-                    }
-                    *captured_ws_for_accept.lock().unwrap() = Some(CapturedWsHandshake {
-                        path: request
-                            .uri()
-                            .path_and_query()
-                            .map(|value| value.as_str().to_string())
-                            .unwrap_or_else(|| request.uri().path().to_string()),
-                        headers,
-                    });
-                    Ok(response)
-                })
+                let mut socket = accept_hdr_async(
+                    ws_stream,
+                    move |request: &WsRequest, response: WsResponse| {
+                        let mut headers = BTreeMap::new();
+                        for (name, value) in request.headers() {
+                            headers.insert(
+                                name.as_str().to_ascii_lowercase(),
+                                value.to_str().unwrap_or_default().to_string(),
+                            );
+                        }
+                        *captured_ws_for_accept.lock().unwrap() = Some(CapturedWsHandshake {
+                            path: request
+                                .uri()
+                                .path_and_query()
+                                .map(|value| value.as_str().to_string())
+                                .unwrap_or_else(|| request.uri().path().to_string()),
+                            headers,
+                        });
+                        Ok(response)
+                    },
+                )
                 .await
                 .map_err(|error| error.to_string())?;
 
@@ -1133,7 +1155,7 @@ impl MockRealtimeBootstrapHarness {
         let mut trace = self
             .trace_rx
             .await
-            .expect("realtime bootstrap trace sender") 
+            .expect("realtime bootstrap trace sender")
             .expect("realtime bootstrap trace");
         trace.secret_request_id = secret_request_id;
         let _ = self.worker.await;
@@ -1242,7 +1264,9 @@ fn normalize_chat_finish_reason(finish_reason: Option<&str>) -> &'static str {
     }
 }
 
-fn normalize_file_status(status: Option<&openai_rust::resources::files::FileStatus>) -> &'static str {
+fn normalize_file_status(
+    status: Option<&openai_rust::resources::files::FileStatus>,
+) -> &'static str {
     match status {
         Some(openai_rust::resources::files::FileStatus::Uploaded)
         | Some(openai_rust::resources::files::FileStatus::Processed) => "ready_or_processing",
