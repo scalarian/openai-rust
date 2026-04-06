@@ -337,6 +337,44 @@ fn upload_and_poll_merges_existing_file_ids_and_rejects_empty_work() {
     assert!(matches!(empty.kind, ErrorKind::Validation));
 }
 
+#[test]
+fn upload_and_poll_waits_for_all_upload_workers_before_returning_error() {
+    let server = MixedUploadFailureServer::spawn().unwrap();
+    let client = client(server.url());
+    let started = Instant::now();
+
+    let error = client
+        .vector_stores()
+        .file_batches()
+        .upload_and_poll(
+            "vs_123",
+            VectorStoreFileBatchUploadAndPollParams {
+                files: vec![
+                    FileUpload::new("fail.txt", "text/plain", b"fail upload".to_vec()),
+                    FileUpload::new("slow.txt", "text/plain", b"slow upload".to_vec()),
+                ],
+                file_ids: vec![String::from("file_existing")],
+            },
+            VectorStoreFileBatchPollOptions {
+                poll_interval: None,
+                max_wait: Duration::from_secs(1),
+            },
+        )
+        .unwrap_err();
+    let elapsed = started.elapsed();
+
+    assert!(!matches!(error.kind, ErrorKind::Validation));
+    assert!(
+        elapsed >= Duration::from_millis(120),
+        "expected helper to wait for delayed upload worker before returning error, got {:?}",
+        elapsed
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(requests[0].path, "/v1/files");
+    assert_eq!(requests[1].path, "/v1/files");
+}
+
 fn client(base_url: &str) -> OpenAI {
     OpenAI::builder()
         .api_key("sk-test")
@@ -445,6 +483,71 @@ struct ConcurrentUploadServer {
     url: String,
     captured: mpsc::Receiver<mock_http::CapturedRequest>,
     worker: Option<thread::JoinHandle<()>>,
+}
+
+#[derive(Debug)]
+struct MixedUploadFailureServer {
+    url: String,
+    captured: mpsc::Receiver<mock_http::CapturedRequest>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl MixedUploadFailureServer {
+    fn spawn() -> std::io::Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        listener.set_nonblocking(true)?;
+        let url = format!("http://{}", listener.local_addr()?);
+        let (captured_tx, captured_rx) = mpsc::channel();
+        let started_at = Instant::now();
+        let worker = thread::spawn(move || {
+            let mut handles = Vec::new();
+            while handles.len() < 2 {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        let captured_tx = captured_tx.clone();
+                        handles.push(thread::spawn(move || {
+                            handle_mixed_upload_failure_connection(stream, started_at, captured_tx)
+                        }));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(_) => break,
+                }
+            }
+            drop(captured_tx);
+            for handle in handles {
+                let _ = handle.join();
+            }
+        });
+
+        Ok(Self {
+            url,
+            captured: captured_rx,
+            worker: Some(worker),
+        })
+    }
+
+    fn url(&self) -> &str {
+        &self.url
+    }
+
+    fn captured_requests(&self, count: usize) -> Option<Vec<mock_http::CapturedRequest>> {
+        let mut requests = Vec::with_capacity(count);
+        for _ in 0..count {
+            requests.push(self.captured.recv_timeout(Duration::from_secs(2)).ok()?);
+        }
+        Some(requests)
+    }
+}
+
+impl Drop for MixedUploadFailureServer {
+    fn drop(&mut self) {
+        let _ = TcpStream::connect(self.url.trim_start_matches("http://"));
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
 }
 
 impl ConcurrentUploadServer {
@@ -606,6 +709,51 @@ fn handle_concurrent_upload_connection(
     let _ = write_http_response(&mut stream, body.as_bytes(), &extra_headers);
 }
 
+fn handle_mixed_upload_failure_connection(
+    mut stream: TcpStream,
+    started_at: Instant,
+    captured_tx: mpsc::Sender<mock_http::CapturedRequest>,
+) {
+    let request = read_request(&mut stream, started_at).unwrap();
+    let _ = captured_tx.send(request.clone());
+
+    if request.path != "/v1/files" {
+        return;
+    }
+
+    let body_text = String::from_utf8_lossy(&request.body);
+    if body_text.contains("filename=\"slow.txt\"") {
+        thread::sleep(Duration::from_millis(150));
+        let body = file_payload("file_slow");
+        let headers = vec![
+            (String::from("content-length"), body.len().to_string()),
+            (
+                String::from("content-type"),
+                String::from("application/json"),
+            ),
+        ];
+        let _ = write_http_response(&mut stream, body.as_bytes(), &headers);
+        return;
+    }
+
+    let body = json!({
+        "error": {
+            "message": "upload failed",
+            "type": "invalid_request_error"
+        }
+    })
+    .to_string();
+    let headers = vec![
+        (String::from("content-length"), body.len().to_string()),
+        (
+            String::from("content-type"),
+            String::from("application/json"),
+        ),
+    ];
+    let _ =
+        write_http_response_with_status(&mut stream, "400 Bad Request", body.as_bytes(), &headers);
+}
+
 fn read_request(
     stream: &mut TcpStream,
     started_at: Instant,
@@ -669,7 +817,16 @@ fn write_http_response(
     body: &[u8],
     headers: &[(String, String)],
 ) -> std::io::Result<()> {
-    let mut response_bytes = b"HTTP/1.1 200 OK\r\n".to_vec();
+    write_http_response_with_status(stream, "200 OK", body, headers)
+}
+
+fn write_http_response_with_status(
+    stream: &mut TcpStream,
+    status: &str,
+    body: &[u8],
+    headers: &[(String, String)],
+) -> std::io::Result<()> {
+    let mut response_bytes = format!("HTTP/1.1 {status}\r\n").into_bytes();
     for (name, value) in headers {
         response_bytes.extend_from_slice(format!("{}: {}\r\n", name, value).as_bytes());
     }

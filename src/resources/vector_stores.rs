@@ -569,6 +569,7 @@ impl VectorStoreFileBatches {
         params: VectorStoreFileBatchUploadAndPollParams,
         options: VectorStoreFileBatchPollOptions,
     ) -> Result<ApiResponse<VectorStoreFileBatch>, OpenAIError> {
+        validate_path_id("vector_store_id", vector_store_id)?;
         if params.files.is_empty() {
             return Err(OpenAIError::new(
                 ErrorKind::Validation,
@@ -594,15 +595,31 @@ impl VectorStoreFileBatches {
             .collect();
 
         let mut file_ids = params.file_ids;
+        let mut uploaded_ids = Vec::with_capacity(upload_workers.len());
+        let mut first_error = None;
         for worker in upload_workers {
-            let uploaded_id = worker.join().map_err(|_| {
-                OpenAIError::new(
-                    ErrorKind::Transport,
-                    "vector-store batch file upload worker panicked",
-                )
-            })??;
-            file_ids.push(uploaded_id);
+            match worker.join() {
+                Ok(Ok(uploaded_id)) => uploaded_ids.push(uploaded_id),
+                Ok(Err(error)) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+                Err(_) => {
+                    if first_error.is_none() {
+                        first_error = Some(OpenAIError::new(
+                            ErrorKind::Transport,
+                            "vector-store batch file upload worker panicked",
+                        ));
+                    }
+                }
+            }
         }
+
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+        file_ids.extend(uploaded_ids);
 
         self.create_and_poll(
             vector_store_id,
