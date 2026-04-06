@@ -1,6 +1,6 @@
 {
   "milestone": "advanced-platform",
-  "round": 3,
+  "round": 2,
   "status": "pass",
   "validatorsRun": {
     "test": {
@@ -20,14 +20,20 @@
     }
   },
   "reviewsSummary": {
-    "total": 1,
-    "passed": 1,
+    "total": 4,
+    "passed": 4,
     "failed": 0,
     "failedFeatures": []
   },
   "blockingIssues": [],
-  "appliedUpdates": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Added an advanced-platform note to `.factory/library/api-surface.md` documenting that live eval-run payloads may return `null` for `per_model_usage` / `per_testing_criteria_results` and live eval output items may return `sample: null`.",
+      "sourceFeature": "advanced-platform-fix-eval-run-status-and-live-proof"
+    }
+  ],
   "suggestedGuidanceUpdates": [],
   "rejectedObservations": [],
-  "previousRound": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/scrutiny/synthesis.round2.json"
+  "previousRound": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/scrutiny/synthesis.round1.json"
 }
