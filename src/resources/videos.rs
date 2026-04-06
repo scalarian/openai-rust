@@ -34,54 +34,8 @@ impl Videos {
 
     /// Creates a new video generation job.
     pub fn create(&self, params: VideoCreateParams) -> Result<ApiResponse<Video>, OpenAIError> {
-        let VideoCreateParams {
-            prompt,
-            input_reference,
-            model,
-            seconds,
-            size,
-        } = params;
-        let base = VideoCreateParams {
-            prompt,
-            input_reference: None,
-            model,
-            seconds,
-            size,
-        };
-        match input_reference {
-            Some(VideoCreateReference::Upload(upload)) => {
-                let multipart = base.into_multipart(upload);
-                let content_type = multipart.content_type();
-                let mut request = self.runtime.prepare_request_with_body(
-                    "POST",
-                    "/videos",
-                    Some(multipart.into_body()),
-                )?;
-                request
-                    .headers
-                    .insert(String::from("content-type"), content_type);
-                request
-                    .headers
-                    .insert(String::from("accept"), String::from("application/json"));
-                let options = self
-                    .runtime
-                    .resolve_request_options(&RequestOptions::default())?;
-                let response = execute_bytes(&request, &options)?;
-                parse_json_bytes_response(response)
-            }
-            Some(VideoCreateReference::Asset(reference)) => self.runtime.execute_json_with_body(
-                "POST",
-                "/videos",
-                &base.into_json(Some(reference)),
-                RequestOptions::default(),
-            ),
-            None => self.runtime.execute_json_with_body(
-                "POST",
-                "/videos",
-                &base.into_json(None),
-                RequestOptions::default(),
-            ),
-        }
+        let multipart = params.into_multipart();
+        self.execute_json_multipart("/videos", multipart)
     }
 
     /// Creates a new video and polls until the job reaches a terminal state.
@@ -253,88 +207,14 @@ impl Videos {
 
     /// Creates an edit job from an existing video id or uploaded video bytes.
     pub fn edit(&self, params: VideoEditParams) -> Result<ApiResponse<Video>, OpenAIError> {
-        let VideoEditParams { prompt, video } = params;
-        match video {
-            VideoSource::Upload(upload) => {
-                let multipart = VideoEditParams {
-                    prompt,
-                    video: VideoSource::Id(String::new()),
-                }
-                .into_multipart(upload);
-                let content_type = multipart.content_type();
-                let mut request = self.runtime.prepare_request_with_body(
-                    "POST",
-                    "/videos/edits",
-                    Some(multipart.into_body()),
-                )?;
-                request
-                    .headers
-                    .insert(String::from("content-type"), content_type);
-                request
-                    .headers
-                    .insert(String::from("accept"), String::from("application/json"));
-                let options = self
-                    .runtime
-                    .resolve_request_options(&RequestOptions::default())?;
-                let response = execute_bytes(&request, &options)?;
-                parse_json_bytes_response(response)
-            }
-            VideoSource::Id(id) => self.runtime.execute_json_with_body(
-                "POST",
-                "/videos/edits",
-                &serde_json::json!({
-                    "prompt": prompt,
-                    "video": { "id": id }
-                }),
-                RequestOptions::default(),
-            ),
-        }
+        let multipart = params.into_multipart();
+        self.execute_json_multipart("/videos/edits", multipart)
     }
 
     /// Creates an extension job from an existing video id or uploaded video bytes.
     pub fn extend(&self, params: VideoExtendParams) -> Result<ApiResponse<Video>, OpenAIError> {
-        let VideoExtendParams {
-            prompt,
-            seconds,
-            video,
-        } = params;
-        match video {
-            VideoSource::Upload(upload) => {
-                let multipart = VideoExtendParams {
-                    prompt,
-                    seconds,
-                    video: VideoSource::Id(String::new()),
-                }
-                .into_multipart(upload);
-                let content_type = multipart.content_type();
-                let mut request = self.runtime.prepare_request_with_body(
-                    "POST",
-                    "/videos/extensions",
-                    Some(multipart.into_body()),
-                )?;
-                request
-                    .headers
-                    .insert(String::from("content-type"), content_type);
-                request
-                    .headers
-                    .insert(String::from("accept"), String::from("application/json"));
-                let options = self
-                    .runtime
-                    .resolve_request_options(&RequestOptions::default())?;
-                let response = execute_bytes(&request, &options)?;
-                parse_json_bytes_response(response)
-            }
-            VideoSource::Id(id) => self.runtime.execute_json_with_body(
-                "POST",
-                "/videos/extensions",
-                &serde_json::json!({
-                    "prompt": prompt,
-                    "seconds": seconds.as_str(),
-                    "video": { "id": id }
-                }),
-                RequestOptions::default(),
-            ),
-        }
+        let multipart = params.into_multipart();
+        self.execute_json_multipart("/videos/extensions", multipart)
     }
 
     /// Creates a remix job for an existing video.
@@ -364,6 +244,28 @@ impl Videos {
         for (name, value) in extra_headers {
             request.headers.insert(name, value);
         }
+        let options = self
+            .runtime
+            .resolve_request_options(&RequestOptions::default())?;
+        let response = execute_bytes(&request, &options)?;
+        parse_json_bytes_response(response)
+    }
+
+    fn execute_json_multipart(
+        &self,
+        path: &str,
+        multipart: crate::helpers::multipart::MultipartPayload,
+    ) -> Result<ApiResponse<Video>, OpenAIError> {
+        let content_type = multipart.content_type();
+        let mut request =
+            self.runtime
+                .prepare_request_with_body("POST", path, Some(multipart.into_body()))?;
+        request
+            .headers
+            .insert(String::from("content-type"), content_type);
+        request
+            .headers
+            .insert(String::from("accept"), String::from("application/json"));
         let options = self
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
@@ -523,37 +425,7 @@ pub struct VideoCreateParams {
 }
 
 impl VideoCreateParams {
-    fn into_json(self, input_reference: Option<VideoReferenceAsset>) -> Value {
-        let mut value = serde_json::Map::new();
-        value.insert(String::from("prompt"), Value::String(self.prompt));
-        if let Some(reference) = input_reference {
-            value.insert(
-                String::from("input_reference"),
-                serde_json::to_value(reference).unwrap_or(Value::Null),
-            );
-        }
-        if let Some(model) = self.model {
-            value.insert(
-                String::from("model"),
-                Value::String(model.as_str().to_string()),
-            );
-        }
-        if let Some(seconds) = self.seconds {
-            value.insert(
-                String::from("seconds"),
-                Value::String(seconds.as_str().to_string()),
-            );
-        }
-        if let Some(size) = self.size {
-            value.insert(
-                String::from("size"),
-                Value::String(size.as_str().to_string()),
-            );
-        }
-        Value::Object(value)
-    }
-
-    fn into_multipart(self, upload: VideoUpload) -> crate::helpers::multipart::MultipartPayload {
+    fn into_multipart(self) -> crate::helpers::multipart::MultipartPayload {
         let mut builder = MultipartBuilder::new();
         builder.add_text("prompt", self.prompt);
         if let Some(model) = self.model {
@@ -565,7 +437,21 @@ impl VideoCreateParams {
         if let Some(size) = self.size {
             builder.add_text("size", size.as_str());
         }
-        builder.add_file("input_reference", upload.to_multipart_file());
+        if let Some(input_reference) = self.input_reference {
+            match input_reference {
+                VideoCreateReference::Upload(upload) => {
+                    builder.add_file("input_reference", upload.to_multipart_file());
+                }
+                VideoCreateReference::Asset(reference) => {
+                    if let Some(file_id) = reference.file_id {
+                        builder.add_text("input_reference[file_id]", file_id);
+                    }
+                    if let Some(image_url) = reference.image_url {
+                        builder.add_text("input_reference[image_url]", image_url);
+                    }
+                }
+            }
+        }
         builder.build()
     }
 }
@@ -643,10 +529,17 @@ pub struct VideoEditParams {
 }
 
 impl VideoEditParams {
-    fn into_multipart(self, upload: VideoUpload) -> crate::helpers::multipart::MultipartPayload {
+    fn into_multipart(self) -> crate::helpers::multipart::MultipartPayload {
         let mut builder = MultipartBuilder::new();
         builder.add_text("prompt", self.prompt);
-        builder.add_file("video", upload.to_multipart_file());
+        match self.video {
+            VideoSource::Upload(upload) => {
+                builder.add_file("video", upload.to_multipart_file());
+            }
+            VideoSource::Id(id) => {
+                builder.add_text("video[id]", id);
+            }
+        };
         builder.build()
     }
 }
@@ -660,11 +553,18 @@ pub struct VideoExtendParams {
 }
 
 impl VideoExtendParams {
-    fn into_multipart(self, upload: VideoUpload) -> crate::helpers::multipart::MultipartPayload {
+    fn into_multipart(self) -> crate::helpers::multipart::MultipartPayload {
         let mut builder = MultipartBuilder::new();
         builder.add_text("prompt", self.prompt);
         builder.add_text("seconds", self.seconds.as_str());
-        builder.add_file("video", upload.to_multipart_file());
+        match self.video {
+            VideoSource::Upload(upload) => {
+                builder.add_file("video", upload.to_multipart_file());
+            }
+            VideoSource::Id(id) => {
+                builder.add_text("video[id]", id);
+            }
+        };
         builder.build()
     }
 }

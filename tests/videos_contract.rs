@@ -205,25 +205,42 @@ fn video_job_lifecycle_and_transforms_preserve_typed_ids_polling_and_character_f
     assert!(deleted.output.deleted);
 
     let requests = server.captured_requests(13).unwrap();
-    let create_body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(requests[0].path, "/v1/videos");
-    assert_eq!(
-        requests[0].headers.get("content-type").map(String::as_str),
-        Some("application/json")
+    let create_content_type = requests[0].headers.get("content-type").unwrap();
+    assert!(create_content_type.starts_with("multipart/form-data; boundary="));
+    let create_boundary = create_content_type.split("boundary=").nth(1).unwrap();
+    let create_multipart =
+        multipart_support::parse_multipart(&requests[0].body, create_boundary).unwrap();
+    assert_text_part(&create_multipart, "prompt", "a robot walking in the rain");
+    assert_text_part(&create_multipart, "model", "sora-2-pro");
+    assert_text_part(&create_multipart, "seconds", "8");
+    assert_text_part(&create_multipart, "size", "1280x720");
+    assert_text_part(
+        &create_multipart,
+        "input_reference[image_url]",
+        "https://example.com/reference.png",
     );
-    assert_eq!(
-        create_body["input_reference"]["image_url"],
-        json!("https://example.com/reference.png")
-    );
-    assert_eq!(create_body["model"], json!("sora-2-pro"));
-    assert_eq!(create_body["seconds"], json!("8"));
-    assert_eq!(create_body["size"], json!("1280x720"));
 
-    let create_and_poll_body: serde_json::Value =
-        serde_json::from_slice(&requests[1].body).unwrap();
-    assert_eq!(
-        create_and_poll_body["input_reference"]["file_id"],
-        json!("file_ref_123")
+    let create_and_poll_content_type = requests[1].headers.get("content-type").unwrap();
+    assert!(create_and_poll_content_type.starts_with("multipart/form-data; boundary="));
+    let create_and_poll_boundary = create_and_poll_content_type
+        .split("boundary=")
+        .nth(1)
+        .unwrap();
+    let create_and_poll_multipart =
+        multipart_support::parse_multipart(&requests[1].body, create_and_poll_boundary).unwrap();
+    assert_text_part(
+        &create_and_poll_multipart,
+        "prompt",
+        "a robot walking in the rain",
+    );
+    assert_text_part(&create_and_poll_multipart, "model", "sora-2");
+    assert_text_part(&create_and_poll_multipart, "seconds", "4");
+    assert_text_part(&create_and_poll_multipart, "size", "720x1280");
+    assert_text_part(
+        &create_and_poll_multipart,
+        "input_reference[file_id]",
+        "file_ref_123",
     );
     assert_eq!(
         requests[2]
@@ -239,9 +256,14 @@ fn video_job_lifecycle_and_transforms_preserve_typed_ids_polling_and_character_f
         "/v1/videos?after=vid_prev&limit=2&order=asc"
     );
 
-    let edit_body: serde_json::Value = serde_json::from_slice(&requests[5].body).unwrap();
     assert_eq!(requests[5].path, "/v1/videos/edits");
-    assert_eq!(edit_body["video"]["id"], json!("vid_create"));
+    let edit_content_type = requests[5].headers.get("content-type").unwrap();
+    assert!(edit_content_type.starts_with("multipart/form-data; boundary="));
+    let edit_boundary = edit_content_type.split("boundary=").nth(1).unwrap();
+    let edit_multipart =
+        multipart_support::parse_multipart(&requests[5].body, edit_boundary).unwrap();
+    assert_text_part(&edit_multipart, "prompt", "prompt edit");
+    assert_text_part(&edit_multipart, "video[id]", "vid_create");
 
     assert_eq!(requests[6].path, "/v1/videos/edits");
     let edit_upload_content_type = requests[6].headers.get("content-type").unwrap();
@@ -262,10 +284,15 @@ fn video_job_lifecycle_and_transforms_preserve_typed_ids_polling_and_character_f
         Some("edit.mp4")
     );
 
-    let extend_body: serde_json::Value = serde_json::from_slice(&requests[7].body).unwrap();
     assert_eq!(requests[7].path, "/v1/videos/extensions");
-    assert_eq!(extend_body["video"]["id"], json!("vid_create"));
-    assert_eq!(extend_body["seconds"], json!("16"));
+    let extend_content_type = requests[7].headers.get("content-type").unwrap();
+    assert!(extend_content_type.starts_with("multipart/form-data; boundary="));
+    let extend_boundary = extend_content_type.split("boundary=").nth(1).unwrap();
+    let extend_multipart =
+        multipart_support::parse_multipart(&requests[7].body, extend_boundary).unwrap();
+    assert_text_part(&extend_multipart, "prompt", "prompt extend");
+    assert_text_part(&extend_multipart, "seconds", "16");
+    assert_text_part(&extend_multipart, "video[id]", "vid_create");
 
     let extend_upload_content_type = requests[8].headers.get("content-type").unwrap();
     let extend_upload_boundary = extend_upload_content_type
@@ -329,19 +356,29 @@ fn create_request_shape_preserves_nested_reference_configuration_without_flatten
 
     let request = server.captured_request().unwrap();
     assert_eq!(request.path, "/v1/videos");
-    assert_eq!(
-        request.headers.get("content-type").map(String::as_str),
-        Some("application/json")
+    let content_type = request.headers.get("content-type").unwrap();
+    assert!(content_type.starts_with("multipart/form-data; boundary="));
+    let boundary = content_type.split("boundary=").nth(1).unwrap();
+    let multipart = multipart_support::parse_multipart(&request.body, boundary).unwrap();
+    assert_text_part(&multipart, "prompt", "with nested input reference");
+    assert_text_part(&multipart, "input_reference[file_id]", "file_nested");
+    assert_text_part(
+        &multipart,
+        "input_reference[image_url]",
+        "data:image/png;base64,AAAA",
     );
-    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-    assert_eq!(body["prompt"], json!("with nested input reference"));
-    assert_eq!(body["input_reference"]["file_id"], json!("file_nested"));
-    assert_eq!(
-        body["input_reference"]["image_url"],
-        json!("data:image/png;base64,AAAA")
-    );
-    assert_eq!(body["seconds"], json!("12"));
-    assert_eq!(body["size"], json!("1024x1792"));
+    assert_text_part(&multipart, "model", "sora-2-2025-12-08");
+    assert_text_part(&multipart, "seconds", "12");
+    assert_text_part(&multipart, "size", "1024x1792");
+}
+
+fn assert_text_part(multipart: &multipart_support::ParsedMultipart, name: &str, value: &str) {
+    let part = multipart
+        .parts
+        .iter()
+        .find(|part| part.name.as_deref() == Some(name))
+        .unwrap_or_else(|| panic!("missing multipart text part `{name}`"));
+    assert_eq!(part.body, value.as_bytes());
 }
 
 #[test]
