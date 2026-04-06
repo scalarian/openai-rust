@@ -66,7 +66,7 @@ impl ResourceFamilies {
             vector_stores: vector_stores::VectorStores::new(runtime.clone()),
             batches: batches::Batches::new(runtime.clone()),
             webhooks: webhooks::Webhooks::new(runtime.clone()),
-            fine_tuning: fine_tuning::FineTuning,
+            fine_tuning: fine_tuning::FineTuning::new(runtime.clone()),
             evals: evals::Evals,
             containers: containers::Containers,
             skills: skills::Skills,
