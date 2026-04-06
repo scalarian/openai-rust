@@ -1,22 +1,15 @@
 use std::{fs, path::Path};
 
-use openai_rust::{
-    ApiResponse, OpenAI, ResponseMetadata,
-    resources::{
-        chat::ChatCompletionCreateParams,
-        completions::CompletionCreateParams,
-        embeddings::{EmbeddingCreateParams, EmbeddingEncodingFormat},
-        responses::{
-            FunctionTool, ResponseCreateParams, ResponseFormatTextConfig,
-            ResponseFormatTextJSONSchemaConfig, ResponseParseParams, ResponseTextConfig,
-        },
-        uploads::{ChunkedUploadSource, UploadChunkedParams, UploadPurpose},
-    },
+mod support;
+
+use support::markdown::{
+    CargoPackageMetadata, ExampleCommandValidation, FencedBlockLanguage,
+    assert_markdown_rust_block_compiles, extract_command_lines, extract_fenced_blocks,
+    parse_markdown_links, validate_command_line,
 };
-use serde_json::json;
 
 #[test]
-fn readme_exists_and_contains_publish_facing_sections() {
+fn readme_sections_links_and_claims_resolve_from_the_published_markdown() {
     let readme = fs::read_to_string(repo_root().join("README.md")).expect("README.md should exist");
     for section in [
         "# openai-rust",
@@ -34,16 +27,17 @@ fn readme_exists_and_contains_publish_facing_sections() {
         );
     }
 
-    for command in [
-        "cargo add openai-rust",
-        "cargo fmt --all --check",
-        "cargo test --workspace",
-        "cargo check --examples --all-features",
-        "cargo test --doc",
-    ] {
+    let links = parse_markdown_links("README.md", &readme);
+    for link in links {
+        if link.target.starts_with("http://") || link.target.starts_with("https://") {
+            continue;
+        }
+
         assert!(
-            readme.contains(command),
-            "README.md should document `{command}`"
+            repo_root().join(&link.target).exists(),
+            "{} should point at an existing local artifact `{}`",
+            link.location(),
+            link.target
         );
     }
 
@@ -55,100 +49,51 @@ fn readme_exists_and_contains_publish_facing_sections() {
         readme.contains("actions/workflows/ci.yml/badge.svg"),
         "README.md should include the CI badge"
     );
+
+    for exported_surface in [
+        ("`openai_rust::OpenAI`", "src/lib.rs"),
+        ("`openai_rust::resources`", "src/resources/mod.rs"),
+        ("`openai_rust::realtime`", "src/realtime"),
+        ("`openai_rust::helpers`", "src/helpers"),
+        ("`openai_rust::blocking`", "src/blocking"),
+    ] {
+        assert!(
+            readme.contains(exported_surface.0),
+            "README.md should mention {}",
+            exported_surface.0
+        );
+        assert!(
+            repo_root().join(exported_surface.1).exists(),
+            "README claim {} should resolve to {}",
+            exported_surface.0,
+            exported_surface.1
+        );
+    }
 }
 
 #[test]
-fn quickstart_and_claims_match_public_api() {
-    let client = OpenAI::builder().api_key("sk-test").build();
-    let request = client
-        .prepare_request("GET", "/models")
-        .expect("quickstart request should prepare");
-    assert_eq!(request.method, "GET");
-    assert!(request.url.ends_with("/models"));
+fn readme_fenced_snippets_and_commands_validate_against_real_markdown_locations() {
+    let readme_path = repo_root().join("README.md");
+    let fenced_blocks = extract_fenced_blocks(&readme_path).expect("README blocks should parse");
+    assert_eq!(fenced_blocks.len(), 3, "README.md fence count drifted");
 
-    let _response_params = ResponseCreateParams {
-        model: "gpt-4.1-mini".into(),
-        input: Some(json!("Say hello from Rust.")),
-        ..Default::default()
-    };
-
-    let _parse_params = ResponseParseParams {
-        model: "gpt-4.1-mini".into(),
-        input: Some(json!("Return {\"language\":\"rust\"}")),
-        text: Some(ResponseTextConfig {
-            format: Some(ResponseFormatTextConfig::JsonSchema(
-                ResponseFormatTextJSONSchemaConfig {
-                    name: "language".into(),
-                    schema: json!({
-                        "type": "object",
-                        "properties": { "language": { "type": "string" } },
-                        "required": ["language"],
-                        "additionalProperties": false
-                    }),
-                    description: Some("Structured quickstart response".into()),
-                    strict: Some(true),
-                },
-            )),
-            verbosity: None,
-        }),
-        tools: vec![FunctionTool {
-            name: "lookup_model".into(),
-            parameters: json!({
-                "type": "object",
-                "properties": { "model": { "type": "string" } },
-                "required": ["model"],
-                "additionalProperties": false
-            }),
-            strict: Some(true),
-            description: Some("Example tool schema".into()),
-            defer_loading: None,
-        }],
-        ..Default::default()
-    };
-
-    let _chat_params = ChatCompletionCreateParams {
-        model: "gpt-4.1-mini".into(),
-        messages: vec![json!({"role":"user","content":"Say hello"})],
-        ..Default::default()
-    };
-
-    let _legacy_params = CompletionCreateParams {
-        model: "gpt-3.5-turbo-instruct".into(),
-        prompt: Some(json!("Say hello")),
-        ..Default::default()
-    };
-
-    let _embedding_params = EmbeddingCreateParams {
-        model: "text-embedding-3-small".into(),
-        input: json!(["rust", "responses"]),
-        encoding_format: Some(EmbeddingEncodingFormat::Float),
-        ..Default::default()
-    };
-
-    let _chunked_upload = UploadChunkedParams {
-        source: ChunkedUploadSource::InMemory {
-            bytes: b"hello from rust".to_vec(),
-            filename: Some("notes.txt".into()),
-            byte_length: Some(15),
-        },
-        mime_type: "text/plain".into(),
-        purpose: UploadPurpose::Assistants,
-        part_size: Some(8),
-        md5: None,
-    };
-
-    let metadata = ResponseMetadata {
-        status_code: 200,
-        headers: [("x-request-id".into(), "req_readme".into())]
-            .into_iter()
-            .collect(),
-        request_id: Some("req_readme".into()),
-    };
-    let response = ApiResponse {
-        output: vec!["ok"],
-        metadata,
-    };
-    assert_eq!(response.request_id(), Some("req_readme"));
+    for block in fenced_blocks {
+        match block.language {
+            FencedBlockLanguage::Rust => assert_markdown_rust_block_compiles(&block),
+            FencedBlockLanguage::Shell => {
+                for command in extract_command_lines(&block) {
+                    validate_command_line(
+                        &command,
+                        &CargoPackageMetadata::read(repo_root().join("Cargo.toml")),
+                        &ExampleCommandValidation::from_repo_root(repo_root()),
+                        &fs::read_to_string(repo_root().join(".factory/services.yaml"))
+                            .expect("services manifest should exist"),
+                    );
+                }
+            }
+            FencedBlockLanguage::Other(_) => {}
+        }
+    }
 }
 
 fn repo_root() -> &'static Path {
