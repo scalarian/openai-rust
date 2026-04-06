@@ -462,6 +462,57 @@ fn mock_cross_surface_report_matches_publish_ready_equivalence_baseline() {
     );
 }
 
+#[test]
+fn live_report_normalization_consumes_observed_request_metadata_and_event_ordering() {
+    #[derive(serde::Serialize)]
+    struct LiveEntry<'a> {
+        surface: &'a str,
+        status_class: &'a str,
+        request_metadata: serde_json::Value,
+        terminal_interpretation: &'a str,
+        event_ordering: Vec<&'a str>,
+    }
+
+    #[derive(serde::Serialize)]
+    struct LiveReport<'a> {
+        entries: Vec<LiveEntry<'a>>,
+    }
+
+    let report = LiveReport {
+        entries: vec![LiveEntry {
+            surface: "realtime.client_secrets.create + ws bootstrap",
+            status_class: "success",
+            request_metadata: json!({
+                "request_id": "req_live_cross_surface",
+            }),
+            terminal_interpretation: "session.created observed",
+            event_ordering: vec![
+                "rest.client_secrets.create",
+                "ws.session.created",
+                "ws.keepalive",
+                "ws.close",
+            ],
+        }],
+    };
+
+    let normalized = cross_surface::normalize_live_publish_ready_report(&report);
+    assert_eq!(
+        normalized.entries,
+        vec![cross_surface::normalized_entry(
+            "realtime.client_secrets.create + ws bootstrap",
+            "success",
+            "request_id:present",
+            "session_created",
+            [
+                "rest.client_secrets.create",
+                "ws.session.created",
+                "ws.keepalive",
+                "ws.close",
+            ],
+        )]
+    );
+}
+
 fn client(base_url: &str) -> OpenAI {
     OpenAI::builder()
         .api_key("sk-test")

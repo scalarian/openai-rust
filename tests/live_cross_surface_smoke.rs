@@ -16,11 +16,17 @@ use openai_rust::{
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
+struct RequestMetadata {
+    request_id: String,
+}
+
+#[derive(Debug, Serialize)]
 struct ReportEntry {
     surface: &'static str,
     status_class: &'static str,
-    request_id: String,
+    request_metadata: RequestMetadata,
     terminal_interpretation: String,
+    event_ordering: Vec<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -87,7 +93,9 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
         .enable_all()
         .build()
         .unwrap();
-    realtime_runtime.block_on(async {
+    let realtime_event_ordering = realtime_runtime.block_on(async {
+        let mut event_ordering = vec!["rest.client_secrets.create"];
+
         let mut connection = client
             .realtime()
             .connect(RealtimeConnectOptions {
@@ -109,10 +117,14 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
             bootstrap,
             RealtimeServerEvent::SessionCreated { .. }
         ));
+        event_ordering.push("ws.session.created");
         connection
             .close()
             .await
             .expect("realtime close should succeed");
+        event_ordering.push("ws.close");
+
+        event_ordering
     });
 
     let deleted = client
@@ -126,23 +138,31 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
             ReportEntry {
                 surface: "responses.create",
                 status_class: "success",
-                request_id: response.request_id().unwrap_or("<missing>").to_string(),
+                request_metadata: RequestMetadata {
+                    request_id: response.request_id().unwrap_or("<missing>").to_string(),
+                },
                 terminal_interpretation: String::from("completed response object"),
+                event_ordering: Vec::new(),
             },
             ReportEntry {
                 surface: "chat.completions.create",
                 status_class: "success",
-                request_id: chat.request_id().unwrap_or("<missing>").to_string(),
+                request_metadata: RequestMetadata {
+                    request_id: chat.request_id().unwrap_or("<missing>").to_string(),
+                },
                 terminal_interpretation: chat.output.choices[0]
                     .finish_reason
                     .as_deref()
                     .unwrap_or("missing finish_reason")
                     .to_string(),
+                event_ordering: Vec::new(),
             },
             ReportEntry {
                 surface: "files.create",
                 status_class: "success",
-                request_id: file.request_id().unwrap_or("<missing>").to_string(),
+                request_metadata: RequestMetadata {
+                    request_id: file.request_id().unwrap_or("<missing>").to_string(),
+                },
                 terminal_interpretation: file
                     .output
                     .status
@@ -163,15 +183,19 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
                         }
                     })
                     .unwrap_or_else(|| String::from("missing status")),
+                event_ordering: Vec::new(),
             },
             ReportEntry {
                 surface: "realtime.client_secrets.create + ws bootstrap",
                 status_class: "success",
-                request_id: realtime_secret
-                    .request_id()
-                    .unwrap_or("<missing>")
-                    .to_string(),
+                request_metadata: RequestMetadata {
+                    request_id: realtime_secret
+                        .request_id()
+                        .unwrap_or("<missing>")
+                        .to_string(),
+                },
                 terminal_interpretation: String::from("session.created observed"),
+                event_ordering: realtime_event_ordering,
             },
         ],
     };

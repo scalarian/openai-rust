@@ -94,21 +94,39 @@ pub fn normalize_live_publish_ready_report<T: Serialize>(
                 .as_str()
                 .expect("report entry status_class")
                 .to_string();
-            let request_id = entry["request_id"].as_str().unwrap_or_default();
             normalized_entry(
                 surface.clone(),
                 status_class,
-                if request_id.is_empty() || request_id == "<missing>" {
-                    "request_id:missing"
-                } else {
-                    "request_id:present"
-                },
+                normalize_request_metadata_shape(entry),
                 normalize_terminal_state(&surface, entry["terminal_interpretation"].as_str()),
-                normalize_event_ordering(&surface),
+                normalize_event_ordering(&surface, entry["event_ordering"].as_array()),
             )
         })
         .collect();
     NormalizedCrossSurfaceReport { entries }
+}
+
+fn normalize_request_metadata_shape(entry: &serde_json::Value) -> &'static str {
+    let request_id = entry["request_id"].as_str().unwrap_or_default();
+    if !request_id.is_empty() && request_id != "<missing>" {
+        return "request_id:present";
+    }
+
+    let metadata_request_id = entry["request_metadata"]["request_id"]
+        .as_str()
+        .unwrap_or_default();
+    if !metadata_request_id.is_empty() && metadata_request_id != "<missing>" {
+        return "request_id:present";
+    }
+
+    if entry["request_metadata"]["request_id_present"]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        "request_id:present"
+    } else {
+        "request_id:missing"
+    }
 }
 
 fn normalize_terminal_state(surface: &str, interpretation: Option<&str>) -> String {
@@ -138,7 +156,17 @@ fn normalize_terminal_state(surface: &str, interpretation: Option<&str>) -> Stri
     }
 }
 
-fn normalize_event_ordering(surface: &str) -> Vec<String> {
+fn normalize_event_ordering(
+    surface: &str,
+    event_ordering: Option<&Vec<serde_json::Value>>,
+) -> Vec<String> {
+    if let Some(event_ordering) = event_ordering {
+        return event_ordering
+            .iter()
+            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+            .collect();
+    }
+
     if surface == "realtime.client_secrets.create + ws bootstrap" {
         vec![
             String::from("rest.client_secrets.create"),
