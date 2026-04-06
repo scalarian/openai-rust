@@ -1,0 +1,71 @@
+{
+  "milestone": "realtime-blocking",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cargo test --all-features -- --test-threads=5",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cargo check --all-targets --all-features",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "failedFeatures": [
+      "realtime-rest-helpers-and-bootstrap",
+      "realtime-event-state-audio-and-tools"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "realtime-rest-helpers-and-bootstrap",
+      "severity": "blocking",
+      "description": "`prepare_ws_target` resolves the full client config before honoring `RealtimeAuth::ClientSecret`, so websocket setup still requires a configured server API key and does not satisfy the client-secret-only ephemeral auth path."
+    },
+    {
+      "featureId": "realtime-event-state-audio-and-tools",
+      "severity": "blocking",
+      "description": "The Realtime GA event decoder does not model or decode `response.output_audio.done`, causing that documented audio lifecycle event to fall through to `RealtimeServerEvent::Unknown` instead of a first-class event."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "sdk-realtime-worker skill",
+      "suggestion": "Add an explicit non-interactive Exec Mode fallback for the required `brainstorming` step so Realtime workers can satisfy the procedure without needing an approval gate.",
+      "evidence": "Both `realtime-rest-helpers-and-bootstrap` and `realtime-event-state-audio-and-tools` reviews flagged the same mismatch: `.factory/skills/sdk-realtime-worker/SKILL.md` requires `brainstorming`, but the worker handoffs recorded deviations because Exec Mode does not allow that interactive approval flow.",
+      "isSystemic": true
+    },
+    {
+      "target": "validation-contract.md",
+      "suggestion": "Rename the VAL-REALTIME-013 verification command from `cargo test --test realtime_tooling_contract` to the implemented target `cargo test --test realtime_tool_state_contract`.",
+      "evidence": "The review for `realtime-event-state-audio-and-tools` found that `validation-contract.md` still names `realtime_tooling_contract`, while the feature plan and committed test file use `realtime_tool_state_contract`.",
+      "isSystemic": false
+    },
+    {
+      "target": "sdk-core-worker skill",
+      "suggestion": "Tighten the handoff instructions so Exec-mode workers explicitly record the compared design options and the chosen/rejected path in the final handoff, making scrutiny evidence easier to audit.",
+      "evidence": "The `blocking-client-parity` review found the current `sdk-core-worker` wording ambiguous about where option-comparison evidence must appear, even though the skill expects workers to compare at least two directions.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Mission guidance for Realtime live validation is inconsistent because this feature's verification command omits `unset OPENAI_BASE_URL`.",
+      "reason": "The shared library already documents clearing `OPENAI_BASE_URL` for default-host live proofs in `.factory/library/environment.md` and `.factory/library/user-testing.md`; the remaining mismatch is confined to historical mission metadata and handoff text, so no additive shared-state update was warranted here."
+    }
+  ],
+  "previousRound": null
+}
