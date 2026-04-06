@@ -1,0 +1,39 @@
+{
+  "featureId": "skills-and-videos-surfaces",
+  "reviewedAt": "2026-04-06T03:30:00Z",
+  "commitId": "a61f7eeaba7ceb6c668ffe4817441d68b3aacb8c",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The skills surface looks complete for CRUD, versioning, and binary content access, but the videos family does not preserve the documented wire shape: create, edit, and extend switch to JSON bodies for non-upload references even though the current public surface is modeled as multipart form-data throughout the official SDK references.",
+    "issues": [
+      {
+        "file": "src/resources/videos.rs",
+        "line": 72,
+        "severity": "blocking",
+        "description": "`Videos::create` falls back to `execute_json_with_body` whenever `input_reference` is an asset object or absent, so `/videos` is sent as `application/json`. The official Node and Python references both model `/videos` create as multipart form-data regardless of whether `input_reference` is an upload or a nested asset object (`references/openai-node/src/resources/videos.ts:16-18`, `references/openai-python/src/openai/resources/videos.py:116-124`). The added contract test also locks in the JSON expectation (`tests/videos_contract.rs:211-213`, `tests/videos_contract.rs:332-344`), so VAL-ADV-017's request-shape requirement is not actually met."
+      },
+      {
+        "file": "src/resources/videos.rs",
+        "line": 282,
+        "severity": "blocking",
+        "description": "`Videos::edit` and `Videos::extend` take JSON code paths for `VideoSource::Id` (`src/resources/videos.rs:282-290`, `src/resources/videos.rs:327-335`), but the official references send `/videos/edits` and `/videos/extensions` through multipart-form helpers even when the source is an existing video id (`references/openai-node/src/resources/videos.ts:79-92`, `references/openai-python/src/openai/resources/videos.py:449-510`). That breaks wire-shape parity for the ID-chained transform flows covered by VAL-ADV-012."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The shared API-surface notes do not record that Videos create/edit/extend are multipart-form endpoints even for non-upload references. That omission made it easy for this worker to codify a JSON-vs-multipart split that conflicts with the official reference clients.",
+      "evidence": "`.factory/library/api-surface.md:54-59` only lists Videos at a family level; `tests/videos_contract.rs:211-213` and `tests/videos_contract.rs:332-344` assert `application/json`, while `references/openai-node/src/resources/videos.ts:16-18,79-92` and `references/openai-python/src/openai/resources/videos.py:116-124,449-510` consistently use multipart form-data."
+    },
+    {
+      "area": "skills",
+      "observation": "`sdk-surface-worker` still leaves low-cost entitlement-proof strategy implicit for expensive advanced surfaces. The worker followed procedure, but the handoff explicitly asks for the skill to bless `list`-style entitlement probes so reviewers and future workers do not assume a costly create job is required.",
+      "evidence": "Handoff `skillFeedback.followedProcedure` is true, but `suggestedChanges` requests this clarification at `/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/handoffs/2026-04-06T03-22-26-389Z__skills-and-videos-surfaces__fe69a8ce-40c1-4a05-9136-5b2fc71792df.json:114-117`; the current skill procedure at `.factory/skills/sdk-surface-worker/SKILL.md` only says to run a low-cost live smoke if needed, without calling out list-based entitlement probes for expensive job surfaces."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: skills CRUD/version/content behavior looks aligned with the milestone, but the videos implementation and its tests currently enforce JSON request bodies where the documented surface uses multipart form-data, so VAL-ADV-012 and VAL-ADV-017 are not satisfied."
+}

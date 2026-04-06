@@ -58,6 +58,10 @@ High-level scope map for the crate. This file is for workers choosing where new 
 - Skills (if the public surface is available to the staged project)
 - Videos
 
+### Advanced platform wire-shape notes
+- Current public Containers read models/examples do not document request-only execution-policy inputs such as `file_ids`, `skills`, or allowlist `domain_secrets` on retrieve/list responses. Do not assume those create-time fields round-trip on reads without fresh live proof.
+- Videos `create`, `edit`, and `extend` use multipart form-data even when the source/input reference is an existing asset or video id rather than a new upload. Do not switch those routes to JSON just because no local file bytes are being sent.
+
 ## Realtime Surface
 - Realtime client secrets
 - Realtime call helpers
