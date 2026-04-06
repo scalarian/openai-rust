@@ -172,7 +172,15 @@ fn list_and_search_preserve_distinct_page_contracts() {
         requests[0].path,
         "/v1/vector_stores?after=vs_000&before=vs_999&limit=2&order=desc"
     );
+    assert_eq!(
+        requests[0].headers.get("openai-beta").map(String::as_str),
+        Some("assistants=v2")
+    );
     assert_eq!(requests[1].path, "/v1/vector_stores/vs_123/search");
+    assert_eq!(
+        requests[1].headers.get("openai-beta").map(String::as_str),
+        Some("assistants=v2")
+    );
     let search_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
     assert_eq!(search_body["max_num_results"], json!(8));
     assert_eq!(

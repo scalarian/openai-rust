@@ -169,6 +169,13 @@ fn polling_helpers_respect_explicit_and_server_intervals() {
             vec![(String::from("openai-poll-after-ms"), String::from("15"))],
         ),
         json_response(vector_store_file_payload("vsf_header", "completed")),
+        json_response(vector_store_file_failed_payload(
+            "vsf_failed",
+            "file_too_large",
+            "The file exceeded the processing limit.",
+        )),
+        json_response(vector_store_file_payload("vsf_cancelled", "in_progress")),
+        json_response(vector_store_file_payload("vsf_cancelled", "cancelled")),
     ])
     .unwrap();
     let client = client(&server.url());
@@ -210,8 +217,52 @@ fn polling_helpers_respect_explicit_and_server_intervals() {
         header_driven.output.status,
         Some(VectorStoreFileStatus::Completed)
     );
+    let failed = client
+        .vector_stores()
+        .files()
+        .poll(
+            "vs_123",
+            "vsf_failed",
+            VectorStoreFilePollOptions {
+                poll_interval: None,
+                max_wait: Duration::from_secs(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(failed.output.status, Some(VectorStoreFileStatus::Failed));
+    assert_eq!(
+        failed.output.last_error,
+        Some(
+            openai_rust::resources::vector_stores::VectorStoreFileLastError {
+                code: Some(String::from("file_too_large")),
+                message: Some(String::from("The file exceeded the processing limit.")),
+                extra: Default::default(),
+            }
+        )
+    );
 
-    let requests = server.captured_requests(5).unwrap();
+    let cancelled = client
+        .vector_stores()
+        .files()
+        .create_and_poll(
+            "vs_123",
+            VectorStoreFileCreateParams {
+                file_id: String::from("file_456"),
+                attributes: None,
+                chunking_strategy: None,
+            },
+            VectorStoreFilePollOptions {
+                poll_interval: None,
+                max_wait: Duration::from_secs(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        cancelled.output.status,
+        Some(VectorStoreFileStatus::Cancelled)
+    );
+
+    let requests = server.captured_requests(8).unwrap();
     assert_eq!(
         requests[1]
             .headers
@@ -241,6 +292,29 @@ fn polling_helpers_respect_explicit_and_server_intervals() {
             .contains_key("x-stainless-custom-poll-interval")
     );
     assert!(requests[4].received_after >= requests[3].received_after + Duration::from_millis(10));
+    assert_eq!(
+        requests[5]
+            .headers
+            .get("x-stainless-poll-helper")
+            .map(String::as_str),
+        Some("true")
+    );
+    assert_eq!(
+        requests[5].path,
+        "/v1/vector_stores/vs_123/files/vsf_failed"
+    );
+    assert_eq!(requests[6].path, "/v1/vector_stores/vs_123/files");
+    assert_eq!(
+        requests[7].path,
+        "/v1/vector_stores/vs_123/files/vsf_cancelled"
+    );
+    assert_eq!(
+        requests[7]
+            .headers
+            .get("x-stainless-poll-helper")
+            .map(String::as_str),
+        Some("true")
+    );
 
     let blank_id = client
         .vector_stores()
@@ -259,6 +333,23 @@ fn client(base_url: &str) -> OpenAI {
 
 fn vector_store_file_payload(id: &str, status: &str) -> String {
     vector_store_file_with_attributes_payload(id, status, json!({"department": "support"}))
+}
+
+fn vector_store_file_failed_payload(id: &str, code: &str, message: &str) -> String {
+    json!({
+        "id": id,
+        "object": "vector_store.file",
+        "created_at": 1_717_171_717,
+        "usage_bytes": 1024,
+        "vector_store_id": "vs_123",
+        "status": "failed",
+        "last_error": {
+            "code": code,
+            "message": message
+        },
+        "attributes": {"department": "support"}
+    })
+    .to_string()
 }
 
 fn vector_store_file_with_attributes_payload(
