@@ -13,7 +13,7 @@ Use this skill for Realtime GA features: client-secret helpers, Realtime call he
 
 ## Required Skills
 
-- `brainstorming` — invoke before changing Realtime public session/event ergonomics.
+- `brainstorming` — invoke before changing Realtime public session/event ergonomics. In Exec Mode, satisfy this with a written chosen-vs-rejected design note in your session notes and final handoff; no interactive approval loop is required.
 - `test-driven-development` — invoke before editing code; add failing transcript or websocket tests first.
 - `verification-before-completion` — invoke before handoff so claims about Realtime behavior are backed by command output.
 - `systematic-debugging` — invoke immediately if websocket ordering, event decoding, or live Realtime behavior is unstable.
@@ -21,7 +21,7 @@ Use this skill for Realtime GA features: client-secret helpers, Realtime call he
 ## Work Procedure
 
 1. Read `mission.md`, `AGENTS.md`, `.factory/library/architecture.md`, `.factory/library/environment.md`, `.factory/library/user-testing.md`, and `.factory/services.yaml`.
-2. Invoke `brainstorming` when the feature changes event naming, session ergonomics, or Realtime public types.
+2. Invoke `brainstorming` when the feature changes event naming, session ergonomics, or Realtime public types. In Exec Mode, compare plausible designs, record the chosen and rejected directions in your notes/handoff, and proceed without waiting for user approval.
 3. Invoke `test-driven-development` and add failing tests first. Prefer transcript-driven fixtures and local websocket harnesses over ad hoc manual poking.
 4. Keep REST Realtime helpers and websocket machinery separate, while reusing shared error/metadata principles.
 5. Model events first, then derived helpers. Do not make helper assumptions that bypass the canonical event transcript.
