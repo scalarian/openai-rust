@@ -6,8 +6,8 @@ use openai_rust::{
     resources::containers::{
         ContainerCreateParams, ContainerExpiresAfter, ContainerInlineSkill,
         ContainerInlineSkillSource, ContainerListParams, ContainerMemoryLimit,
-        ContainerNetworkPolicy, ContainerOrder, ContainerSkill, ContainerSkillReference,
-        ContainerStatus, DomainSecret,
+        ContainerNetworkPolicy, ContainerOrder, ContainerReadNetworkPolicy, ContainerSkill,
+        ContainerSkillReference, ContainerStatus, DomainSecret,
     },
 };
 use serde_json::json;
@@ -61,24 +61,11 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     assert_eq!(created.output.memory_limit, Some(ContainerMemoryLimit::G4));
     assert_eq!(created.output.status, Some(ContainerStatus::Running));
     match created.output.network_policy.as_ref().unwrap() {
-        ContainerNetworkPolicy::Allowlist {
-            allowed_domains,
-            domain_secrets,
-        } => {
+        ContainerReadNetworkPolicy::Allowlist { allowed_domains } => {
             assert_eq!(allowed_domains, &vec![String::from("api.buildkite.com")]);
-            assert_eq!(domain_secrets.as_ref().unwrap()[0].name, "BUILDKITE_TOKEN");
         }
         other => panic!("expected allowlist policy, got {other:?}"),
     }
-    assert_eq!(created.output.file_ids.as_ref().unwrap().len(), 2);
-    assert!(matches!(
-        &created.output.skills.as_ref().unwrap()[0],
-        ContainerSkill::Reference(ContainerSkillReference { skill_id, .. }) if skill_id == "skill_123"
-    ));
-    assert!(matches!(
-        &created.output.skills.as_ref().unwrap()[1],
-        ContainerSkill::Inline(ContainerInlineSkill { name, .. }) if name == "zip-skill"
-    ));
 
     let retrieved = client.containers().retrieve("cntr_created").unwrap();
     assert_eq!(retrieved.output.id, "cntr_created");
@@ -290,33 +277,8 @@ fn container_payload(id: &str) -> String {
         "memory_limit": "4g",
         "network_policy": {
             "type": "allowlist",
-            "allowed_domains": ["api.buildkite.com"],
-            "domain_secrets": [
-                {
-                    "domain": "api.buildkite.com",
-                    "name": "BUILDKITE_TOKEN",
-                    "value": "secret-value"
-                }
-            ]
-        },
-        "file_ids": ["file_alpha", "file_beta"],
-        "skills": [
-            {
-                "type": "skill_reference",
-                "skill_id": "skill_123",
-                "version": "latest"
-            },
-            {
-                "type": "inline",
-                "name": "zip-skill",
-                "description": "inline bundle",
-                "source": {
-                    "type": "base64",
-                    "media_type": "application/zip",
-                    "data": "UEsDBAoAAAAAA"
-                }
-            }
-        ]
+            "allowed_domains": ["api.buildkite.com"]
+        }
     })
     .to_string()
 }

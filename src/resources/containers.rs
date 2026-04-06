@@ -282,6 +282,14 @@ pub enum ContainerNetworkPolicy {
     Disabled,
 }
 
+/// Documented read-time container network policy.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContainerReadNetworkPolicy {
+    Allowlist { allowed_domains: Vec<String> },
+    Disabled,
+}
+
 /// Domain-scoped secret injected into an allowlisted network policy.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DomainSecret {
@@ -438,11 +446,7 @@ pub struct Container {
     #[serde(default)]
     pub memory_limit: Option<ContainerMemoryLimit>,
     #[serde(default)]
-    pub network_policy: Option<ContainerNetworkPolicy>,
-    #[serde(default)]
-    pub file_ids: Option<Vec<String>>,
-    #[serde(default)]
-    pub skills: Option<Vec<ContainerSkill>>,
+    pub network_policy: Option<ContainerReadNetworkPolicy>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
