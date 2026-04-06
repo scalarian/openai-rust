@@ -1,0 +1,22 @@
+{
+  "featureId": "advanced-platform-fix-fine-tuning-label-model-and-live-job-proof",
+  "reviewedAt": "2026-04-06T04:35:41Z",
+  "commitId": "8aebbfd",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed the original `fine-tuning-surface-and-graders` implementation, the prior failed review, the fix handoff/transcript skeleton, and commit `8aebbfd`. The fix closes both prior blockers: `FineTuningGrader` now supports the documented `label_model` wire shape for request serialization and response deserialization, the graders contract now exercises that variant directly, and the repo now includes a dedicated ignored `live_fine_tuning_job_smoke` target with recorded successful create/retrieve/list/cancel proof against the default OpenAI host.",
+    "issues": [
+      {
+        "file": "tests/live_fine_tuning_job_smoke.rs",
+        "line": 91,
+        "severity": "non_blocking",
+        "description": "The live smoke prints the post-cancel status instead of asserting it, so VAL-ADV-001's required cancel-status transition is evidenced by the recorded handoff run rather than locked in by the test itself. Tightening the assertion would make the proof more regression-resistant, but this does not negate the fact that the missing live smoke target now exists and was successfully exercised."
+      }
+    ]
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/scrutiny/reviews/fine-tuning-jobs-and-graders.json",
+  "summary": "Pass. The rerun fix addresses the original blocking gaps by adding `label_model` support plus contract coverage and by adding/running the missing live fine-tuning job smoke. I noted one non-blocking test-tightness gap: the live smoke logs the cancel status instead of asserting it."
+}

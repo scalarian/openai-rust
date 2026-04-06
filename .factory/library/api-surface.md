@@ -60,6 +60,7 @@ High-level scope map for the crate. This file is for workers choosing where new 
 
 ### Advanced platform wire-shape notes
 - Current public Containers read models/examples do not document request-only execution-policy inputs such as `file_ids`, `skills`, or allowlist `domain_secrets` on retrieve/list responses. Do not assume those create-time fields round-trip on reads without fresh live proof.
+- Real eval-run payloads may return `null` for collection-style fields such as `per_model_usage` and `per_testing_criteria_results`, and real eval output items may return `sample: null`. Treat those live null shapes as part of the supported contract instead of assuming empty arrays/objects or a populated sample record.
 - Videos `create`, `edit`, and `extend` use multipart form-data even when the source/input reference is an existing asset or video id rather than a new upload. Do not switch those routes to JSON just because no local file bytes are being sent.
 
 ## Realtime Surface
