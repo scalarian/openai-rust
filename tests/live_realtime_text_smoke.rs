@@ -1,5 +1,5 @@
 use openai_rust::{
-    OpenAI,
+    ClientConfig, OpenAI,
     realtime::{
         RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
         RealtimeConversationMessageContentPart, RealtimeOutputModality, RealtimeServerEvent,
@@ -11,11 +11,23 @@ use tokio::time::{Duration, Instant, timeout_at};
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires live OpenAI credentials"]
 async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
-    let client = OpenAI::builder().build();
+    let issuer_client = OpenAI::builder().build();
+    let consumer_client = OpenAI::builder()
+        .config(ClientConfig {
+            api_key: Some(String::new()),
+            base_url: issuer_client.config().base_url.clone(),
+            organization: issuer_client.config().organization.clone(),
+            project: issuer_client.config().project.clone(),
+            user_agent: issuer_client.config().user_agent.clone(),
+            webhook_secret: issuer_client.config().webhook_secret.clone(),
+            timeout: issuer_client.config().timeout,
+            max_retries: issuer_client.config().max_retries,
+        })
+        .build();
     let client_secret = tokio::task::spawn_blocking({
-        let client = client.clone();
+        let issuer_client = issuer_client.clone();
         move || {
-            client.realtime().client_secrets().create(
+            issuer_client.realtime().client_secrets().create(
                 openai_rust::realtime::RealtimeClientSecretCreateParams {
                     expires_after: Some(openai_rust::realtime::RealtimeSessionTTL {
                         anchor: String::from("created_at"),
@@ -47,7 +59,13 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
         .clone()
         .unwrap_or_else(|| String::from("gpt-realtime-mini"));
 
-    let mut connection = client
+    assert_eq!(
+        consumer_client.config().api_key.as_deref(),
+        Some(""),
+        "consumer client should intentionally omit a reusable server API key"
+    );
+
+    let mut connection = consumer_client
         .realtime()
         .connect(RealtimeConnectOptions {
             model: Some(model.clone()),
@@ -165,6 +183,10 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
     );
 
     println!("live realtime client-secret request id: {request_id}");
+    println!(
+        "live realtime consumer client api_key field: {:?}",
+        consumer_client.config().api_key
+    );
     println!(
         "live realtime session id: {}",
         connection.session_id().unwrap_or("unknown")

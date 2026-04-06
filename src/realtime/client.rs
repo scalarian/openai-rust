@@ -12,6 +12,7 @@ use url::Url;
 
 use crate::{
     OpenAIError,
+    config::{ClientConfig, build_user_agent, normalize_base_url},
     core::{
         request::RequestOptions,
         response::ApiResponse,
@@ -254,11 +255,31 @@ impl Realtime {
             ));
         }
 
-        let resolved = self.runtime.resolved_config()?;
-        let mut url = Url::parse(&resolved.base_url).map_err(|error| {
+        let auth = options.auth;
+        let (base_url, mut headers) = match auth.as_ref() {
+            Some(RealtimeAuth::ClientSecret(_)) => {
+                let config = self.runtime.config();
+                (
+                    normalize_base_url(
+                        config
+                            .base_url
+                            .as_deref()
+                            .unwrap_or(crate::DEFAULT_BASE_URL),
+                    )?,
+                    websocket_headers_from_config(config),
+                )
+            }
+            _ => {
+                let resolved = self.runtime.resolved_config()?;
+                let headers = resolved.headers();
+                (resolved.base_url, headers)
+            }
+        };
+
+        let mut url = Url::parse(&base_url).map_err(|error| {
             OpenAIError::new(
                 ErrorKind::Configuration,
-                format!("invalid OpenAI base URL `{}`: {error}", resolved.base_url),
+                format!("invalid OpenAI base URL `{}`: {error}", base_url),
             )
             .with_source(error)
         })?;
@@ -300,10 +321,12 @@ impl Realtime {
             url.query_pairs_mut().append_pair("call_id", call_id);
         }
 
-        let mut headers = resolved.headers();
-        let auth = options
-            .auth
-            .unwrap_or_else(|| RealtimeAuth::api_key(resolved.api_key));
+        let auth = auth.unwrap_or_else(|| {
+            let resolved = self.runtime.resolved_config().expect(
+                "default websocket auth resolution should have already required an API key",
+            );
+            RealtimeAuth::api_key(resolved.api_key)
+        });
         headers.insert(
             String::from("authorization"),
             format!("Bearer {}", auth.token()),
@@ -698,6 +721,28 @@ impl RealtimeConnection {
             _ => {}
         }
     }
+}
+
+fn websocket_headers_from_config(config: &ClientConfig) -> BTreeMap<String, String> {
+    let mut headers = BTreeMap::new();
+    headers.insert(
+        String::from("user-agent"),
+        build_user_agent(config.user_agent.as_deref()),
+    );
+    if let Some(organization) = normalize_ws_header_value(config.organization.as_deref()) {
+        headers.insert(String::from("openai-organization"), organization);
+    }
+    if let Some(project) = normalize_ws_header_value(config.project.as_deref()) {
+        headers.insert(String::from("openai-project"), project);
+    }
+    headers
+}
+
+fn normalize_ws_header_value(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {

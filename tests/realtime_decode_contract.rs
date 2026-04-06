@@ -1,4 +1,4 @@
-use openai_rust::realtime::{RealtimeServerEvent, decode_server_event};
+use openai_rust::realtime::{RealtimeConversationItem, RealtimeServerEvent, decode_server_event};
 use serde_json::json;
 
 #[test]
@@ -64,5 +64,52 @@ fn ga_event_names_are_canonical_and_beta_aliases_stay_non_primary() {
     assert!(matches!(
         additive_unknown,
         RealtimeServerEvent::Unknown { ref event_type, .. } if event_type == "response.future.added"
+    ));
+}
+
+#[test]
+fn output_item_events_derive_item_id_from_the_nested_item_payload() {
+    let item_added = decode_server_event(&json!({
+        "type": "response.output_item.added",
+        "event_id": "evt_added",
+        "response_id": "resp_123",
+        "output_index": 0,
+        "item": {
+            "id": "msg_123",
+            "type": "message",
+            "role": "assistant",
+            "content": []
+        }
+    }))
+    .expect("response.output_item.added should decode from item.id");
+    assert!(matches!(
+        item_added,
+        RealtimeServerEvent::ResponseOutputItemAdded {
+            ref item_id,
+            item: RealtimeConversationItem { id: Some(ref nested_id), .. },
+            ..
+        } if item_id == "msg_123" && nested_id == "msg_123"
+    ));
+
+    let item_done = decode_server_event(&json!({
+        "type": "response.output_item.done",
+        "event_id": "evt_done",
+        "response_id": "resp_123",
+        "output_index": 0,
+        "item": {
+            "id": "msg_123",
+            "type": "message",
+            "role": "assistant",
+            "content": []
+        }
+    }))
+    .expect("response.output_item.done should decode from item.id");
+    assert!(matches!(
+        item_done,
+        RealtimeServerEvent::ResponseOutputItemDone {
+            ref item_id,
+            item: RealtimeConversationItem { id: Some(ref nested_id), .. },
+            ..
+        } if item_id == "msg_123" && nested_id == "msg_123"
     ));
 }

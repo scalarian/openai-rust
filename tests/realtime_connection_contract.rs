@@ -56,6 +56,68 @@ fn websocket_target_builds_ws_urls_and_safe_auth_inputs() {
         Some("Bearer ek_test_secret")
     );
 
+    let consumer_client = OpenAI::builder()
+        .base_url("https://example.openai.invalid/v1")
+        .organization("org_consumer")
+        .project("proj_consumer")
+        .user_agent("consumer-app/1.0")
+        .build();
+    let consumer_target = consumer_client
+        .realtime()
+        .prepare_ws_target(RealtimeConnectOptions {
+            model: Some(String::from("gpt-realtime-mini")),
+            auth: Some(RealtimeAuth::client_secret("ek_consumer_secret")),
+            ..Default::default()
+        })
+        .expect("explicit client-secret auth should not require a server API key");
+    assert_eq!(
+        consumer_target.url,
+        "wss://example.openai.invalid/v1/realtime?model=gpt-realtime-mini"
+    );
+    assert_eq!(
+        consumer_target
+            .headers
+            .get("authorization")
+            .map(String::as_str),
+        Some("Bearer ek_consumer_secret")
+    );
+    assert_eq!(
+        consumer_target
+            .headers
+            .get("openai-organization")
+            .map(String::as_str),
+        Some("org_consumer")
+    );
+    assert_eq!(
+        consumer_target
+            .headers
+            .get("openai-project")
+            .map(String::as_str),
+        Some("proj_consumer")
+    );
+    assert_eq!(
+        consumer_target
+            .headers
+            .get("user-agent")
+            .map(String::as_str),
+        Some(concat!(
+            "consumer-app/1.0 openai-rust/",
+            env!("CARGO_PKG_VERSION")
+        ))
+    );
+
+    let default_auth_requires_server_key = consumer_client
+        .realtime()
+        .prepare_ws_target(RealtimeConnectOptions {
+            model: Some(String::from("gpt-realtime-mini")),
+            ..Default::default()
+        })
+        .expect_err("default websocket auth should still require a server API key");
+    assert_eq!(
+        default_auth_requires_server_key.kind,
+        ErrorKind::Configuration
+    );
+
     let missing_target = client
         .realtime()
         .prepare_ws_target(RealtimeConnectOptions::default())

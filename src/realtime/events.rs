@@ -565,20 +565,26 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
             content_index: required_usize(object, "content_index")?,
             text: required_string(object, "text")?,
         }),
-        "response.output_item.added" => Ok(RealtimeServerEvent::ResponseOutputItemAdded {
-            event_id: required_string(object, "event_id")?,
-            response_id: required_string(object, "response_id")?,
-            item_id: required_string(object, "item_id")?,
-            output_index: required_usize(object, "output_index")?,
-            item: required_json(object, "item")?,
-        }),
-        "response.output_item.done" => Ok(RealtimeServerEvent::ResponseOutputItemDone {
-            event_id: required_string(object, "event_id")?,
-            response_id: required_string(object, "response_id")?,
-            item_id: required_string(object, "item_id")?,
-            output_index: required_usize(object, "output_index")?,
-            item: required_json(object, "item")?,
-        }),
+        "response.output_item.added" => {
+            let item: RealtimeConversationItem = required_json(object, "item")?;
+            Ok(RealtimeServerEvent::ResponseOutputItemAdded {
+                event_id: required_string(object, "event_id")?,
+                response_id: required_string(object, "response_id")?,
+                item_id: response_output_item_id(object, &item)?,
+                output_index: required_usize(object, "output_index")?,
+                item,
+            })
+        }
+        "response.output_item.done" => {
+            let item: RealtimeConversationItem = required_json(object, "item")?;
+            Ok(RealtimeServerEvent::ResponseOutputItemDone {
+                event_id: required_string(object, "event_id")?,
+                response_id: required_string(object, "response_id")?,
+                item_id: response_output_item_id(object, &item)?,
+                output_index: required_usize(object, "output_index")?,
+                item,
+            })
+        }
         "response.content_part.added" => Ok(RealtimeServerEvent::ResponseContentPartAdded {
             event_id: required_string(object, "event_id")?,
             response_id: required_string(object, "response_id")?,
@@ -726,6 +732,20 @@ where
         )
         .with_source(error)
     })
+}
+
+fn response_output_item_id(
+    object: &Map<String, Value>,
+    item: &RealtimeConversationItem,
+) -> Result<String, OpenAIError> {
+    optional_string(object, "item_id")
+        .or_else(|| item.id.clone())
+        .ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Parse,
+                "failed to parse Realtime websocket event: missing `item_id`",
+            )
+        })
 }
 
 fn required_string(object: &Map<String, Value>, key: &str) -> Result<String, OpenAIError> {
