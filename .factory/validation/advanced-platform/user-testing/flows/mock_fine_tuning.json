@@ -1,0 +1,117 @@
+{
+  "groupId": "mock_fine_tuning",
+  "testedAt": "2026-04-06T04:48:57Z",
+  "surface": "mocked cargo validation",
+  "isolation": {
+    "repoRoot": "/Users/staticpayload/Mainframe/openai-rust",
+    "missionDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841",
+    "targetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_fine_tuning",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/advanced-platform/mock_fine_tuning"
+  },
+  "toolsUsed": [
+    "cargo test",
+    "Read",
+    "Grep"
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_fine_tuning\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test fine_tuning_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/advanced-platform/mock_fine_tuning/fine_tuning_contract.log\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `fine_tuning_contract` test binary finished successfully with 1/1 tests passing: `job_lifecycle_checkpoint_listing_and_permission_admin_semantics`.",
+      "evidencePath": "advanced-platform/mock_fine_tuning/fine_tuning_contract.log"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_fine_tuning\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test fine_tuning_controls_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/advanced-platform/mock_fine_tuning/fine_tuning_controls_contract.log\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `fine_tuning_controls_contract` test binary finished successfully with 1/1 tests passing: `method_variants_and_job_controls_remain_distinct`.",
+      "evidencePath": "advanced-platform/mock_fine_tuning/fine_tuning_controls_contract.log"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=\"/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_fine_tuning\" cargo test --manifest-path \"/Users/staticpayload/Mainframe/openai-rust/Cargo.toml\" --test graders_contract -- --nocapture > \"/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/advanced-platform/mock_fine_tuning/graders_contract.log\" 2>&1",
+      "exitCode": 0,
+      "observation": "The `graders_contract` test binary finished successfully with 1/1 tests passing: `graders_validate_configs_and_run_tiny_samples`.",
+      "evidencePath": "advanced-platform/mock_fine_tuning/graders_contract.log"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ADV-001",
+      "status": "blocked",
+      "tests": [
+        "tests/fine_tuning_contract.rs::job_lifecycle_checkpoint_listing_and_permission_admin_semantics",
+        "tests/fine_tuning_controls_contract.rs::method_variants_and_job_controls_remain_distinct"
+      ],
+      "reason": "`fine_tuning_contract` proves mocked create/retrieve/list/cancel behavior for a fine-tuning job, and `fine_tuning_controls_contract` separately proves `jobs.list_events(...)` returns typed `fine_tuning.job.event` records. However, the observed mocked fixtures do not show an event record for the same cancelled job or tie the listed event output to the cancel transition, so the full lifecycle-plus-matching-event clause is not completely proven on this surface."
+    },
+    {
+      "id": "VAL-ADV-002",
+      "status": "blocked",
+      "tests": [
+        "tests/fine_tuning_contract.rs::job_lifecycle_checkpoint_listing_and_permission_admin_semantics"
+      ],
+      "reason": "The mocked checkpoint listing coverage proves the `/fine_tuning/jobs/{id}/checkpoints` route, checkpoint `id`, `fine_tuned_model_checkpoint`, `metrics.train_loss`, and unknown metric preservation via `metrics.extra[\"custom_metric\"]`. But the test never asserts `step_number`, and source inspection shows `FineTuningCheckpoint.step_number` is `#[serde(default)]`, so the currently observed pass does not fully prove the checkpoint identity envelope required by the contract."
+    },
+    {
+      "id": "VAL-ADV-003",
+      "status": "pass",
+      "tests": [
+        "tests/fine_tuning_contract.rs::job_lifecycle_checkpoint_listing_and_permission_admin_semantics"
+      ],
+      "reason": "The same mocked test proves checkpoint permission create/list/delete route shapes, preserves `checkpoint.permission` objects with `project_id`, and surfaces a typed `ErrorKind::Api(ApiErrorKind::PermissionDenied)` with API code `permission_denied` when the permission-create path is exercised with an ordinary project key."
+    },
+    {
+      "id": "VAL-ADV-004",
+      "status": "pass",
+      "tests": [
+        "tests/graders_contract.rs::graders_validate_configs_and_run_tiny_samples"
+      ],
+      "reason": "`graders_contract` validates both `score_model` and `label_model` grader definitions and proves `run(...)` returns structured `reward`, `sub_rewards`, per-model token-usage metadata, grader type/name metadata, and explicit structured error flags for tiny mocked samples."
+    },
+    {
+      "id": "VAL-ADV-013",
+      "status": "blocked",
+      "tests": [
+        "tests/fine_tuning_controls_contract.rs::method_variants_and_job_controls_remain_distinct"
+      ],
+      "reason": "The mocked controls test proves distinct `supervised` and `reinforcement` create payloads plus typed `list_events`, `pause`, and `resume` operations. However, the contract explicitly names `dpo` alongside those methods, and no assigned mocked cargo test exercises a DPO create payload even though the SDK surface exposes that variant, so the full method-variant matrix remains unproven."
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Cargo output only reports passing test function names; mapping those passes back to assertion-level behavior required reading the assigned fine-tuning contract tests and, for defaulted fields, the corresponding resource model definitions.",
+      "resolved": true,
+      "resolution": "Reviewed `tests/fine_tuning_contract.rs`, `tests/fine_tuning_controls_contract.rs`, `tests/graders_contract.rs`, and the relevant `src/resources/fine_tuning.rs` model defaults before assigning assertion statuses.",
+      "affectedAssertions": [
+        "VAL-ADV-001",
+        "VAL-ADV-002",
+        "VAL-ADV-003",
+        "VAL-ADV-004",
+        "VAL-ADV-013"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "description": "No observed mocked fixture ties `jobs.cancel(...)` to a corresponding `jobs.list_events(...)` record for the same fine-tuning job, so the event portion of VAL-ADV-001 is only partially covered.",
+      "affectedAssertions": [
+        "VAL-ADV-001"
+      ],
+      "quickFixAttempted": "Inspected both assigned fine-tuning test binaries; one covers create/retrieve/list/cancel and the other covers event listing, but no fixture combines cancel with event retrieval for the same job."
+    },
+    {
+      "description": "The observed checkpoint-listing test does not assert `step_number`, and the SDK model defaults that field during deserialization, so VAL-ADV-002 cannot be fully proven from the assigned mocked cargo surface.",
+      "affectedAssertions": [
+        "VAL-ADV-002"
+      ],
+      "quickFixAttempted": "Inspected `tests/fine_tuning_contract.rs` and confirmed it asserts checkpoint identity and metrics but not `step_number`; then verified in `src/resources/fine_tuning.rs` that `FineTuningCheckpoint.step_number` uses `#[serde(default)]`."
+    },
+    {
+      "description": "The assigned mocked controls coverage does not exercise the DPO fine-tuning method variant named by VAL-ADV-013.",
+      "affectedAssertions": [
+        "VAL-ADV-013"
+      ],
+      "quickFixAttempted": "Searched the assigned fine-tuning tests and found coverage for `FineTuningMethod::Supervised` and `FineTuningMethod::Reinforcement` only; no assigned mocked test invokes `FineTuningMethod::Dpo`."
+    }
+  ],
+  "summary": "Ran all 3 assigned mocked cargo commands successfully. Confirmed VAL-ADV-003 and VAL-ADV-004, and marked VAL-ADV-001, VAL-ADV-002, and VAL-ADV-013 blocked because the assigned mocked cargo surface leaves specific contract clauses unproven."
+}

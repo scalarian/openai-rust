@@ -1,0 +1,184 @@
+{
+  "groupId": "mock_evals",
+  "testedAt": "2026-04-06T04:50:41.331155+00:00",
+  "isolation": {
+    "surface": "mocked cargo validation",
+    "targetDir": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_evals",
+    "evidenceDir": "/Users/staticpayload/.factory/missions/beaa247f-5975-4da4-acc2-19deef388841/evidence/advanced-platform/mock_evals",
+    "reportPath": "/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/flows/mock_evals.json"
+  },
+  "toolsUsed": [
+    "cargo test",
+    "Read",
+    "Grep"
+  ],
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_evals cargo test --test evals_contract -- --nocapture",
+      "exitCode": 0,
+      "observation": "Passed 1 test: evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts.",
+      "evidencePath": "advanced-platform/mock_evals/evals_contract.log"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_evals cargo test --test eval_runs_contract -- --nocapture",
+      "exitCode": 0,
+      "observation": "Passed 1 test: eval_runs_cover_routes_cancel_semantics_and_datasource_families.",
+      "evidencePath": "advanced-platform/mock_evals/eval_runs_contract.log"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/Users/staticpayload/Mainframe/openai-rust/.factory/validation/advanced-platform/user-testing/target/mock_evals cargo test --test eval_output_items_contract -- --nocapture",
+      "exitCode": 0,
+      "observation": "Passed 1 test: eval_output_items_preserve_grader_results_sample_provenance_and_usage_detail.",
+      "evidencePath": "advanced-platform/mock_evals/eval_output_items_contract.log"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "VAL-ADV-005",
+      "title": "Evals CRUD preserves schema-bearing datasource and testing-criteria contracts",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect tests/evals_contract.rs",
+          "expected": "Mapped mocked coverage for eval create/retrieve/update/list/delete plus datasource/testing-criteria assertions.",
+          "observed": "tests/evals_contract.rs:14-207 creates a custom datasource with JSON schema and graders, retrieves a logs datasource, updates a stored_completions eval, lists with cursor params, deletes the eval, and validates blank-id guards."
+        },
+        {
+          "action": "Review captured request/body assertions in tests/evals_contract.rs",
+          "expected": "Datasource config, testing criteria, metadata, and pagination are checked on the wire.",
+          "observed": "tests/evals_contract.rs:178-207 asserts /v1/evals CRUD/list routes, checks create_body.data_source_config.type=custom, include_sample_schema=true, grader pass_threshold/sampling_params, update metadata/name, and local validation on blank ids."
+        },
+        {
+          "action": "Run cargo test --test evals_contract -- --nocapture",
+          "expected": "The mocked eval CRUD contract passes.",
+          "observed": "Exit code 0; 1 test passed per advanced-platform/mock_evals/evals_contract.log."
+        }
+      ],
+      "evidence": {
+        "commandLogs": [
+          "advanced-platform/mock_evals/evals_contract.log"
+        ],
+        "sourceReferences": [
+          "tests/evals_contract.rs:14-207"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ADV-006",
+      "title": "Eval runs expose reportable summaries and honor the unusual cancel route",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect tests/eval_runs_contract.rs",
+          "expected": "Mapped mocked coverage for run creation, reportable summary fields, cancel behavior, and validation guards.",
+          "observed": "tests/eval_runs_contract.rs:32-178 creates a responses-backed run, retrieves a completions-backed run, lists runs, deletes one run, cancels another run, and validates blank eval/run ids."
+        },
+        {
+          "action": "Review captured request/path and parsed-field assertions in tests/eval_runs_contract.rs",
+          "expected": "Run summaries and the unusual cancel route are asserted.",
+          "observed": "tests/eval_runs_contract.rs:71-89 asserts report_url, result_counts.total=1, and per_model_usage[0].model_name; tests/eval_runs_contract.rs:154-178 asserts the cancel path is /v1/evals/eval_123/runs/run_resp (not /cancel), create body uses responses datasource with file_content sampling params, and blank ids fail validation."
+        },
+        {
+          "action": "Run cargo test --test eval_runs_contract -- --nocapture",
+          "expected": "The mocked eval run contract passes.",
+          "observed": "Exit code 0; 1 test passed per advanced-platform/mock_evals/eval_runs_contract.log."
+        }
+      ],
+      "evidence": {
+        "commandLogs": [
+          "advanced-platform/mock_evals/eval_runs_contract.log"
+        ],
+        "sourceReferences": [
+          "tests/eval_runs_contract.rs:32-178"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ADV-007",
+      "title": "Eval output-item retrieval preserves grader results and sample provenance",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect tests/eval_output_items_contract.rs",
+          "expected": "Mapped mocked coverage for output-item list/retrieve behavior and item-level provenance.",
+          "observed": "tests/eval_output_items_contract.rs:11-110 lists output items with cursor/status filters and retrieves one output item with datasource linkage, sample input/output, usage details, grader results, and validation guards."
+        },
+        {
+          "action": "Review parsed-field assertions in tests/eval_output_items_contract.rs",
+          "expected": "Grader results, provenance, and usage details are asserted.",
+          "observed": "tests/eval_output_items_contract.rs:37-83 asserts result names and extra reason, sample usage.prompt_tokens and reasoning_tokens detail, datasource_item_id/question, sample input/output, sample error code, and grader sample rubric; tests/eval_output_items_contract.rs:90-110 asserts list/retrieve routes and blank-id validation."
+        },
+        {
+          "action": "Run cargo test --test eval_output_items_contract -- --nocapture",
+          "expected": "The mocked eval output-item contract passes.",
+          "observed": "Exit code 0; 1 test passed per advanced-platform/mock_evals/eval_output_items_contract.log."
+        }
+      ],
+      "evidence": {
+        "commandLogs": [
+          "advanced-platform/mock_evals/eval_output_items_contract.log"
+        ],
+        "sourceReferences": [
+          "tests/eval_output_items_contract.rs:11-110"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ADV-014",
+      "title": "Eval Runs Support Full Inspection Across Datasource Families",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect tests/eval_runs_contract.rs for datasource-family coverage",
+          "expected": "Mapped mocked coverage across representative eval run datasource families and lifecycle routes.",
+          "observed": "tests/eval_runs_contract.rs:32-124 exercises create/retrieve/list using Responses+file_content, Completions+stored_completions, and Jsonl datasource families, then tests delete/cancel on eval runs."
+        },
+        {
+          "action": "Review typed parsing assertions in tests/eval_runs_contract.rs",
+          "expected": "Datasource families keep report URLs, result counts, per-model usage, and typed status fields without schema loss.",
+          "observed": "tests/eval_runs_contract.rs:63-89 and 93-124 assert queued/in_progress/canceled statuses, report_url, result_counts, per_model_usage, Responses/Completions/Jsonl variants, and next_after pagination behavior."
+        },
+        {
+          "action": "Run cargo test --test eval_runs_contract -- --nocapture",
+          "expected": "The multi-family eval run contract passes.",
+          "observed": "Exit code 0; 1 test passed per advanced-platform/mock_evals/eval_runs_contract.log."
+        }
+      ],
+      "evidence": {
+        "commandLogs": [
+          "advanced-platform/mock_evals/eval_runs_contract.log"
+        ],
+        "sourceReferences": [
+          "tests/eval_runs_contract.rs:32-178"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Cargo output only reported test-function names, so mapping those passes back to VAL-ADV-005/006/007/014 required manual inspection of the corresponding test source and request assertions.",
+      "resolved": true,
+      "resolution": "Reviewed tests/evals_contract.rs, tests/eval_runs_contract.rs, and tests/eval_output_items_contract.rs alongside the validation contract before writing the report.",
+      "affectedAssertions": [
+        "VAL-ADV-005",
+        "VAL-ADV-006",
+        "VAL-ADV-007",
+        "VAL-ADV-014"
+      ]
+    },
+    {
+      "description": "The cancel-route test explicitly proves the non-/cancel path but does not separately assert the captured HTTP method in the test body.",
+      "resolved": true,
+      "resolution": "Recorded the exact proven scope as route-path coverage plus successful cancel parsing from the passing mocked contract.",
+      "affectedAssertions": [
+        "VAL-ADV-006"
+      ]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 4 assigned assertions on the mocked cargo surface: 4 passed. Evidence logs were captured for eval CRUD, eval run, and eval output-item contract tests using the isolated mock_evals target directory."
+}

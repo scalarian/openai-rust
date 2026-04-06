@@ -62,3 +62,5 @@ Testing surface findings, validation tools, and resource-cost guidance for this 
 - Use an isolated `CARGO_TARGET_DIR` under `.factory/validation/<milestone>/user-testing/target/<group>` for the live flow so repeated runs do not collide with mocked validators.
 - Live validation is serialized at concurrency 1 to avoid rate-limit noise and to keep evidence tied to a single request sequence.
 - Capture the command, exit code, resolved default-host proof from output, and any surfaced request ID.
+- Advanced-platform entitlement-aware live smokes are embedded as ignored tests inside `tests/containers_contract.rs`, `tests/skills_contract.rs`, and `tests/videos_contract.rs` rather than separate `tests/live_*.rs` binaries.
+- Observed on `2026-04-06`: the staged project credentials successfully reached the containers, skills, and videos entitlement-aware live smokes without hitting skip paths, and each surface printed live request IDs.
