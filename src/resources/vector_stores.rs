@@ -358,6 +358,7 @@ impl VectorStoreFiles {
         vector_store_id: &str,
         params: VectorStoreFileUploadParams,
     ) -> Result<ApiResponse<VectorStoreFile>, OpenAIError> {
+        validate_path_id("vector_store_id", vector_store_id)?;
         let file = Files::new(self.runtime.clone()).create(FileCreateParams {
             file: params.file,
             purpose: FilePurpose::Assistants,

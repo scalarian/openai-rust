@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use openai_rust::{
     OpenAI,
+    error::ErrorKind,
     resources::{
         files::FileUpload,
         vector_stores::{
@@ -15,6 +16,32 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+
+#[test]
+fn blank_vector_store_id_fails_before_file_upload() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(file_payload(
+        "file_should_not_upload",
+    ))])
+    .unwrap();
+    let client = client(&server.url());
+
+    let error = client
+        .vector_stores()
+        .files()
+        .upload(
+            "   ",
+            VectorStoreFileUploadParams {
+                file: FileUpload::new("knowledge.txt", "text/plain", b"support policy".to_vec()),
+                attributes: None,
+                chunking_strategy: None,
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, ErrorKind::Validation);
+    assert_eq!(error.message, "vector_store_id cannot be blank");
+    assert!(server.captured_request().is_none());
+}
 
 #[test]
 fn upload_composes_files_create_and_attach() {
