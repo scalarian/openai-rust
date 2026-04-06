@@ -3,7 +3,14 @@ mod mock_http;
 #[path = "support/multipart.rs"]
 mod multipart_support;
 
-use std::time::Duration;
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+    net::{Shutdown, TcpListener, TcpStream},
+    sync::{Arc, Mutex, mpsc},
+    thread,
+    time::{Duration, Instant},
+};
 
 use openai_rust::{
     ErrorKind, OpenAI,
@@ -184,6 +191,52 @@ fn create_retrieve_cancel_and_list_files_cover_batch_contract() {
 }
 
 #[test]
+fn upload_and_poll_uploads_new_files_concurrently() {
+    let server = ConcurrentUploadServer::spawn().unwrap();
+    let base_url = server.url().to_string();
+    let client = client(&base_url);
+
+    let response = client
+        .vector_stores()
+        .file_batches()
+        .upload_and_poll(
+            "vs_123",
+            VectorStoreFileBatchUploadAndPollParams {
+                files: vec![
+                    FileUpload::new("first.txt", "text/plain", b"first upload".to_vec()),
+                    FileUpload::new("second.txt", "text/plain", b"second upload".to_vec()),
+                ],
+                file_ids: vec![String::from("file_existing")],
+            },
+            VectorStoreFileBatchPollOptions {
+                poll_interval: None,
+                max_wait: Duration::from_secs(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        response.output.status,
+        VectorStoreFileBatchStatus::Completed
+    );
+
+    let requests = server.captured_requests(5).unwrap();
+    assert_eq!(requests[0].path, "/v1/files");
+    assert_eq!(requests[1].path, "/v1/files");
+    assert_eq!(requests[2].path, "/v1/vector_stores/vs_123/file_batches");
+    assert!(
+        requests[1].received_after < Duration::from_millis(60),
+        "expected second upload request to start before the delayed first upload completed, got {:?}",
+        requests
+    );
+
+    let batch_body: serde_json::Value = serde_json::from_slice(&requests[2].body).unwrap();
+    assert_eq!(
+        batch_body["file_ids"],
+        json!(["file_existing", "file_first", "file_second"])
+    );
+}
+
+#[test]
 fn upload_and_poll_merges_existing_file_ids_and_rejects_empty_work() {
     let server = mock_http::MockHttpServer::spawn_sequence(vec![
         json_response(file_payload("file_uploaded")),
@@ -203,7 +256,8 @@ fn upload_and_poll_merges_existing_file_ids_and_rejects_empty_work() {
         )),
     ])
     .unwrap();
-    let client = client(&server.url());
+    let base_url = server.url().to_string();
+    let client = client(&base_url);
 
     let response = client
         .vector_stores()
@@ -384,4 +438,245 @@ fn json_response_with_headers(
         body: body.into_bytes(),
         ..Default::default()
     }
+}
+
+#[derive(Debug)]
+struct ConcurrentUploadServer {
+    url: String,
+    captured: mpsc::Receiver<mock_http::CapturedRequest>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl ConcurrentUploadServer {
+    fn spawn() -> std::io::Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        listener.set_nonblocking(true)?;
+        let url = format!("http://{}", listener.local_addr()?);
+        let (captured_tx, captured_rx) = mpsc::channel();
+        let started_at = Instant::now();
+        let poll_count = Arc::new(Mutex::new(0_u8));
+        let worker = thread::spawn({
+            let poll_count = Arc::clone(&poll_count);
+            move || {
+                let mut handles = Vec::new();
+                while handles.len() < 5 {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            let captured_tx = captured_tx.clone();
+                            let poll_count = Arc::clone(&poll_count);
+                            handles.push(thread::spawn(move || {
+                                handle_concurrent_upload_connection(
+                                    stream,
+                                    started_at,
+                                    captured_tx,
+                                    poll_count,
+                                )
+                            }));
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(_) => break,
+                    }
+                }
+                drop(captured_tx);
+                for handle in handles {
+                    let _ = handle.join();
+                }
+            }
+        });
+
+        Ok(Self {
+            url,
+            captured: captured_rx,
+            worker: Some(worker),
+        })
+    }
+
+    fn url(&self) -> &str {
+        &self.url
+    }
+
+    fn captured_requests(&self, count: usize) -> Option<Vec<mock_http::CapturedRequest>> {
+        let mut requests = Vec::with_capacity(count);
+        for _ in 0..count {
+            requests.push(self.captured.recv_timeout(Duration::from_secs(2)).ok()?);
+        }
+        Some(requests)
+    }
+}
+
+impl Drop for ConcurrentUploadServer {
+    fn drop(&mut self) {
+        let _ = TcpStream::connect(self.url.trim_start_matches("http://"));
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+fn handle_concurrent_upload_connection(
+    mut stream: TcpStream,
+    started_at: Instant,
+    captured_tx: mpsc::Sender<mock_http::CapturedRequest>,
+    poll_count: Arc<Mutex<u8>>,
+) {
+    let request = read_request(&mut stream, started_at).unwrap();
+    let _ = captured_tx.send(request.clone());
+
+    let (body, extra_headers, delay) = match request.path.as_str() {
+        "/v1/files" => {
+            let body_text = String::from_utf8_lossy(&request.body);
+            if body_text.contains("filename=\"first.txt\"") {
+                (
+                    file_payload("file_first"),
+                    vec![
+                        (
+                            String::from("content-length"),
+                            file_payload("file_first").len().to_string(),
+                        ),
+                        (
+                            String::from("content-type"),
+                            String::from("application/json"),
+                        ),
+                    ],
+                    Duration::from_millis(120),
+                )
+            } else {
+                (
+                    file_payload("file_second"),
+                    vec![
+                        (
+                            String::from("content-length"),
+                            file_payload("file_second").len().to_string(),
+                        ),
+                        (
+                            String::from("content-type"),
+                            String::from("application/json"),
+                        ),
+                    ],
+                    Duration::ZERO,
+                )
+            }
+        }
+        "/v1/vector_stores/vs_123/file_batches" => {
+            let body = vector_store_file_batch_payload(
+                "vsfb_upload",
+                "in_progress",
+                counts(2, 0, 0, 0, 2),
+            );
+            (
+                body.clone(),
+                vec![
+                    (String::from("content-length"), body.len().to_string()),
+                    (
+                        String::from("content-type"),
+                        String::from("application/json"),
+                    ),
+                ],
+                Duration::ZERO,
+            )
+        }
+        "/v1/vector_stores/vs_123/file_batches/vsfb_upload" => {
+            let mut poll_count = poll_count.lock().unwrap();
+            let body = if *poll_count == 0 {
+                *poll_count += 1;
+                vector_store_file_batch_payload("vsfb_upload", "in_progress", counts(2, 0, 0, 0, 2))
+            } else {
+                vector_store_file_batch_payload("vsfb_upload", "completed", counts(0, 2, 0, 0, 2))
+            };
+            let mut headers = vec![
+                (String::from("content-length"), body.len().to_string()),
+                (
+                    String::from("content-type"),
+                    String::from("application/json"),
+                ),
+            ];
+            if *poll_count == 1 {
+                headers.push((String::from("openai-poll-after-ms"), String::from("10")));
+            }
+            (body, headers, Duration::ZERO)
+        }
+        _ => return,
+    };
+
+    if !delay.is_zero() {
+        thread::sleep(delay);
+    }
+    let _ = write_http_response(&mut stream, body.as_bytes(), &extra_headers);
+}
+
+fn read_request(
+    stream: &mut TcpStream,
+    started_at: Instant,
+) -> std::io::Result<mock_http::CapturedRequest> {
+    let mut buffer = Vec::new();
+    let mut header_end = None;
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let bytes_read = stream.read(&mut chunk)?;
+        if bytes_read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..bytes_read]);
+        if let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n") {
+            header_end = Some(position);
+            break;
+        }
+    }
+
+    let Some(header_end) = header_end else {
+        return Ok(mock_http::CapturedRequest::default());
+    };
+    let body_start = header_end + 4;
+    let header_text = String::from_utf8_lossy(&buffer[..body_start]);
+    let mut lines = header_text.lines();
+    let request_line = lines.next().unwrap_or_default();
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or_default().to_string();
+    let path = parts.next().unwrap_or_default().to_string();
+    let mut headers = BTreeMap::new();
+    for line in lines {
+        if let Some((name, value)) = line.split_once(':') {
+            headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
+        }
+    }
+
+    let content_length = headers
+        .get("content-length")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0);
+    while buffer.len().saturating_sub(body_start) < content_length {
+        let mut chunk = [0_u8; 1024];
+        let bytes_read = stream.read(&mut chunk)?;
+        if bytes_read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..bytes_read]);
+    }
+
+    Ok(mock_http::CapturedRequest {
+        method,
+        path,
+        headers,
+        body: buffer[body_start..].to_vec(),
+        received_after: started_at.elapsed(),
+    })
+}
+
+fn write_http_response(
+    stream: &mut TcpStream,
+    body: &[u8],
+    headers: &[(String, String)],
+) -> std::io::Result<()> {
+    let mut response_bytes = b"HTTP/1.1 200 OK\r\n".to_vec();
+    for (name, value) in headers {
+        response_bytes.extend_from_slice(format!("{}: {}\r\n", name, value).as_bytes());
+    }
+    response_bytes.extend_from_slice(b"connection: close\r\n\r\n");
+    response_bytes.extend_from_slice(body);
+    stream.write_all(&response_bytes)?;
+    stream.flush()?;
+    stream.shutdown(Shutdown::Write)?;
+    Ok(())
 }

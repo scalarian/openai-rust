@@ -576,15 +576,32 @@ impl VectorStoreFileBatches {
             ));
         }
 
+        let upload_workers: Vec<_> = params
+            .files
+            .into_iter()
+            .map(|file| {
+                let runtime = self.runtime.clone();
+                thread::spawn(move || {
+                    Files::new(runtime)
+                        .create(FileCreateParams {
+                            file,
+                            purpose: FilePurpose::Assistants,
+                            expires_after: None,
+                        })
+                        .map(|uploaded| uploaded.output.id)
+                })
+            })
+            .collect();
+
         let mut file_ids = params.file_ids;
-        let files = Files::new(self.runtime.clone());
-        for file in params.files {
-            let uploaded = files.create(FileCreateParams {
-                file,
-                purpose: FilePurpose::Assistants,
-                expires_after: None,
-            })?;
-            file_ids.push(uploaded.output.id);
+        for worker in upload_workers {
+            let uploaded_id = worker.join().map_err(|_| {
+                OpenAIError::new(
+                    ErrorKind::Transport,
+                    "vector-store batch file upload worker panicked",
+                )
+            })??;
+            file_ids.push(uploaded_id);
         }
 
         self.create_and_poll(
