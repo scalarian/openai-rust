@@ -1,7 +1,7 @@
 {
   "milestone": "realtime-blocking",
-  "round": 2,
-  "status": "pass",
+  "round": 1,
+  "status": "fail",
   "validatorsRun": {
     "test": {
       "passed": true,
@@ -20,12 +20,26 @@
     }
   },
   "reviewsSummary": {
-    "total": 2,
-    "passed": 2,
-    "failed": 0,
-    "failedFeatures": []
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "failedFeatures": [
+      "realtime-rest-helpers-and-bootstrap",
+      "realtime-event-state-audio-and-tools"
+    ]
   },
-  "blockingIssues": [],
+  "blockingIssues": [
+    {
+      "featureId": "realtime-rest-helpers-and-bootstrap",
+      "severity": "blocking",
+      "description": "`prepare_ws_target` resolves the full client config before honoring `RealtimeAuth::ClientSecret`, so websocket setup still requires a configured server API key and does not satisfy the client-secret-only ephemeral auth path."
+    },
+    {
+      "featureId": "realtime-event-state-audio-and-tools",
+      "severity": "blocking",
+      "description": "The Realtime GA event decoder does not model or decode `response.output_audio.done`, causing that documented audio lifecycle event to fall through to `RealtimeServerEvent::Unknown` instead of a first-class event."
+    }
+  ],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
@@ -53,5 +67,5 @@
       "reason": "The shared library already documents clearing `OPENAI_BASE_URL` for default-host live proofs in `.factory/library/environment.md` and `.factory/library/user-testing.md`; the remaining mismatch is confined to historical mission metadata and handoff text, so no additive shared-state update was warranted here."
     }
   ],
-  "previousRound": ".factory/validation/realtime-blocking/scrutiny/synthesis.round1.json"
+  "previousRound": null
 }
