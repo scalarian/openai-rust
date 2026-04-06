@@ -23,15 +23,15 @@ Use this skill for documentation, examples, README alignment, docs guides, bench
 1. Read `mission.md`, `AGENTS.md`, `.factory/library/architecture.md`, `.factory/library/api-surface.md`, `.factory/library/user-testing.md`, and `.factory/services.yaml`.
 2. Invoke `brainstorming` when changing the public story: README quickstart, migration guidance, guide structure, example inventory, or publish positioning.
 3. Invoke `test-driven-development` and add failing validation harnesses first. Good first moves include:
-   - README snippet extraction/validation
+   - extracting and validating the actual fenced README snippets/commands
    - example compile checks and representative example smoke runs
-   - docs guide snippet validation
+   - extracting and validating the actual docs guide snippets/commands
    - `cargo package` / manifest metadata assertions
 4. Update docs/examples only after the validation harness expresses what "correct" means.
 5. Keep docs aligned with the actual crate API. Do not add aspirational examples or unsupported feature claims.
 6. Run the doc/example/package validators first, then the broader cargo validation commands required by the feature.
 7. Perform representative smoke checks for examples and onboarding flows, not just compile-only checks.
-8. Invoke `verification-before-completion` and confirm README, docs guides, examples, package assets, and publish notes are all mechanically validated.
+8. Invoke `verification-before-completion` and confirm README, docs guides, examples, package assets, and publish notes are all mechanically validated from the actual published Markdown/snippets; do not rely on proxy string checks or stand-in fixtures when the feature claims mechanical validation.
 
 ## Example Handoff
 
