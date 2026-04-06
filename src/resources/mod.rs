@@ -69,8 +69,8 @@ impl ResourceFamilies {
             fine_tuning: fine_tuning::FineTuning::new(runtime.clone()),
             evals: evals::Evals::new(runtime.clone()),
             containers: containers::Containers::new(runtime.clone()),
-            skills: skills::Skills,
-            videos: videos::Videos,
+            skills: skills::Skills::new(runtime.clone()),
+            videos: videos::Videos::new(runtime.clone()),
         }
     }
 }
