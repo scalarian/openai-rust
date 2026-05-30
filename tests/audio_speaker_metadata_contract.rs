@@ -65,6 +65,10 @@ fn diarized_transcription_and_streaming_segments_preserve_speaker_metadata() {
         openai_rust::resources::audio::TranscriptionResponse::DiarizedJson(payload) => {
             assert_eq!(payload.text, "Hello Hi");
             assert_eq!(payload.segments[0].speaker, "agent");
+            assert_eq!(
+                payload.segments[0].event_type.as_deref(),
+                Some("transcript.text.segment")
+            );
             assert_eq!(payload.segments[1].speaker, "customer");
             assert_eq!(payload.usage.as_ref().unwrap().total_tokens(), Some(8));
         }
@@ -89,6 +93,10 @@ fn diarized_transcription_and_streaming_segments_preserve_speaker_metadata() {
     match stream.next_event().expect("first segment") {
         openai_rust::resources::audio::TranscriptionStreamEvent::TextSegment(segment) => {
             assert_eq!(segment.id, "seg_agent");
+            assert_eq!(
+                segment.event_type.as_deref(),
+                Some("transcript.text.segment")
+            );
             assert_eq!(segment.speaker, "agent");
         }
         other => panic!("expected first segment event, got {other:?}"),

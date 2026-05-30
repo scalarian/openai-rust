@@ -19,7 +19,7 @@ fn transcription_dispatches_typed_formats_and_preserves_multipart_semantics() {
                     "total_tokens": 14,
                     "input_token_details": {"audio_tokens": 7, "text_tokens": 3}
                 },
-                "logprobs": [{"token": "hello", "logprob": -0.1, "bytes": [104, 101, 108, 108, 111]}]
+                "logprobs": [{"token": "hello", "logprob": -0.1, "bytes": [104.0, 101.0, 108.0, 108.0, 111.0]}]
             })
             .to_string(),
         ),
@@ -88,6 +88,10 @@ fn transcription_dispatches_typed_formats_and_preserves_multipart_semantics() {
             assert_eq!(payload.text, "hello there");
             assert_eq!(payload.usage.as_ref().unwrap().total_tokens(), Some(14));
             assert_eq!(payload.logprobs[0].token.as_deref(), Some("hello"));
+            assert_eq!(
+                payload.logprobs[0].bytes.as_ref().unwrap(),
+                &vec![104.0, 101.0, 108.0, 108.0, 111.0]
+            );
         }
         other => panic!("expected json transcription, got {other:?}"),
     }
@@ -194,10 +198,67 @@ fn transcription_dispatches_typed_formats_and_preserves_multipart_semantics() {
 }
 
 #[test]
+fn transcription_server_vad_chunking_serializes_numeric_threshold() {
+    let server =
+        mock_http::MockHttpServer::spawn(json_response(json!({"text": "hello"}).to_string()))
+            .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let _ = client
+        .audio()
+        .transcriptions
+        .create(openai_rust::resources::audio::TranscriptionParams {
+            file: openai_rust::resources::audio::AudioInput::new(
+                "clip.wav",
+                "audio/wav",
+                tiny_wav_bytes(),
+            ),
+            model: String::from("gpt-4o-transcribe"),
+            chunking_strategy: Some(
+                openai_rust::resources::audio::TranscriptionChunkingStrategy::ServerVad(
+                    openai_rust::resources::audio::TranscriptionVadConfig {
+                        kind: String::from("server_vad"),
+                        prefix_padding_ms: Some(250),
+                        silence_duration_ms: Some(400),
+                        threshold: Some(0.42),
+                    },
+                ),
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let request = server.captured_request().expect("captured request");
+    let multipart =
+        multipart_support::parse_multipart(&request.body, &boundary_from_headers(&request.headers))
+            .unwrap();
+    let chunking_strategy = multipart
+        .parts
+        .iter()
+        .find(|part| part.name.as_deref() == Some("chunking_strategy"))
+        .expect("chunking strategy part");
+    let chunking_strategy: serde_json::Value =
+        serde_json::from_slice(&chunking_strategy.body).unwrap();
+    assert_eq!(chunking_strategy["type"], "server_vad");
+    assert_eq!(chunking_strategy["prefix_padding_ms"], json!(250));
+    assert_eq!(chunking_strategy["silence_duration_ms"], json!(400));
+    assert!(chunking_strategy["threshold"].is_number());
+    assert!(
+        (chunking_strategy["threshold"].as_f64().unwrap() - 0.42).abs() < 1e-6,
+        "threshold should serialize as a JSON number"
+    );
+}
+
+#[test]
 fn streaming_transcription_assembles_deltas_segments_and_usage() {
     let body = concat!(
         "event: transcript.text.delta\n",
-        "data: {\"type\":\"transcript.text.delta\",\"delta\":\"hello \",\"segment_id\":\"seg_1\"}\n\n",
+        "data: {\"type\":\"transcript.text.delta\",\"delta\":\"hello \",\"segment_id\":\"seg_1\",\"logprobs\":[{\"token\":\"hello\",\"bytes\":[104,101],\"logprob\":-0.2}]}\n\n",
         "event: transcript.text.segment\n",
         "data: {\"type\":\"transcript.text.segment\",\"id\":\"seg_1\",\"speaker\":\"agent\",\"start\":0.0,\"end\":0.6,\"text\":\"hello\"}\n\n",
         "event: transcript.text.delta\n",
@@ -232,13 +293,19 @@ fn streaming_transcription_assembles_deltas_segments_and_usage() {
     match stream.next_event().expect("delta") {
         openai_rust::resources::audio::TranscriptionStreamEvent::TextDelta(event) => {
             assert_eq!(event.delta, "hello ");
+            assert_eq!(event.event_type.as_deref(), Some("transcript.text.delta"));
             assert_eq!(event.segment_id.as_deref(), Some("seg_1"));
+            assert_eq!(
+                event.logprobs[0].bytes.as_ref().unwrap(),
+                &vec![104.0, 101.0]
+            );
         }
         other => panic!("expected text delta event, got {other:?}"),
     }
     match stream.next_event().expect("segment") {
         openai_rust::resources::audio::TranscriptionStreamEvent::TextSegment(event) => {
             assert_eq!(event.id, "seg_1");
+            assert_eq!(event.event_type.as_deref(), Some("transcript.text.segment"));
             assert_eq!(event.speaker, "agent");
         }
         other => panic!("expected text segment event, got {other:?}"),
@@ -252,6 +319,7 @@ fn streaming_transcription_assembles_deltas_segments_and_usage() {
     match stream.next_event().expect("done") {
         openai_rust::resources::audio::TranscriptionStreamEvent::TextDone(event) => {
             assert_eq!(event.text, "hello there");
+            assert_eq!(event.event_type.as_deref(), Some("transcript.text.done"));
             assert_eq!(event.usage.as_ref().unwrap().total_tokens(), Some(13));
         }
         other => panic!("expected text done event, got {other:?}"),

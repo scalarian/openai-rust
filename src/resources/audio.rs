@@ -147,7 +147,7 @@ impl TranscriptionTimestampGranularity {
 }
 
 /// Optional server chunking strategy for transcription.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum TranscriptionChunkingStrategy {
     #[default]
     Auto,
@@ -155,7 +155,7 @@ pub enum TranscriptionChunkingStrategy {
 }
 
 /// Server VAD tuning knobs for transcription chunking.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TranscriptionVadConfig {
     #[serde(rename = "type")]
     pub kind: String,
@@ -164,7 +164,7 @@ pub struct TranscriptionVadConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub silence_duration_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub threshold: Option<String>,
+    pub threshold: Option<f32>,
 }
 
 impl TranscriptionVadConfig {
@@ -681,7 +681,7 @@ pub struct TranscriptionLogprob {
     #[serde(default)]
     pub token: Option<String>,
     #[serde(default)]
-    pub bytes: Option<Vec<u8>>,
+    pub bytes: Option<Vec<f64>>,
     #[serde(default)]
     pub logprob: Option<f32>,
     #[serde(flatten)]
@@ -732,6 +732,8 @@ pub struct TranscriptionWord {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct TranscriptionTextDeltaEvent {
     pub delta: String,
+    #[serde(default, rename = "type")]
+    pub event_type: Option<String>,
     #[serde(default)]
     pub segment_id: Option<String>,
     #[serde(default)]
@@ -744,6 +746,8 @@ pub struct TranscriptionTextDeltaEvent {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct TranscriptionTextDoneEvent {
     pub text: String,
+    #[serde(default, rename = "type")]
+    pub event_type: Option<String>,
     #[serde(default)]
     pub logprobs: Vec<TranscriptionLogprob>,
     #[serde(default)]
@@ -756,6 +760,8 @@ pub struct TranscriptionTextDoneEvent {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct TranscriptionTextSegmentEvent {
     pub id: String,
+    #[serde(default, rename = "type")]
+    pub event_type: Option<String>,
     #[serde(default)]
     pub end: f32,
     #[serde(default)]
