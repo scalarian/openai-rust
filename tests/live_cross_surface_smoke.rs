@@ -8,7 +8,7 @@ use openai_rust::{
         RealtimeSessionTTL,
     },
     resources::{
-        chat::ChatCompletionCreateParams,
+        chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
         files::{FileCreateParams, FileCreatePurpose, FileUpload},
         responses::{ResponseCreateParams, ResponseInput},
     },
@@ -53,10 +53,7 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
         .completions()
         .create(ChatCompletionCreateParams {
             model: String::from("gpt-4.1-mini"),
-            messages: vec![serde_json::json!({
-                "role": "user",
-                "content": "Reply with exactly hi."
-            })],
+            messages: vec![ChatCompletionMessageParam::user("Reply with exactly hi.")],
             ..Default::default()
         })
         .expect("live compatibility chat call should succeed");

@@ -1,9 +1,11 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
-    resources::chat::{ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionStream},
+    resources::chat::{
+        ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionMessageParam,
+        ChatCompletionStream,
+    },
 };
-use serde_json::json;
 use std::{
     io::{Read, Write},
     net::{Shutdown, TcpListener, TcpStream},
@@ -158,7 +160,7 @@ fn stream_yields_incremental_chunks_before_terminal_tail_arrives() {
         .completions()
         .stream(ChatCompletionCreateParams {
             model: String::from("gpt-4.1-mini"),
-            messages: vec![json!({"role": "user", "content": "hello"})],
+            messages: vec![ChatCompletionMessageParam::user("hello")],
             ..Default::default()
         })
         .expect("stream should start");

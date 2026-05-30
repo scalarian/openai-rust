@@ -2,7 +2,7 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::chat::{
         ChatCompletionAudioParams, ChatCompletionFunction, ChatCompletionFunctionCall,
-        ChatCompletionFunctionDefinition, ChatCompletionFunctionTool,
+        ChatCompletionFunctionDefinition, ChatCompletionFunctionTool, ChatCompletionMessageParam,
         ChatCompletionPredictionContent, ChatCompletionResponseFormat, ChatCompletionStreamOptions,
         ChatCompletionTool, ChatCompletionToolChoice, ChatCompletionVoice, ChatStop,
         ChatWebSearchOptions,
@@ -36,10 +36,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
         .completions()
         .create(openai_rust::resources::chat::ChatCompletionCreateParams {
             model: String::from("gpt-4.1-mini"),
-            messages: vec![json!({
-                "role": "user",
-                "content": "Say hello"
-            })],
+            messages: vec![ChatCompletionMessageParam::user("Say hello")],
             audio: Some(ChatCompletionAudioParams {
                 format: String::from("wav"),
                 voice: ChatCompletionVoice::from("alloy"),

@@ -14,13 +14,12 @@ Responses is the primary surface for new code.
 ## Chat Completions to Responses
 
 ```rust
-use openai_rust::resources::chat::ChatCompletionCreateParams;
+use openai_rust::resources::chat::{ChatCompletionCreateParams, ChatCompletionMessageParam};
 use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
-use serde_json::json;
 
 let compatibility = ChatCompletionCreateParams {
     model: "gpt-5.5".into(),
-    messages: vec![json!({"role":"user","content":"Say hello"})],
+    messages: vec![ChatCompletionMessageParam::user("Say hello")],
     ..Default::default()
 };
 

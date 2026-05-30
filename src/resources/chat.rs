@@ -168,7 +168,7 @@ impl StoredChatCompletionMessages {
 pub struct ChatCompletionCreateParams {
     pub model: String,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub messages: Vec<Value>,
+    pub messages: Vec<ChatCompletionMessageParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<ChatCompletionAudioParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -251,7 +251,10 @@ impl ChatCompletionCreateParams {
                 "chat.completions.messages must serialize to a JSON array",
             ));
         };
-        self.messages = messages;
+        self.messages = messages
+            .into_iter()
+            .map(ChatCompletionMessageParam::Json)
+            .collect();
         Ok(self)
     }
 
@@ -263,6 +266,597 @@ impl ChatCompletionCreateParams {
         }
         value
     }
+}
+
+/// Message parameter accepted by chat-completion creation.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionMessageParam {
+    Developer(ChatCompletionDeveloperMessageParam),
+    System(ChatCompletionSystemMessageParam),
+    User(ChatCompletionUserMessageParam),
+    Assistant(ChatCompletionAssistantMessageParam),
+    Tool(ChatCompletionToolMessageParam),
+    Function(ChatCompletionFunctionMessageParam),
+    Json(Value),
+}
+
+impl ChatCompletionMessageParam {
+    pub fn user(content: impl Into<ChatCompletionUserMessageContent>) -> Self {
+        Self::User(ChatCompletionUserMessageParam::new(content))
+    }
+
+    pub fn system(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
+        Self::System(ChatCompletionSystemMessageParam::new(content))
+    }
+
+    pub fn developer(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
+        Self::Developer(ChatCompletionDeveloperMessageParam::new(content))
+    }
+
+    pub fn assistant(content: impl Into<ChatCompletionAssistantMessageContent>) -> Self {
+        Self::Assistant(ChatCompletionAssistantMessageParam::new(Some(
+            content.into(),
+        )))
+    }
+
+    pub fn tool(
+        tool_call_id: impl Into<String>,
+        content: impl Into<ChatCompletionTextMessageContent>,
+    ) -> Self {
+        Self::Tool(ChatCompletionToolMessageParam::new(tool_call_id, content))
+    }
+
+    pub fn function(name: impl Into<String>, content: Option<String>) -> Self {
+        Self::Function(ChatCompletionFunctionMessageParam::new(name, content))
+    }
+}
+
+impl From<ChatCompletionDeveloperMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionDeveloperMessageParam) -> Self {
+        Self::Developer(value)
+    }
+}
+
+impl From<ChatCompletionSystemMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionSystemMessageParam) -> Self {
+        Self::System(value)
+    }
+}
+
+impl From<ChatCompletionUserMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionUserMessageParam) -> Self {
+        Self::User(value)
+    }
+}
+
+impl From<ChatCompletionAssistantMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionAssistantMessageParam) -> Self {
+        Self::Assistant(value)
+    }
+}
+
+impl From<ChatCompletionToolMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionToolMessageParam) -> Self {
+        Self::Tool(value)
+    }
+}
+
+impl From<ChatCompletionFunctionMessageParam> for ChatCompletionMessageParam {
+    fn from(value: ChatCompletionFunctionMessageParam) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl From<Value> for ChatCompletionMessageParam {
+    fn from(value: Value) -> Self {
+        Self::Json(value)
+    }
+}
+
+/// Developer-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionDeveloperMessageParam {
+    pub content: ChatCompletionTextMessageContent,
+    #[serde(rename = "role")]
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionDeveloperMessageParam {
+    pub fn new(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
+        Self {
+            content: content.into(),
+            role: String::from("developer"),
+            name: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// System-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionSystemMessageParam {
+    pub content: ChatCompletionTextMessageContent,
+    #[serde(rename = "role")]
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionSystemMessageParam {
+    pub fn new(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
+        Self {
+            content: content.into(),
+            role: String::from("system"),
+            name: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// User-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionUserMessageParam {
+    pub content: ChatCompletionUserMessageContent,
+    #[serde(rename = "role")]
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionUserMessageParam {
+    pub fn new(content: impl Into<ChatCompletionUserMessageContent>) -> Self {
+        Self {
+            content: content.into(),
+            role: String::from("user"),
+            name: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Assistant-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionAssistantMessageParam {
+    #[serde(rename = "role")]
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio: Option<ChatCompletionAssistantAudioParam>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ChatCompletionAssistantMessageContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_call: Option<ChatCompletionAssistantFunctionCallParam>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ChatCompletionMessageToolCallParam>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionAssistantMessageParam {
+    pub fn new(content: Option<ChatCompletionAssistantMessageContent>) -> Self {
+        Self {
+            role: String::from("assistant"),
+            audio: None,
+            content,
+            function_call: None,
+            name: None,
+            refusal: None,
+            tool_calls: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Tool-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionToolMessageParam {
+    pub content: ChatCompletionTextMessageContent,
+    #[serde(rename = "role")]
+    pub role: String,
+    pub tool_call_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionToolMessageParam {
+    pub fn new(
+        tool_call_id: impl Into<String>,
+        content: impl Into<ChatCompletionTextMessageContent>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            role: String::from("tool"),
+            tool_call_id: tool_call_id.into(),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Legacy function-role chat message parameter.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionFunctionMessageParam {
+    pub content: Option<String>,
+    pub name: String,
+    #[serde(rename = "role")]
+    pub role: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionFunctionMessageParam {
+    pub fn new(name: impl Into<String>, content: Option<String>) -> Self {
+        Self {
+            content,
+            name: name.into(),
+            role: String::from("function"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Text-only message content used by developer, system, and tool messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionTextMessageContent {
+    Text(String),
+    Parts(Vec<ChatCompletionContentPartText>),
+}
+
+impl From<String> for ChatCompletionTextMessageContent {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ChatCompletionTextMessageContent {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ChatCompletionContentPartText>> for ChatCompletionTextMessageContent {
+    fn from(value: Vec<ChatCompletionContentPartText>) -> Self {
+        Self::Parts(value)
+    }
+}
+
+/// User message content accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionUserMessageContent {
+    Text(String),
+    Parts(Vec<ChatCompletionContentPartParam>),
+}
+
+impl From<String> for ChatCompletionUserMessageContent {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ChatCompletionUserMessageContent {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ChatCompletionContentPartParam>> for ChatCompletionUserMessageContent {
+    fn from(value: Vec<ChatCompletionContentPartParam>) -> Self {
+        Self::Parts(value)
+    }
+}
+
+/// Assistant message content accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionAssistantMessageContent {
+    Text(String),
+    Parts(Vec<ChatCompletionAssistantContentPartParam>),
+}
+
+impl From<String> for ChatCompletionAssistantMessageContent {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ChatCompletionAssistantMessageContent {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ChatCompletionAssistantContentPartParam>> for ChatCompletionAssistantMessageContent {
+    fn from(value: Vec<ChatCompletionAssistantContentPartParam>) -> Self {
+        Self::Parts(value)
+    }
+}
+
+/// User content part accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionContentPartParam {
+    Text(ChatCompletionContentPartText),
+    Image(ChatCompletionContentPartImage),
+    InputAudio(ChatCompletionContentPartInputAudio),
+    File(ChatCompletionContentPartFile),
+}
+
+impl From<ChatCompletionContentPartText> for ChatCompletionContentPartParam {
+    fn from(value: ChatCompletionContentPartText) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<ChatCompletionContentPartImage> for ChatCompletionContentPartParam {
+    fn from(value: ChatCompletionContentPartImage) -> Self {
+        Self::Image(value)
+    }
+}
+
+impl From<ChatCompletionContentPartInputAudio> for ChatCompletionContentPartParam {
+    fn from(value: ChatCompletionContentPartInputAudio) -> Self {
+        Self::InputAudio(value)
+    }
+}
+
+impl From<ChatCompletionContentPartFile> for ChatCompletionContentPartParam {
+    fn from(value: ChatCompletionContentPartFile) -> Self {
+        Self::File(value)
+    }
+}
+
+/// Assistant content part accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionAssistantContentPartParam {
+    Text(ChatCompletionContentPartText),
+    Refusal(ChatCompletionContentPartRefusal),
+}
+
+impl From<ChatCompletionContentPartText> for ChatCompletionAssistantContentPartParam {
+    fn from(value: ChatCompletionContentPartText) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<ChatCompletionContentPartRefusal> for ChatCompletionAssistantContentPartParam {
+    fn from(value: ChatCompletionContentPartRefusal) -> Self {
+        Self::Refusal(value)
+    }
+}
+
+/// Image content part accepted in user chat messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartImage {
+    pub image_url: ChatCompletionImageUrlParam,
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionContentPartImage {
+    pub fn url(url: impl Into<String>, detail: Option<String>) -> Self {
+        Self {
+            image_url: ChatCompletionImageUrlParam {
+                url: url.into(),
+                detail,
+                extra: BTreeMap::new(),
+            },
+            content_type: String::from("image_url"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Image URL descriptor for chat message content.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionImageUrlParam {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Input-audio content part accepted in user chat messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartInputAudio {
+    pub input_audio: ChatCompletionInputAudioParam,
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionContentPartInputAudio {
+    pub fn new(input_audio: ChatCompletionInputAudioParam) -> Self {
+        Self {
+            input_audio,
+            content_type: String::from("input_audio"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Encoded input audio embedded in a chat user message.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionInputAudioParam {
+    pub data: String,
+    pub format: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File content part accepted in user chat messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartFile {
+    pub file: ChatCompletionContentPartFileValue,
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionContentPartFile {
+    pub fn new(file: ChatCompletionContentPartFileValue) -> Self {
+        Self {
+            file,
+            content_type: String::from("file"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// File value nested in a chat file content part.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartFileValue {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Refusal content part accepted in assistant chat messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartRefusal {
+    pub refusal: String,
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionContentPartRefusal {
+    pub fn new(refusal: impl Into<String>) -> Self {
+        Self {
+            refusal: refusal.into(),
+            content_type: String::from("refusal"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Previous assistant audio response reference.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionAssistantAudioParam {
+    pub id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated assistant function-call payload.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionAssistantFunctionCallParam {
+    pub arguments: String,
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool-call parameter nested in assistant messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionMessageToolCallParam {
+    Function(ChatCompletionMessageFunctionToolCallParam),
+    Custom(ChatCompletionMessageCustomToolCallParam),
+}
+
+impl From<ChatCompletionMessageFunctionToolCallParam> for ChatCompletionMessageToolCallParam {
+    fn from(value: ChatCompletionMessageFunctionToolCallParam) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl From<ChatCompletionMessageCustomToolCallParam> for ChatCompletionMessageToolCallParam {
+    fn from(value: ChatCompletionMessageCustomToolCallParam) -> Self {
+        Self::Custom(value)
+    }
+}
+
+/// Function tool-call parameter nested in assistant messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionMessageFunctionToolCallParam {
+    pub id: String,
+    pub function: ChatCompletionMessageFunctionToolCallFunctionParam,
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionMessageFunctionToolCallParam {
+    pub fn new(
+        id: impl Into<String>,
+        function: ChatCompletionMessageFunctionToolCallFunctionParam,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            function,
+            tool_type: String::from("function"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Function payload nested in an assistant tool-call parameter.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionMessageFunctionToolCallFunctionParam {
+    pub arguments: String,
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Custom tool-call parameter nested in assistant messages.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionMessageCustomToolCallParam {
+    pub id: String,
+    pub custom: ChatCompletionMessageCustomToolCallCustomParam,
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionMessageCustomToolCallParam {
+    pub fn new(
+        id: impl Into<String>,
+        custom: ChatCompletionMessageCustomToolCallCustomParam,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            custom,
+            tool_type: String::from("custom"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Custom payload nested in an assistant tool-call parameter.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionMessageCustomToolCallCustomParam {
+    pub input: String,
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Parameters for audio output from chat completions.

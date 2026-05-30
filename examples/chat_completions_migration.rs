@@ -1,5 +1,5 @@
 use openai_rust::resources::{
-    chat::ChatCompletionCreateParams,
+    chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
     completions::CompletionCreateParams,
     responses::{ResponseCreateParams, ResponseInput},
 };
@@ -8,7 +8,7 @@ use serde_json::json;
 fn main() {
     let chat = ChatCompletionCreateParams {
         model: "gpt-5.5".into(),
-        messages: vec![json!({"role":"user","content":"Say hello"})],
+        messages: vec![ChatCompletionMessageParam::user("Say hello")],
         ..Default::default()
     };
 

@@ -22,7 +22,7 @@ use openai_rust::{
         RealtimeSessionTTL,
     },
     resources::{
-        chat::ChatCompletionCreateParams,
+        chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
         files::{FileCreateParams, FileCreatePurpose, FileUpload},
         multimodal::{ResponseInputMessage, ResponseInputPart},
         responses::{
@@ -94,7 +94,7 @@ fn env_loaded_client_reaches_multiple_subsystems_without_per_endpoint_reconfigur
                 .completions()
                 .create(ChatCompletionCreateParams {
                     model: String::from("gpt-4.1-mini"),
-                    messages: vec![json!({"role": "user", "content": "Say hi"})],
+                    messages: vec![ChatCompletionMessageParam::user("Say hi")],
                     ..Default::default()
                 })
                 .unwrap();
@@ -822,10 +822,7 @@ fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCrossSurf
                 .completions()
                 .create(ChatCompletionCreateParams {
                     model: String::from("gpt-4.1-mini"),
-                    messages: vec![json!({
-                        "role": "user",
-                        "content": "Reply with exactly hi."
-                    })],
+                    messages: vec![ChatCompletionMessageParam::user("Reply with exactly hi.")],
                     ..Default::default()
                 })
                 .expect("mock chat.completions.create");
