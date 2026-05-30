@@ -1,4 +1,7 @@
-use openai_rust::OpenAI;
+use openai_rust::{
+    OpenAI,
+    resources::moderations::{ModerationInput, ModerationInputItem},
+};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -23,7 +26,7 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
         .create(
             openai_rust::resources::moderations::ModerationCreateParams {
                 model: Some(String::from("omni-moderation-latest")),
-                input: json!(["first text", "second text"]),
+                input: ModerationInput::from(vec!["first text", "second text"]),
                 ..Default::default()
             },
         )
@@ -49,7 +52,11 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
         vec![String::from("text")]
     );
 
-    let multimodal_input = json!([
+    let multimodal_input = ModerationInput::items(vec![
+        ModerationInputItem::text("describe this image"),
+        ModerationInputItem::image_url("https://example.com/cat.png"),
+    ]);
+    let multimodal_expected = json!([
         {
             "type": "text",
             "text": "describe this image"
@@ -64,7 +71,7 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
         .create(
             openai_rust::resources::moderations::ModerationCreateParams {
                 model: Some(String::from("omni-moderation-latest")),
-                input: multimodal_input.clone(),
+                input: multimodal_input,
                 ..Default::default()
             },
         )
@@ -91,7 +98,7 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
     assert_eq!(text_body["model"], "omni-moderation-latest");
 
     let multimodal_body: Value = serde_json::from_slice(&requests[1].body).unwrap();
-    assert_eq!(multimodal_body["input"], multimodal_input);
+    assert_eq!(multimodal_body["input"], multimodal_expected);
 }
 
 fn json_response(body: String) -> mock_http::ScriptedResponse {

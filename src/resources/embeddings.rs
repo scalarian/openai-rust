@@ -44,7 +44,7 @@ impl Embeddings {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct EmbeddingCreateParams {
     pub model: String,
-    pub input: Value,
+    pub input: EmbeddingInput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimensions: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,6 +65,92 @@ impl EmbeddingCreateParams {
                 .or_insert_with(|| Value::String(String::from("base64")));
         }
         value
+    }
+}
+
+/// Input text or token arrays accepted by embeddings.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    Text(String),
+    Texts(Vec<String>),
+    Tokens(Vec<i64>),
+    TokenBatches(Vec<Vec<i64>>),
+}
+
+impl Default for EmbeddingInput {
+    fn default() -> Self {
+        Self::Text(String::new())
+    }
+}
+
+impl From<String> for EmbeddingInput {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for EmbeddingInput {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<String>> for EmbeddingInput {
+    fn from(value: Vec<String>) -> Self {
+        Self::Texts(value)
+    }
+}
+
+impl From<Vec<&str>> for EmbeddingInput {
+    fn from(value: Vec<&str>) -> Self {
+        Self::Texts(value.into_iter().map(str::to_string).collect())
+    }
+}
+
+impl From<Vec<i64>> for EmbeddingInput {
+    fn from(value: Vec<i64>) -> Self {
+        Self::Tokens(value)
+    }
+}
+
+impl From<Vec<u32>> for EmbeddingInput {
+    fn from(value: Vec<u32>) -> Self {
+        Self::Tokens(value.into_iter().map(i64::from).collect())
+    }
+}
+
+impl From<Vec<usize>> for EmbeddingInput {
+    fn from(value: Vec<usize>) -> Self {
+        Self::Tokens(value.into_iter().map(|token| token as i64).collect())
+    }
+}
+
+impl From<Vec<Vec<i64>>> for EmbeddingInput {
+    fn from(value: Vec<Vec<i64>>) -> Self {
+        Self::TokenBatches(value)
+    }
+}
+
+impl From<Vec<Vec<u32>>> for EmbeddingInput {
+    fn from(value: Vec<Vec<u32>>) -> Self {
+        Self::TokenBatches(
+            value
+                .into_iter()
+                .map(|tokens| tokens.into_iter().map(i64::from).collect())
+                .collect(),
+        )
+    }
+}
+
+impl From<Vec<Vec<usize>>> for EmbeddingInput {
+    fn from(value: Vec<Vec<usize>>) -> Self {
+        Self::TokenBatches(
+            value
+                .into_iter()
+                .map(|tokens| tokens.into_iter().map(|token| token as i64).collect())
+                .collect(),
+        )
     }
 }
 

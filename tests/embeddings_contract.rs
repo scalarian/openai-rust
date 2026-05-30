@@ -1,4 +1,4 @@
-use openai_rust::OpenAI;
+use openai_rust::{OpenAI, resources::embeddings::EmbeddingInput};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -23,7 +23,7 @@ fn embeddings_default_transport_decodes_base64_but_preserves_explicit_formats() 
         .embeddings()
         .create(openai_rust::resources::embeddings::EmbeddingCreateParams {
             model: String::from("text-embedding-3-small"),
-            input: json!(["first", "second"]),
+            input: EmbeddingInput::from(vec!["first", "second"]),
             dimensions: Some(3),
             user: Some(String::from("user-123")),
             ..Default::default()
@@ -45,7 +45,7 @@ fn embeddings_default_transport_decodes_base64_but_preserves_explicit_formats() 
         .embeddings()
         .create(openai_rust::resources::embeddings::EmbeddingCreateParams {
             model: String::from("text-embedding-3-small"),
-            input: json!("just one"),
+            input: EmbeddingInput::from("just one"),
             encoding_format: Some(
                 openai_rust::resources::embeddings::EmbeddingEncodingFormat::Float,
             ),
@@ -61,7 +61,7 @@ fn embeddings_default_transport_decodes_base64_but_preserves_explicit_formats() 
         .embeddings()
         .create(openai_rust::resources::embeddings::EmbeddingCreateParams {
             model: String::from("text-embedding-3-small"),
-            input: json!("raw base64 please"),
+            input: EmbeddingInput::from("raw base64 please"),
             encoding_format: Some(
                 openai_rust::resources::embeddings::EmbeddingEncodingFormat::Base64,
             ),

@@ -1,10 +1,11 @@
-use openai_rust::resources::embeddings::{EmbeddingCreateParams, EmbeddingEncodingFormat};
-use serde_json::json;
+use openai_rust::resources::embeddings::{
+    EmbeddingCreateParams, EmbeddingEncodingFormat, EmbeddingInput,
+};
 
 fn main() {
     let params = EmbeddingCreateParams {
         model: "text-embedding-3-small".into(),
-        input: json!(["rust sdk", "responses"]),
+        input: EmbeddingInput::from(vec!["rust sdk", "responses"]),
         dimensions: Some(256),
         encoding_format: Some(EmbeddingEncodingFormat::Float),
         user: Some("docs-example".into()),

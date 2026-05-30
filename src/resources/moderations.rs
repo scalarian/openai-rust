@@ -36,9 +36,137 @@ impl Moderations {
 /// Moderation create parameters accepting text or multimodal inputs.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ModerationCreateParams {
-    pub input: Value,
+    pub input: ModerationInput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Text or multimodal moderation input.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ModerationInput {
+    Text(String),
+    Texts(Vec<String>),
+    Items(Vec<ModerationInputItem>),
+}
+
+impl ModerationInput {
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::Text(text.into())
+    }
+
+    pub fn texts(texts: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self::Texts(texts.into_iter().map(Into::into).collect())
+    }
+
+    pub fn items(items: Vec<ModerationInputItem>) -> Self {
+        Self::Items(items)
+    }
+}
+
+impl Default for ModerationInput {
+    fn default() -> Self {
+        Self::Text(String::new())
+    }
+}
+
+impl From<String> for ModerationInput {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ModerationInput {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<String>> for ModerationInput {
+    fn from(value: Vec<String>) -> Self {
+        Self::Texts(value)
+    }
+}
+
+impl From<Vec<&str>> for ModerationInput {
+    fn from(value: Vec<&str>) -> Self {
+        Self::Texts(value.into_iter().map(str::to_string).collect())
+    }
+}
+
+impl From<Vec<ModerationInputItem>> for ModerationInput {
+    fn from(value: Vec<ModerationInputItem>) -> Self {
+        Self::Items(value)
+    }
+}
+
+/// One multimodal moderation input item.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ModerationInputItem {
+    Text(ModerationTextInput),
+    ImageUrl(ModerationImageUrlInput),
+}
+
+impl ModerationInputItem {
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::Text(ModerationTextInput::new(text))
+    }
+
+    pub fn image_url(url: impl Into<String>) -> Self {
+        Self::ImageUrl(ModerationImageUrlInput::url(url))
+    }
+}
+
+/// Text input item for multimodal moderation requests.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModerationTextInput {
+    #[serde(rename = "type")]
+    pub input_type: String,
+    pub text: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ModerationTextInput {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            input_type: String::from("text"),
+            text: text.into(),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Image URL input item for multimodal moderation requests.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModerationImageUrlInput {
+    #[serde(rename = "type")]
+    pub input_type: String,
+    pub image_url: ModerationImageUrl,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ModerationImageUrlInput {
+    pub fn url(url: impl Into<String>) -> Self {
+        Self {
+            input_type: String::from("image_url"),
+            image_url: ModerationImageUrl {
+                url: url.into(),
+                extra: BTreeMap::new(),
+            },
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Image URL wrapper for moderation image inputs.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ModerationImageUrl {
+    pub url: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
