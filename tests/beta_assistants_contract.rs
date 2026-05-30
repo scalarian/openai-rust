@@ -15,7 +15,8 @@ use openai_rust::{
         BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
         BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
         BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
-        BetaTruncationStrategy,
+        BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
+        BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
     },
 };
 use serde_json::json;
@@ -125,11 +126,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                     String::from("case_id"),
                     String::from("case_123"),
                 )])),
-                tool_resources: Some(json!({
-                    "code_interpreter": {
-                        "file_ids": ["file_123"]
-                    }
-                })),
+                tool_resources: Some(BetaToolResources {
+                    code_interpreter: Some(BetaToolResourcesCodeInterpreter {
+                        file_ids: vec![String::from("file_123")],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
             })
             .unwrap()
             .output["id"],
@@ -148,11 +151,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                         String::from("priority"),
                         String::from("high"),
                     )])),
-                    tool_resources: Some(json!({
-                        "file_search": {
-                            "vector_store_ids": ["vs_123"]
-                        }
-                    })),
+                    tool_resources: Some(BetaToolResourceOverrides {
+                        file_search: Some(BetaToolResourceFileSearchOverrides {
+                            vector_store_ids: vec![String::from("vs_123")],
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
                 },
             )
             .unwrap()

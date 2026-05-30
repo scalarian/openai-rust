@@ -133,7 +133,7 @@ pub struct BetaAssistantCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResources>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -160,7 +160,7 @@ pub struct BetaAssistantUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResourceOverrides>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -400,6 +400,88 @@ pub struct BetaAssistantFunctionDefinition {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Tool resources accepted when creating beta assistants or threads.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResources {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_interpreter: Option<BetaToolResourcesCodeInterpreter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_search: Option<BetaToolResourcesFileSearch>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Code-interpreter file resources.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResourcesCodeInterpreter {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub file_ids: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-search resources accepted by create calls.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResourcesFileSearch {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub vector_store_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub vector_stores: Vec<BetaToolResourcesVectorStore>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Inline vector-store creation helper for beta tool resources.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResourcesVectorStore {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking_strategy: Option<BetaVectorStoreChunkingStrategy>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub file_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Vector-store chunking strategy for beta tool-resource helpers.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaVectorStoreChunkingStrategy {
+    Auto,
+    Static {
+        #[serde(rename = "static")]
+        static_config: BetaVectorStoreStaticChunkingStrategy,
+    },
+}
+
+/// Static vector-store chunking configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct BetaVectorStoreStaticChunkingStrategy {
+    pub chunk_overlap_tokens: u32,
+    pub max_chunk_size_tokens: u32,
+}
+
+/// Tool-resource overrides accepted by beta update and run top-level calls.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResourceOverrides {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_interpreter: Option<BetaToolResourcesCodeInterpreter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_search: Option<BetaToolResourceFileSearchOverrides>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-search resource override list.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaToolResourceFileSearchOverrides {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub vector_store_ids: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Deprecated beta assistant list parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BetaAssistantListParams {
@@ -506,7 +588,7 @@ pub struct BetaThreadCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResources>,
 }
 
 /// Deprecated beta thread update parameters.
@@ -515,7 +597,7 @@ pub struct BetaThreadUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResourceOverrides>,
 }
 
 /// Deprecated beta create-thread-and-run parameters.
@@ -545,7 +627,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<BetaAssistantToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResourceOverrides>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
