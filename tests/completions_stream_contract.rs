@@ -16,9 +16,9 @@ fn streamed_and_non_streamed_payloads_share_the_text_completion_shape() {
     };
 
     let transcript = vec![concat!(
-        r#"data: {"id":"cmpl_stream","object":"text_completion","created":1,"model":"gpt-3.5-turbo-instruct","choices":[{"text":"Hel","index":0,"logprobs":null,"finish_reason":null}]}"#,
+        r#"data: {"id":"cmpl_stream","object":"text_completion","created":1,"model":"gpt-3.5-turbo-instruct","system_fingerprint":"fp_stream","choices":[{"text":"Hel","index":0,"logprobs":{"text_offset":[0],"token_logprobs":[-0.1],"tokens":["Hel"],"top_logprobs":[{"Hel":-0.1}]},"finish_reason":null}]}"#,
         "\n\n",
-        r#"data: {"id":"cmpl_stream","object":"text_completion","created":1,"model":"gpt-3.5-turbo-instruct","choices":[{"text":"lo","index":0,"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}"#,
+        r#"data: {"id":"cmpl_stream","object":"text_completion","created":1,"model":"gpt-3.5-turbo-instruct","choices":[{"text":"lo","index":0,"logprobs":{"text_offset":[3],"token_logprobs":[-0.2],"tokens":["lo"],"top_logprobs":[{"lo":-0.2}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5,"completion_tokens_details":{"reasoning_tokens":1},"prompt_tokens_details":{"cached_tokens":1}}}"#,
         "\n\n",
         "data: [DONE]\n\n"
     )];
@@ -32,15 +32,44 @@ fn streamed_and_non_streamed_payloads_share_the_text_completion_shape() {
 
     let final_completion = stream.final_completion();
     assert_eq!(final_completion.object, "text_completion");
+    assert_eq!(
+        final_completion.system_fingerprint.as_deref(),
+        Some("fp_stream")
+    );
     assert_eq!(final_completion.choices.len(), 1);
     assert_eq!(final_completion.choices[0].text, "Hello");
     assert_eq!(
         final_completion.choices[0].finish_reason.as_deref(),
         Some("stop")
     );
+    let logprobs = final_completion.choices[0].logprobs.as_ref().unwrap();
+    assert_eq!(logprobs.text_offset.as_deref(), Some(&[0, 3][..]));
     assert_eq!(
-        final_completion.usage.as_ref().unwrap()["total_tokens"].as_i64(),
-        Some(5)
+        logprobs.tokens.as_deref(),
+        Some(&["Hel".to_string(), "lo".to_string()][..])
+    );
+    assert_eq!(final_completion.usage.as_ref().unwrap().total_tokens, 5);
+    assert_eq!(
+        final_completion
+            .usage
+            .as_ref()
+            .unwrap()
+            .completion_tokens_details
+            .as_ref()
+            .unwrap()
+            .reasoning_tokens,
+        Some(1)
+    );
+    assert_eq!(
+        final_completion
+            .usage
+            .as_ref()
+            .unwrap()
+            .prompt_tokens_details
+            .as_ref()
+            .unwrap()
+            .cached_tokens,
+        Some(1)
     );
 }
 

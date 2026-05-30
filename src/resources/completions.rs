@@ -174,11 +174,11 @@ pub struct Completion {
     pub object: String,
     pub created: i64,
     #[serde(default)]
-    pub model: Option<String>,
+    pub model: String,
     #[serde(default)]
     pub choices: Vec<CompletionChoice>,
     #[serde(default)]
-    pub usage: Option<Value>,
+    pub usage: Option<CompletionUsage>,
     #[serde(default)]
     pub system_fingerprint: Option<String>,
     #[serde(flatten)]
@@ -192,9 +192,74 @@ pub struct CompletionChoice {
     pub finish_reason: Option<String>,
     pub index: usize,
     #[serde(default)]
-    pub logprobs: Option<Value>,
+    pub logprobs: Option<CompletionLogprobs>,
     #[serde(default)]
     pub text: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Log probability data for a legacy text-completion choice.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct CompletionLogprobs {
+    #[serde(default)]
+    pub text_offset: Option<Vec<i64>>,
+    #[serde(default)]
+    pub token_logprobs: Option<Vec<f64>>,
+    #[serde(default)]
+    pub tokens: Option<Vec<String>>,
+    #[serde(default)]
+    pub top_logprobs: Option<Vec<BTreeMap<String, f64>>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl CompletionLogprobs {
+    fn append_from(&mut self, other: &Self) {
+        append_option_vec(&mut self.text_offset, &other.text_offset);
+        append_option_vec(&mut self.token_logprobs, &other.token_logprobs);
+        append_option_vec(&mut self.tokens, &other.tokens);
+        append_option_vec(&mut self.top_logprobs, &other.top_logprobs);
+        self.extra.extend(other.extra.clone());
+    }
+}
+
+/// Usage statistics for a legacy text completion.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct CompletionUsage {
+    pub completion_tokens: u64,
+    pub prompt_tokens: u64,
+    pub total_tokens: u64,
+    #[serde(default)]
+    pub completion_tokens_details: Option<CompletionTokensDetails>,
+    #[serde(default)]
+    pub prompt_tokens_details: Option<CompletionPromptTokensDetails>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Completion-token usage breakdown.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct CompletionTokensDetails {
+    #[serde(default)]
+    pub accepted_prediction_tokens: Option<u64>,
+    #[serde(default)]
+    pub audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(default)]
+    pub rejected_prediction_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Prompt-token usage breakdown.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct CompletionPromptTokensDetails {
+    #[serde(default)]
+    pub audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub cached_tokens: Option<u64>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -263,7 +328,7 @@ struct CompletionAccumulator {
     model: Option<String>,
     system_fingerprint: Option<String>,
     choices: Vec<AccumulatedCompletionChoice>,
-    usage: Option<Value>,
+    usage: Option<CompletionUsage>,
     seen_done: bool,
     seen_terminal_chunk: bool,
     parsed_completion: bool,
@@ -299,7 +364,7 @@ impl CompletionAccumulator {
             self.created = Some(completion.created);
         }
         if self.model.is_none() {
-            self.model = completion.model.clone();
+            self.model = Some(completion.model.clone());
         }
         if self.system_fingerprint.is_none() {
             self.system_fingerprint = completion.system_fingerprint.clone();
@@ -322,8 +387,12 @@ impl CompletionAccumulator {
                 )
             })?;
             accumulated.text.push_str(&choice.text);
-            if choice.logprobs.is_some() {
-                accumulated.logprobs = choice.logprobs.clone();
+            if let Some(logprobs) = &choice.logprobs {
+                if let Some(accumulated_logprobs) = &mut accumulated.logprobs {
+                    accumulated_logprobs.append_from(logprobs);
+                } else {
+                    accumulated.logprobs = Some(logprobs.clone());
+                }
             }
             if let Some(finish_reason) = &choice.finish_reason {
                 accumulated.finish_reason = Some(finish_reason.clone());
@@ -354,7 +423,7 @@ impl CompletionAccumulator {
                 .object
                 .unwrap_or_else(|| String::from("text_completion")),
             created: self.created.unwrap_or_default(),
-            model: self.model,
+            model: self.model.unwrap_or_default(),
             choices: self
                 .choices
                 .into_iter()
@@ -377,8 +446,14 @@ impl CompletionAccumulator {
 #[derive(Clone, Debug, Default)]
 struct AccumulatedCompletionChoice {
     finish_reason: Option<String>,
-    logprobs: Option<Value>,
+    logprobs: Option<CompletionLogprobs>,
     text: String,
+}
+
+fn append_option_vec<T: Clone>(target: &mut Option<Vec<T>>, source: &Option<Vec<T>>) {
+    if let Some(values) = source {
+        target.get_or_insert_with(Vec::new).extend(values.clone());
+    }
 }
 
 fn map_live_transport_error(error: reqwest::Error) -> OpenAIError {

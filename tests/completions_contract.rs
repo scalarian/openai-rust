@@ -43,9 +43,39 @@ fn legacy_completions_create_preserves_text_completion_shape() {
         Some("stop")
     );
     assert_eq!(response.output().choices[0].index, 0);
+    assert_eq!(response.output().usage.as_ref().unwrap().total_tokens, 10);
     assert_eq!(
-        response.output().usage.as_ref().unwrap()["total_tokens"],
-        10
+        response
+            .output()
+            .usage
+            .as_ref()
+            .unwrap()
+            .completion_tokens_details
+            .as_ref()
+            .unwrap()
+            .reasoning_tokens,
+        Some(2)
+    );
+    assert_eq!(
+        response
+            .output()
+            .usage
+            .as_ref()
+            .unwrap()
+            .prompt_tokens_details
+            .as_ref()
+            .unwrap()
+            .cached_tokens,
+        Some(1)
+    );
+    let logprobs = response.output().choices[0].logprobs.as_ref().unwrap();
+    assert_eq!(logprobs.text_offset.as_deref(), Some(&[0][..]));
+    assert_eq!(logprobs.tokens.as_deref(), Some(&["Hello".to_string()][..]));
+    assert_eq!(
+        logprobs.top_logprobs.as_ref().unwrap()[0]
+            .get("Hello")
+            .copied(),
+        Some(-0.1)
     );
 
     let request = server.captured_request().expect("captured request");
@@ -104,14 +134,25 @@ fn completion_payload(id: &str, text: &str) -> String {
             {
                 "text": text,
                 "index": 0,
-                "logprobs": null,
+                "logprobs": {
+                    "text_offset": [0],
+                    "token_logprobs": [-0.1],
+                    "tokens": ["Hello"],
+                    "top_logprobs": [{"Hello": -0.1, "Hi": -1.2}]
+                },
                 "finish_reason": "stop"
             }
         ],
         "usage": {
             "prompt_tokens": 4,
             "completion_tokens": 6,
-            "total_tokens": 10
+            "total_tokens": 10,
+            "completion_tokens_details": {
+                "reasoning_tokens": 2
+            },
+            "prompt_tokens_details": {
+                "cached_tokens": 1
+            }
         }
     })
     .to_string()
