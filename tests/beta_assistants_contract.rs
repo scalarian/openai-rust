@@ -11,12 +11,13 @@ use openai_rust::{
             BetaAssistantCreateParams, BetaAssistantFileSearchRanker,
             BetaAssistantFileSearchRankingOptions, BetaAssistantFileSearchTool,
             BetaAssistantListParams, BetaAssistantResponseFormat,
-            BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
-            BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
-            BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
-            BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
-            BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
-            BetaThreadMessageRole, BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
+            BetaAssistantResponseFormatJsonSchema, BetaAssistantStream,
+            BetaAssistantStreamEventType, BetaAssistantTool, BetaAssistantToolChoice,
+            BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams, BetaQueryParams,
+            BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
+            BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool, BetaThreadMessageContent,
+            BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageRole,
+            BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
             BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepInclude,
             BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
             BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
@@ -595,6 +596,8 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
         [concat!(
             "event: thread.run.created\n",
             "data: {\"id\":\"run_stream\",\"status\":\"queued\"}\n\n",
+            "event: thread.future\n",
+            "data: {\"id\":\"run_stream\",\"status\":\"future\"}\n\n",
             "data: [DONE]\n\n"
         )],
     )
@@ -605,12 +608,26 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
         .next_event()
         .expect("event read")
         .expect("first event");
-    assert_eq!(event.event.as_deref(), Some("thread.run.created"));
+    assert_eq!(
+        event.event,
+        Some(BetaAssistantStreamEventType::ThreadRunCreated)
+    );
     assert_eq!(event.data["id"], json!("run_stream"));
     assert_eq!(
         event.raw_data,
         "{\"id\":\"run_stream\",\"status\":\"queued\"}"
     );
+    let unknown = stream
+        .next_event()
+        .expect("unknown event read")
+        .expect("unknown event");
+    assert_eq!(
+        unknown.event,
+        Some(BetaAssistantStreamEventType::Unknown(String::from(
+            "thread.future"
+        )))
+    );
+    assert_eq!(unknown.data["status"], json!("future"));
     assert!(stream.next_event().expect("eof").is_none());
 
     let error = BetaAssistantStream::from_sse_chunks(

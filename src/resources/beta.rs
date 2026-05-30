@@ -173,6 +173,36 @@ beta_string_literal_enum! {
 }
 
 beta_string_literal_enum! {
+    /// Event names emitted by deprecated beta Assistants streams.
+    pub enum BetaAssistantStreamEventType {
+        ThreadCreated => "thread.created",
+        ThreadRunCreated => "thread.run.created",
+        ThreadRunQueued => "thread.run.queued",
+        ThreadRunInProgress => "thread.run.in_progress",
+        ThreadRunRequiresAction => "thread.run.requires_action",
+        ThreadRunCompleted => "thread.run.completed",
+        ThreadRunIncomplete => "thread.run.incomplete",
+        ThreadRunFailed => "thread.run.failed",
+        ThreadRunCancelling => "thread.run.cancelling",
+        ThreadRunCancelled => "thread.run.cancelled",
+        ThreadRunExpired => "thread.run.expired",
+        ThreadRunStepCreated => "thread.run.step.created",
+        ThreadRunStepInProgress => "thread.run.step.in_progress",
+        ThreadRunStepDelta => "thread.run.step.delta",
+        ThreadRunStepCompleted => "thread.run.step.completed",
+        ThreadRunStepFailed => "thread.run.step.failed",
+        ThreadRunStepCancelled => "thread.run.step.cancelled",
+        ThreadRunStepExpired => "thread.run.step.expired",
+        ThreadMessageCreated => "thread.message.created",
+        ThreadMessageInProgress => "thread.message.in_progress",
+        ThreadMessageDelta => "thread.message.delta",
+        ThreadMessageCompleted => "thread.message.completed",
+        ThreadMessageIncomplete => "thread.message.incomplete",
+        Error => "error",
+    }
+}
+
+beta_string_literal_enum! {
     /// ChatKit attachment discriminator.
     pub enum ChatKitAttachmentType {
         Image => "image",
@@ -1554,7 +1584,7 @@ impl Default for BetaRunPollOptions {
 /// One raw Assistants stream event.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BetaAssistantStreamEvent {
-    pub event: Option<String>,
+    pub event: Option<BetaAssistantStreamEventType>,
     pub data: Value,
     pub raw_data: String,
 }
@@ -2940,7 +2970,7 @@ fn parse_beta_assistant_frame(
         .with_source(error)
     })?;
     Ok(Some(BetaAssistantStreamEvent {
-        event: frame.event,
+        event: frame.event.map(BetaAssistantStreamEventType::from),
         raw_data: frame.data,
         data,
     }))
