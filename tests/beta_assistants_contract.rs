@@ -6,7 +6,10 @@ use std::time::Duration;
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
-    resources::beta::{BetaAssistantStream, BetaQueryParams, BetaRunPollOptions},
+    resources::beta::{
+        BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
+        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions,
+    },
 };
 use serde_json::json;
 
@@ -45,11 +48,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     let threads = beta.threads();
 
     let assistant = assistants
-        .create(json!({
-            "model": "gpt-4.1",
-            "name": "Support analyst",
-            "instructions": "Answer succinctly."
-        }))
+        .create(BetaAssistantCreateParams {
+            model: String::from("gpt-4.1"),
+            name: Some(String::from("Support analyst")),
+            instructions: Some(String::from("Answer succinctly.")),
+            reasoning_effort: Some(String::from("low")),
+            tools: Some(vec![json!({"type": "code_interpreter"})]),
+            ..Default::default()
+        })
         .unwrap();
     assert_eq!(assistant.output["id"], json!("asst_123"));
 
@@ -59,19 +65,26 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         assistants
-            .update("asst_123", json!({"metadata": {"tier": "gold"}}))
+            .update(
+                "asst_123",
+                BetaAssistantUpdateParams {
+                    metadata: Some(json!({"tier": "gold"})),
+                    reasoning_effort: Some(String::from("minimal")),
+                    ..Default::default()
+                },
+            )
             .unwrap()
             .output["id"],
         json!("asst_123")
     );
     assert_eq!(
         assistants
-            .list(
-                BetaQueryParams::new()
-                    .push("after", "asst_before")
-                    .push("limit", 2)
-                    .push("order", "asc")
-            )
+            .list(BetaAssistantListParams {
+                after: Some(String::from("asst_after")),
+                before: Some(String::from("asst_before")),
+                limit: Some(2),
+                order: Some(String::from("asc")),
+            })
             .unwrap()
             .output["data"][0]["id"],
         json!("asst_123")
@@ -258,7 +271,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(requests[2].path, "/v1/assistants/asst_123");
     assert_eq!(
         requests[3].path,
-        "/v1/assistants?after=asst_before&limit=2&order=asc"
+        "/v1/assistants?after=asst_after&before=asst_before&limit=2&order=asc"
     );
     assert_eq!(requests[4].path, "/v1/assistants/asst_123");
     assert_eq!(requests[5].path, "/v1/threads");
@@ -310,6 +323,15 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
 
     let assistant_body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(assistant_body["model"], json!("gpt-4.1"));
+    assert_eq!(assistant_body["reasoning_effort"], json!("low"));
+    assert_eq!(
+        assistant_body["tools"][0]["type"],
+        json!("code_interpreter")
+    );
+    let assistant_update_body: serde_json::Value =
+        serde_json::from_slice(&requests[2].body).unwrap();
+    assert_eq!(assistant_update_body["metadata"]["tier"], json!("gold"));
+    assert_eq!(assistant_update_body["reasoning_effort"], json!("minimal"));
     let empty_thread_body: serde_json::Value = serde_json::from_slice(&requests[5].body).unwrap();
     assert_eq!(empty_thread_body, json!({}));
     let message_body: serde_json::Value = serde_json::from_slice(&requests[11].body).unwrap();

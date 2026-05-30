@@ -100,8 +100,11 @@ impl BetaAssistants {
     }
 
     /// Lists assistants.
-    pub fn list(&self, params: BetaQueryParams) -> Result<ApiResponse<Value>, OpenAIError> {
-        assistants_beta_get_query(&self.runtime, "/assistants", params.into_pairs())
+    pub fn list(
+        &self,
+        params: impl Into<BetaQueryParams>,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        assistants_beta_get_query(&self.runtime, "/assistants", params.into().into_pairs())
     }
 
     /// Deletes one assistant by id.
@@ -109,6 +112,68 @@ impl BetaAssistants {
         let assistant_id = path_id("assistant_id", assistant_id)?;
         assistants_beta_delete(&self.runtime, format!("/assistants/{assistant_id}"))
     }
+}
+
+/// Deprecated beta assistant creation parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantCreateParams {
+    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_resources: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+}
+
+/// Deprecated beta assistant update parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_resources: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+}
+
+/// Deprecated beta assistant list parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaAssistantListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
 }
 
 /// Deprecated beta Threads API family.
@@ -635,6 +700,16 @@ where
             params = params.push(key, value);
         }
         params
+    }
+}
+
+impl From<BetaAssistantListParams> for BetaQueryParams {
+    fn from(value: BetaAssistantListParams) -> Self {
+        Self::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
     }
 }
 
