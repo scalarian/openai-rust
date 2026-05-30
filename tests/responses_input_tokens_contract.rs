@@ -61,6 +61,10 @@ fn input_tokens_count_forwards_modalities_and_tools() {
                 description: Some("Weather lookup".into()),
                 defer_loading: None,
             }],
+            raw_tools: vec![json!({
+                "type": "file_search",
+                "vector_store_ids": ["vs_123"]
+            })],
             truncation: Some("auto".into()),
             ..Default::default()
         })
@@ -76,6 +80,8 @@ fn input_tokens_count_forwards_modalities_and_tools() {
     assert_eq!(body["input"][0]["content"][1]["type"], "input_image");
     assert_eq!(body["tools"][0]["type"], "function");
     assert_eq!(body["tools"][0]["strict"], true);
+    assert_eq!(body["tools"][1]["type"], "file_search");
+    assert_eq!(body["tools"][1]["vector_store_ids"], json!(["vs_123"]));
     assert_eq!(body["text"]["verbosity"], "low");
     assert_eq!(body["truncation"], "auto");
 

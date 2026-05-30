@@ -49,6 +49,10 @@ fn create_populates_output_text_helper() {
             top_p: Some(0.8),
             truncation: Some(String::from("auto")),
             user: Some(String::from("legacy-user")),
+            raw_tools: vec![
+                json!({"type": "web_search_preview", "search_context_size": "low"}),
+                json!({"type": "code_interpreter", "container": "auto"}),
+            ],
             ..Default::default()
         })
         .unwrap();
@@ -84,6 +88,10 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["top_p"], 0.8);
     assert_eq!(body["truncation"], "auto");
     assert_eq!(body["user"], "legacy-user");
+    assert_eq!(body["tools"][0]["type"], "web_search_preview");
+    assert_eq!(body["tools"][0]["search_context_size"], "low");
+    assert_eq!(body["tools"][1]["type"], "code_interpreter");
+    assert_eq!(body["tools"][1]["container"], "auto");
     assert_eq!(response.output().id, "resp_create");
     assert_eq!(response.output().object, "response");
     assert_eq!(response.output().created_at, 1.25);

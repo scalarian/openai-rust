@@ -602,6 +602,10 @@ pub struct ResponseCreateParams {
     pub tool_choice: Option<Value>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
+    /// Non-function Responses tools, such as built-in web/file search, MCP, code
+    /// interpreter, image generation, shell, or custom tool payloads.
+    #[serde(skip)]
+    pub raw_tools: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -623,18 +627,22 @@ impl ResponseCreateParams {
         Ok(self)
     }
 
-    fn into_request_body(self) -> Value {
+    fn into_request_body(mut self) -> Value {
+        let raw_tools = std::mem::take(&mut self.raw_tools);
         let mut value =
             serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
+        merge_raw_tools(&mut value, raw_tools);
         if let Value::Object(ref mut object) = value {
             object.insert(String::from("stream"), Value::Bool(false));
         }
         value
     }
 
-    fn into_stream_request_body(self) -> Value {
+    fn into_stream_request_body(mut self) -> Value {
+        let raw_tools = std::mem::take(&mut self.raw_tools);
         let mut value =
             serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
+        merge_raw_tools(&mut value, raw_tools);
         if let Value::Object(ref mut object) = value {
             object.insert(String::from("stream"), Value::Bool(true));
         }
@@ -692,6 +700,10 @@ pub struct ResponseParseParams {
     pub tool_choice: Option<Value>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
+    /// Non-function Responses tools, such as built-in web/file search, MCP, code
+    /// interpreter, image generation, shell, or custom tool payloads.
+    #[serde(skip)]
+    pub raw_tools: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -732,6 +744,7 @@ impl ResponseParseParams {
             text: self.text,
             tool_choice: self.tool_choice,
             tools: self.tools,
+            raw_tools: self.raw_tools,
             top_logprobs: self.top_logprobs,
             top_p: self.top_p,
             truncation: self.truncation,
@@ -815,6 +828,10 @@ pub struct ResponseInputTokensCountParams {
     pub tool_choice: Option<Value>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
+    /// Non-function Responses tools, such as built-in web/file search, MCP, code
+    /// interpreter, image generation, shell, or custom tool payloads.
+    #[serde(skip)]
+    pub raw_tools: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<String>,
     #[serde(flatten)]
@@ -828,6 +845,14 @@ impl ResponseInputTokensCountParams {
     {
         self.input = Some(serialize_json_value("responses.input_tokens.input", input)?);
         Ok(self)
+    }
+
+    fn into_request_body(mut self) -> Value {
+        let raw_tools = std::mem::take(&mut self.raw_tools);
+        let mut value =
+            serde_json::to_value(self).unwrap_or_else(|_| Value::Object(Default::default()));
+        merge_raw_tools(&mut value, raw_tools);
+        value
     }
 }
 
@@ -874,10 +899,11 @@ impl InputTokens {
         &self,
         params: ResponseInputTokensCountParams,
     ) -> Result<ApiResponse<InputTokenCount>, OpenAIError> {
+        let body = params.into_request_body();
         self.runtime.execute_json_with_body(
             "POST",
             "/responses/input_tokens",
-            &params,
+            &body,
             RequestOptions::default(),
         )
     }
@@ -3520,6 +3546,22 @@ where
         )
         .with_source(error)
     })
+}
+
+fn merge_raw_tools(value: &mut Value, raw_tools: Vec<Value>) {
+    if raw_tools.is_empty() {
+        return;
+    }
+
+    let Value::Object(object) = value else {
+        return;
+    };
+    let tools = object
+        .entry(String::from("tools"))
+        .or_insert_with(|| Value::Array(Vec::new()));
+    if let Value::Array(tools) = tools {
+        tools.extend(raw_tools);
+    }
 }
 
 fn prepare_responses_ws_target(
