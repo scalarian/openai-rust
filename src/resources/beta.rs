@@ -135,7 +135,7 @@ pub struct BetaAssistantCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
 }
@@ -162,7 +162,7 @@ pub struct BetaAssistantUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
 }
@@ -337,6 +337,69 @@ impl BetaTruncationStrategy {
     }
 }
 
+/// Tool definition accepted by deprecated beta assistants and runs.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaAssistantTool {
+    CodeInterpreter,
+    FileSearch {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        file_search: Option<BetaAssistantFileSearchTool>,
+    },
+    Function {
+        function: BetaAssistantFunctionDefinition,
+    },
+}
+
+impl BetaAssistantTool {
+    pub fn code_interpreter() -> Self {
+        Self::CodeInterpreter
+    }
+
+    pub fn file_search(file_search: Option<BetaAssistantFileSearchTool>) -> Self {
+        Self::FileSearch { file_search }
+    }
+
+    pub fn function(function: BetaAssistantFunctionDefinition) -> Self {
+        Self::Function { function }
+    }
+}
+
+/// File-search overrides for deprecated beta assistant tools.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantFileSearchTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_num_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranking_options: Option<BetaAssistantFileSearchRankingOptions>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Ranking options for deprecated beta file-search tools.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BetaAssistantFileSearchRankingOptions {
+    pub score_threshold: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranker: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function definition for deprecated beta assistant tools.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantFunctionDefinition {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Deprecated beta assistant list parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BetaAssistantListParams {
@@ -484,7 +547,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -866,7 +929,7 @@ pub struct BetaThreadRunCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<BetaAssistantToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<BetaAssistantTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]

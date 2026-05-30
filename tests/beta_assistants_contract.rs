@@ -8,9 +8,9 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::beta::{
         BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantResponseFormat,
-        BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantToolChoice,
-        BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams, BetaQueryParams,
-        BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
+        BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
+        BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
+        BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
         BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
         BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
         BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
@@ -60,7 +60,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             name: Some(String::from("Support analyst")),
             instructions: Some(String::from("Answer succinctly.")),
             reasoning_effort: Some(String::from("low")),
-            tools: Some(vec![json!({"type": "code_interpreter"})]),
+            tools: Some(vec![BetaAssistantTool::code_interpreter()]),
             ..Default::default()
         })
         .unwrap();
@@ -285,7 +285,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                     },
                 )),
                 tool_choice: Some(BetaAssistantToolChoice::CodeInterpreter),
-                tools: Some(vec![json!({"type": "code_interpreter"})]),
+                tools: Some(vec![BetaAssistantTool::code_interpreter()]),
                 truncation_strategy: Some(BetaTruncationStrategy::auto()),
                 ..Default::default()
             },
