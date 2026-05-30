@@ -8,9 +8,10 @@ use crate::{
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     error::ErrorKind,
     resources::responses::{
-        ResponseCodeInterpreterOutput, ResponseComputerAction, ResponseFileSearchResult,
-        ResponseInputAudioData, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-        ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
+        ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
+        ResponseFileSearchResult, ResponseInputAudioData, ResponseItemAction,
+        ResponseItemEnvironment, ResponseItemOutput, ResponseReasoningSummaryPart,
+        ResponseTextAnnotation, ResponseTextLogprob,
     },
 };
 
@@ -325,7 +326,7 @@ pub struct ConversationItem {
     pub created_by: Option<String>,
     pub action: Option<ResponseItemAction>,
     pub actions: Option<Vec<ResponseComputerAction>>,
-    pub operation: Option<Value>,
+    pub operation: Option<ResponseApplyPatchOperation>,
     pub environment: Option<ResponseItemEnvironment>,
     pub execution: Option<String>,
     pub output: Option<ResponseItemOutput>,
@@ -416,7 +417,7 @@ struct WireConversationItem {
     #[serde(default)]
     actions: Option<Vec<ResponseComputerAction>>,
     #[serde(default)]
-    operation: Option<Value>,
+    operation: Option<ResponseApplyPatchOperation>,
     #[serde(default)]
     environment: Option<ResponseItemEnvironment>,
     #[serde(default)]

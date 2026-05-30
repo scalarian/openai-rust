@@ -1129,7 +1129,7 @@ pub struct ResponseOutputItem {
     pub created_by: Option<String>,
     pub action: Option<ResponseItemAction>,
     pub actions: Option<Vec<ResponseComputerAction>>,
-    pub operation: Option<Value>,
+    pub operation: Option<ResponseApplyPatchOperation>,
     pub environment: Option<ResponseItemEnvironment>,
     pub execution: Option<String>,
     pub output: Option<ResponseItemOutput>,
@@ -1264,6 +1264,73 @@ pub struct ResponseComputerSafetyCheck {
     pub code: Option<String>,
     #[serde(default)]
     pub message: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Operation requested by an apply-patch tool call.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseApplyPatchOperation {
+    CreateFile(ResponseApplyPatchDiffOperation),
+    DeleteFile(ResponseApplyPatchDeleteOperation),
+    UpdateFile(ResponseApplyPatchDiffOperation),
+    Other {
+        operation_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseApplyPatchOperation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(operation_type) = object
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match operation_type.as_str() {
+            "create_file" => serde_json::from_value(Value::Object(object))
+                .map(Self::CreateFile)
+                .map_err(serde::de::Error::custom),
+            "delete_file" => serde_json::from_value(Value::Object(object))
+                .map(Self::DeleteFile)
+                .map_err(serde::de::Error::custom),
+            "update_file" => serde_json::from_value(Value::Object(object))
+                .map(Self::UpdateFile)
+                .map_err(serde::de::Error::custom),
+            _ => {
+                let mut extra = object;
+                extra.remove("type");
+                Ok(Self::Other {
+                    operation_type,
+                    extra: extra.into_iter().collect(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseApplyPatchDiffOperation {
+    pub diff: String,
+    pub path: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseApplyPatchDeleteOperation {
+    pub path: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1787,7 +1854,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     actions: Option<Vec<ResponseComputerAction>>,
     #[serde(default)]
-    operation: Option<Value>,
+    operation: Option<ResponseApplyPatchOperation>,
     #[serde(default)]
     environment: Option<ResponseItemEnvironment>,
     #[serde(default)]

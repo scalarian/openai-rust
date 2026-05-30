@@ -1,8 +1,8 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
-        ResponseComputerAction, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-        ResponseShellOutputOutcome,
+        ResponseApplyPatchOperation, ResponseComputerAction, ResponseItemAction,
+        ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome,
     },
 };
 use serde_json::{Value, json};
@@ -219,6 +219,7 @@ fn typed_known_fields_are_not_lost() {
             shell_call_output_item("shell_output_1"),
             local_shell_call_item("local_shell_1"),
             shell_call_item("shell_1"),
+            apply_patch_call_item("patch_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -393,6 +394,14 @@ fn typed_known_fields_are_not_lost() {
     assert!(matches!(
         shell_call.environment.as_ref(),
         Some(ResponseItemEnvironment::Local(_))
+    ));
+
+    let apply_patch_call = &listed.output().data[9];
+    assert_eq!(apply_patch_call.item_type, "apply_patch_call");
+    assert!(matches!(
+        apply_patch_call.operation.as_ref(),
+        Some(ResponseApplyPatchOperation::CreateFile(operation))
+            if operation.path == "src/new.rs" && operation.diff == "@@ +hello"
     ));
 
     let retrieved_function_call = retrieved.output();
@@ -595,6 +604,16 @@ fn shell_call_item(id: &str) -> Value {
         "status": "completed",
         "action": {"commands": ["echo ok"], "max_output_length": 2048},
         "environment": {"type": "local"}
+    })
+}
+
+fn apply_patch_call_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "apply_patch_call",
+        "call_id": "call_patch",
+        "status": "completed",
+        "operation": {"type": "create_file", "path": "src/new.rs", "diff": "@@ +hello"}
     })
 }
 

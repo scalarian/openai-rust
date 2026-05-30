@@ -3,11 +3,12 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
-        ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
-        ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
-        ResponseFormatTextConfig, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-        ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome, ResponseTextAnnotation,
-        ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+        ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool,
+        ResponseComputerAction, ResponseConversation, ResponseConversationObject,
+        ResponseFileSearchAttributeValue, ResponseFormatTextConfig, ResponseItemAction,
+        ResponseItemEnvironment, ResponseItemOutput, ResponsePrompt, ResponseReasoning,
+        ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
+        ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -600,6 +601,17 @@ fn tool_and_refusal_fields_round_trip() {
                 if environment.container_id == "cntr_123"
         ));
 
+        let apply_patch_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "apply_patch_call")
+            .expect("apply_patch_call item");
+        assert!(matches!(
+            apply_patch_call.operation.as_ref(),
+            Some(ResponseApplyPatchOperation::UpdateFile(operation))
+                if operation.path == "src/lib.rs" && operation.diff == "@@ -1 +1"
+        ));
+
         let shell_output = response
             .output
             .iter()
@@ -1098,6 +1110,18 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                 "environment": {
                     "type": "container_reference",
                     "container_id": "cntr_123"
+                }
+            },
+            {
+                "id": "patch_123",
+                "type": "apply_patch_call",
+                "call_id": "call_patch",
+                "status": "completed",
+                "created_by": "assistant",
+                "operation": {
+                    "type": "update_file",
+                    "path": "src/lib.rs",
+                    "diff": "@@ -1 +1"
                 }
             },
             {
