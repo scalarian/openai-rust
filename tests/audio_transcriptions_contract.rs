@@ -222,7 +222,7 @@ fn transcription_server_vad_chunking_serializes_numeric_threshold() {
             chunking_strategy: Some(
                 openai_rust::resources::audio::TranscriptionChunkingStrategy::ServerVad(
                     openai_rust::resources::audio::TranscriptionVadConfig {
-                        kind: String::from("server_vad"),
+                        kind: openai_rust::resources::audio::TranscriptionVadType::ServerVad,
                         prefix_padding_ms: Some(250),
                         silence_duration_ms: Some(400),
                         threshold: Some(0.42),
@@ -321,12 +321,20 @@ fn streaming_transcription_assembles_deltas_segments_and_usage() {
             assert_eq!(event.text, "hello there");
             assert_eq!(event.event_type.as_deref(), Some("transcript.text.done"));
             assert_eq!(event.usage.as_ref().unwrap().total_tokens(), Some(13));
+            assert_eq!(
+                event.usage.as_ref().unwrap().usage_type.as_deref(),
+                Some("tokens")
+            );
         }
         other => panic!("expected text done event, got {other:?}"),
     }
     assert!(stream.next_event().is_none());
     assert_eq!(stream.final_text().unwrap(), "hello there");
     assert_eq!(stream.final_usage().unwrap().total_tokens(), Some(13));
+    assert_eq!(
+        stream.final_usage().unwrap().usage_type.as_deref(),
+        Some("tokens")
+    );
     assert_eq!(stream.segments()[0].speaker, "agent");
 }
 

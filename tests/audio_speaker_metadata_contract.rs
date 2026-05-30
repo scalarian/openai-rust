@@ -64,6 +64,7 @@ fn diarized_transcription_and_streaming_segments_preserve_speaker_metadata() {
     match diarized.output() {
         openai_rust::resources::audio::TranscriptionResponse::DiarizedJson(payload) => {
             assert_eq!(payload.text, "Hello Hi");
+            assert_eq!(payload.task, "transcribe");
             assert_eq!(payload.segments[0].speaker, "agent");
             assert_eq!(
                 payload.segments[0].event_type.as_deref(),
@@ -71,6 +72,10 @@ fn diarized_transcription_and_streaming_segments_preserve_speaker_metadata() {
             );
             assert_eq!(payload.segments[1].speaker, "customer");
             assert_eq!(payload.usage.as_ref().unwrap().total_tokens(), Some(8));
+            assert_eq!(
+                payload.usage.as_ref().unwrap().usage_type.as_deref(),
+                Some("tokens")
+            );
         }
         other => panic!("expected diarized transcription, got {other:?}"),
     }

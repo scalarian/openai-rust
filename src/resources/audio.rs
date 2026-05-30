@@ -23,6 +23,118 @@ use crate::{
     },
 };
 
+macro_rules! audio_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
 /// Audio API family.
 #[derive(Clone, Debug)]
 pub struct Audio {
@@ -146,6 +258,37 @@ impl TranscriptionTimestampGranularity {
     }
 }
 
+audio_string_literal_enum! {
+    /// VAD strategy discriminator accepted by transcription chunking configuration.
+    pub enum TranscriptionVadType {
+        ServerVad => "server_vad",
+    }
+}
+
+audio_string_literal_enum! {
+    /// Usage accounting shape returned by audio transcription payloads.
+    pub enum AudioUsageType {
+        Tokens => "tokens",
+        Duration => "duration",
+    }
+}
+
+audio_string_literal_enum! {
+    /// Audio task identifier returned by diarized transcription payloads.
+    pub enum TranscriptionTask {
+        Transcribe => "transcribe",
+    }
+}
+
+audio_string_literal_enum! {
+    /// Event discriminator returned in streamed transcription payloads.
+    pub enum TranscriptionStreamEventType {
+        TextDelta => "transcript.text.delta",
+        TextSegment => "transcript.text.segment",
+        TextDone => "transcript.text.done",
+    }
+}
+
 /// Optional server chunking strategy for transcription.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum TranscriptionChunkingStrategy {
@@ -158,7 +301,7 @@ pub enum TranscriptionChunkingStrategy {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TranscriptionVadConfig {
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: TranscriptionVadType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix_padding_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -170,7 +313,7 @@ pub struct TranscriptionVadConfig {
 impl TranscriptionVadConfig {
     pub fn server_vad() -> Self {
         Self {
-            kind: String::from("server_vad"),
+            kind: TranscriptionVadType::ServerVad,
             ..Default::default()
         }
     }
@@ -605,7 +748,7 @@ pub struct DiarizedTranscription {
     #[serde(default)]
     pub segments: Vec<TranscriptionTextSegmentEvent>,
     #[serde(default)]
-    pub task: String,
+    pub task: TranscriptionTask,
     pub text: String,
     #[serde(default)]
     pub usage: Option<AudioUsage>,
@@ -649,7 +792,7 @@ pub struct AudioUsage {
     #[serde(default, rename = "input_token_details")]
     pub input_token_details: Option<AudioInputTokenDetails>,
     #[serde(default, rename = "type")]
-    pub usage_type: Option<String>,
+    pub usage_type: Option<AudioUsageType>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -733,7 +876,7 @@ pub struct TranscriptionWord {
 pub struct TranscriptionTextDeltaEvent {
     pub delta: String,
     #[serde(default, rename = "type")]
-    pub event_type: Option<String>,
+    pub event_type: Option<TranscriptionStreamEventType>,
     #[serde(default)]
     pub segment_id: Option<String>,
     #[serde(default)]
@@ -747,7 +890,7 @@ pub struct TranscriptionTextDeltaEvent {
 pub struct TranscriptionTextDoneEvent {
     pub text: String,
     #[serde(default, rename = "type")]
-    pub event_type: Option<String>,
+    pub event_type: Option<TranscriptionStreamEventType>,
     #[serde(default)]
     pub logprobs: Vec<TranscriptionLogprob>,
     #[serde(default)]
@@ -761,7 +904,7 @@ pub struct TranscriptionTextDoneEvent {
 pub struct TranscriptionTextSegmentEvent {
     pub id: String,
     #[serde(default, rename = "type")]
-    pub event_type: Option<String>,
+    pub event_type: Option<TranscriptionStreamEventType>,
     #[serde(default)]
     pub end: f32,
     #[serde(default)]
