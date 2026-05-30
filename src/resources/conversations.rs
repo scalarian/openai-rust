@@ -15,7 +15,7 @@ use crate::{
             ResponseInputAudioData, ResponseInputItem, ResponseItemAction, ResponseItemEnvironment,
             ResponseItemOutput, ResponseItemRole, ResponseItemStatus, ResponseItemTool,
             ResponseItemType, ResponseMessagePhase, ResponseReasoningSummaryPart,
-            ResponseTextAnnotation, ResponseTextLogprob,
+            ResponseTextAnnotation, ResponseTextLogprob, ResponseToolExecution,
         },
     },
 };
@@ -336,7 +336,7 @@ pub struct ConversationItem {
     pub actions: Option<Vec<ResponseComputerAction>>,
     pub operation: Option<ResponseApplyPatchOperation>,
     pub environment: Option<ResponseItemEnvironment>,
-    pub execution: Option<String>,
+    pub execution: Option<ResponseToolExecution>,
     pub output: Option<ResponseItemOutput>,
     pub result: Option<String>,
     pub queries: Vec<String>,
@@ -418,7 +418,7 @@ struct WireConversationItem {
     #[serde(default)]
     environment: Option<ResponseItemEnvironment>,
     #[serde(default)]
-    execution: Option<String>,
+    execution: Option<ResponseToolExecution>,
     #[serde(default)]
     output: Option<ResponseItemOutput>,
     #[serde(default)]

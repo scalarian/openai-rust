@@ -12,16 +12,17 @@ use openai_rust::{
             ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseCompactServiceTier,
             ResponseComputerAction, ResponseContextManagement, ResponseConversation,
             ResponseConversationObject, ResponseCustomTool, ResponseCustomToolGrammar,
-            ResponseCustomToolInputFormat, ResponseFileSearchAttributeValue,
-            ResponseFileSearchFilter, ResponseFileSearchFilterValue, ResponseFormatTextConfig,
-            ResponseIncludable, ResponseInput, ResponseInputContentPart, ResponseInputItem,
-            ResponseInputText, ResponseInstructions, ResponseItemAction, ResponseItemEnvironment,
-            ResponseItemOutput, ResponseItemRole, ResponseItemStatus, ResponseItemType,
-            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
-            ResponseMcpTool, ResponseMcpToolFilter, ResponseMessagePhase, ResponsePrompt,
-            ResponseReasoning, ResponseShellEnvironment, ResponseShellOutputOutcome,
-            ResponseShellTool, ResponseStreamOptions, ResponseTextAnnotation, ResponseTool,
-            ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseCustomToolGrammarSyntax, ResponseCustomToolInputFormat,
+            ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
+            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseIncludable,
+            ResponseInput, ResponseInputContentPart, ResponseInputItem, ResponseInputText,
+            ResponseInstructions, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+            ResponseItemRole, ResponseItemStatus, ResponseItemType, ResponseMcpAllowedTools,
+            ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
+            ResponseMcpToolFilter, ResponseMessagePhase, ResponsePrompt, ResponseReasoning,
+            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
+            ResponseStreamOptions, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
+            ResponseWebSearchContentType, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -97,7 +98,10 @@ fn create_populates_output_text_helper() {
             user: Some(String::from("legacy-user")),
             tools: vec![
                 ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
-                    search_content_types: Vec::new(),
+                    search_content_types: vec![
+                        ResponseWebSearchContentType::Text,
+                        ResponseWebSearchContentType::Image,
+                    ],
                     search_context_size: Some(SearchContextSize::Low),
                     user_location: None,
                     extra: BTreeMap::new(),
@@ -163,7 +167,7 @@ fn create_populates_output_text_helper() {
                     format: Some(ResponseCustomToolInputFormat::Grammar(
                         ResponseCustomToolGrammar {
                             definition: String::from("start: WORD+"),
-                            syntax: String::from("lark"),
+                            syntax: ResponseCustomToolGrammarSyntax::Lark,
                             extra: BTreeMap::new(),
                         },
                     )),
@@ -209,6 +213,10 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["truncation"], "auto");
     assert_eq!(body["user"], "legacy-user");
     assert_eq!(body["tools"][0]["type"], "web_search_preview");
+    assert_eq!(
+        body["tools"][0]["search_content_types"],
+        json!(["text", "image"])
+    );
     assert_eq!(body["tools"][0]["search_context_size"], "low");
     assert_eq!(body["tools"][1]["type"], "code_interpreter");
     assert_eq!(body["tools"][1]["container"]["type"], "auto");

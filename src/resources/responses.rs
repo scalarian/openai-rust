@@ -1555,6 +1555,52 @@ response_string_literal_enum! {
     }
 }
 
+response_string_literal_enum! {
+    /// Content types supported by the Responses web-search preview tool.
+    pub enum ResponseWebSearchContentType {
+        Text => "text",
+        Image => "image",
+    }
+}
+
+response_string_literal_enum! {
+    /// Grammar syntax accepted by Responses custom tools.
+    pub enum ResponseCustomToolGrammarSyntax {
+        Lark => "lark",
+        Regex => "regex",
+    }
+}
+
+response_string_literal_enum! {
+    /// Execution side for Responses tool-search calls and tools.
+    pub enum ResponseToolExecution {
+        Server => "server",
+        Client => "client",
+    }
+}
+
+response_string_literal_enum! {
+    /// Environment names accepted by the computer-use preview tool.
+    pub enum ResponseComputerEnvironment {
+        Windows => "windows",
+        Mac => "mac",
+        Linux => "linux",
+        Ubuntu => "ubuntu",
+        Browser => "browser",
+    }
+}
+
+response_string_literal_enum! {
+    /// Mouse button names used by computer-use actions.
+    pub enum ResponseComputerButton {
+        Left => "left",
+        Right => "right",
+        Wheel => "wheel",
+        Back => "back",
+        Forward => "forward",
+    }
+}
+
 /// Role attached to message-like response and conversation items.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponseItemRole {
@@ -1964,7 +2010,7 @@ pub struct ResponseOutputItem {
     pub actions: Option<Vec<ResponseComputerAction>>,
     pub operation: Option<ResponseApplyPatchOperation>,
     pub environment: Option<ResponseItemEnvironment>,
-    pub execution: Option<String>,
+    pub execution: Option<ResponseToolExecution>,
     pub output: Option<ResponseItemOutput>,
     pub result: Option<String>,
     pub queries: Vec<String>,
@@ -2596,7 +2642,7 @@ impl<'de> Deserialize<'de> for ResponseComputerAction {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ResponseComputerClickAction {
-    pub button: String,
+    pub button: ResponseComputerButton,
     pub x: i64,
     pub y: i64,
     #[serde(default)]
@@ -2742,7 +2788,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     environment: Option<ResponseItemEnvironment>,
     #[serde(default)]
-    execution: Option<String>,
+    execution: Option<ResponseToolExecution>,
     #[serde(default)]
     output: Option<ResponseItemOutput>,
     #[serde(default)]
@@ -4348,7 +4394,7 @@ pub struct ResponseWebSearchTool {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseWebSearchPreviewTool {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub search_content_types: Vec<String>,
+    pub search_content_types: Vec<ResponseWebSearchContentType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_context_size: Option<SearchContextSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4381,7 +4427,7 @@ pub struct ResponseWebSearchUserLocation {
 pub struct ResponseComputerUsePreviewTool {
     pub display_height: u32,
     pub display_width: u32,
-    pub environment: String,
+    pub environment: ResponseComputerEnvironment,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -5014,7 +5060,7 @@ impl<'de> Deserialize<'de> for ResponseCustomToolInputFormat {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseCustomToolGrammar {
     pub definition: String,
-    pub syntax: String,
+    pub syntax: ResponseCustomToolGrammarSyntax,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -5034,7 +5080,7 @@ pub struct ResponseToolSearchTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub execution: Option<String>,
+    pub execution: Option<ResponseToolExecution>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<Value>,
     #[serde(flatten)]
