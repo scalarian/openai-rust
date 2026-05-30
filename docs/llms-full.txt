@@ -508,7 +508,7 @@ This note tracks the public surface that is already shipped in the crate.
 - `src/resources/containers.rs`
 - `src/resources/skills.rs`
 - `src/resources/videos.rs`
-- `src/realtime`
+- `src/realtime` — Realtime client-secret/calls REST helpers, persistent websocket connect, and upstream-shaped connection event helpers — `tests/realtime_connection_contract.rs`, `tests/realtime_audio_contract.rs`, `tests/realtime_decode_contract.rs`
 
 
 ---

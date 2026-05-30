@@ -293,3 +293,185 @@ async fn bootstrap_and_clean_close() {
     assert!(captured[0].contains("\"session.update\""));
     assert!(captured[1].contains("\"conversation.item.create\""));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn connection_convenience_resources_emit_upstream_client_events() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (captured_tx, captured_rx) = mpsc::channel();
+
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+
+        socket
+            .send(Message::Text(
+                json!({
+                    "type": "session.created",
+                    "event_id": "evt_created",
+                    "session": {
+                        "id": "sess_helpers",
+                        "type": "realtime",
+                        "model": "gpt-realtime-mini",
+                        "output_modalities": ["text"]
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+
+        for _ in 0..11 {
+            let message = socket.next().await.unwrap().unwrap();
+            let text = message.into_text().unwrap().to_string();
+            captured_tx.send(text).unwrap();
+        }
+
+        match socket.next().await.unwrap().unwrap() {
+            Message::Close(_) => {}
+            other => panic!("expected close frame, got {other:?}"),
+        }
+    });
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(format!("http://{addr}/v1"))
+        .build();
+
+    let mut connection = client
+        .realtime()
+        .connect(RealtimeConnectOptions {
+            model: Some(String::from("gpt-realtime-mini")),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let bootstrap = connection.next_event().await.unwrap().unwrap();
+    assert!(matches!(
+        bootstrap,
+        RealtimeServerEvent::SessionCreated { ref session, .. }
+            if session.id.as_deref() == Some("sess_helpers")
+    ));
+
+    connection
+        .session()
+        .update(
+            RealtimeSessionConfig {
+                instructions: Some(String::from("Be direct.")),
+                ..Default::default()
+            },
+            Some(String::from("evt_update")),
+        )
+        .await
+        .unwrap();
+    connection
+        .response()
+        .create(
+            Some(json!({
+                "modalities": ["text"],
+                "metadata": {"source": "test"}
+            })),
+            Some(String::from("evt_response")),
+        )
+        .await
+        .unwrap();
+    connection
+        .response()
+        .cancel(
+            Some(String::from("resp_cancel")),
+            Some(String::from("evt_cancel")),
+        )
+        .await
+        .unwrap();
+    connection
+        .input_audio_buffer()
+        .append("AQID", Some(String::from("evt_append")))
+        .await
+        .unwrap();
+    connection
+        .input_audio_buffer()
+        .commit(Some(String::from("evt_commit")))
+        .await
+        .unwrap();
+    connection
+        .input_audio_buffer()
+        .clear(Some(String::from("evt_input_clear")))
+        .await
+        .unwrap();
+    connection
+        .conversation()
+        .item()
+        .create(
+            RealtimeConversationItem::user_message(vec![
+                RealtimeConversationMessageContentPart::input_text("Hello"),
+            ]),
+            Some(String::from("root")),
+            Some(String::from("evt_item_create")),
+        )
+        .await
+        .unwrap();
+    connection
+        .conversation()
+        .item()
+        .truncate("item_assistant", 0, 240, Some(String::from("evt_truncate")))
+        .await
+        .unwrap();
+    connection
+        .conversation()
+        .item()
+        .retrieve("item_user", Some(String::from("evt_retrieve")))
+        .await
+        .unwrap();
+    connection
+        .conversation()
+        .item()
+        .delete("item_user", Some(String::from("evt_delete")))
+        .await
+        .unwrap();
+    connection
+        .output_audio_buffer()
+        .clear(Some(String::from("evt_output_clear")))
+        .await
+        .unwrap();
+    connection.close().await.unwrap();
+
+    server.await.unwrap();
+
+    let captured = captured_rx
+        .try_iter()
+        .map(|text| serde_json::from_str::<serde_json::Value>(&text).unwrap())
+        .collect::<Vec<_>>();
+    let event_types = captured
+        .iter()
+        .map(|event| event["type"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        event_types,
+        vec![
+            "session.update",
+            "response.create",
+            "response.cancel",
+            "input_audio_buffer.append",
+            "input_audio_buffer.commit",
+            "input_audio_buffer.clear",
+            "conversation.item.create",
+            "conversation.item.truncate",
+            "conversation.item.retrieve",
+            "conversation.item.delete",
+            "output_audio_buffer.clear",
+        ]
+    );
+    assert_eq!(captured[0]["event_id"], "evt_update");
+    assert_eq!(captured[0]["session"]["instructions"], "Be direct.");
+    assert_eq!(captured[1]["response"]["metadata"]["source"], "test");
+    assert_eq!(captured[2]["response_id"], "resp_cancel");
+    assert_eq!(captured[3]["audio"], "AQID");
+    assert_eq!(captured[6]["previous_item_id"], "root");
+    assert_eq!(captured[6]["item"]["content"][0]["text"], "Hello");
+    assert_eq!(captured[7]["item_id"], "item_assistant");
+    assert_eq!(captured[7]["content_index"], 0);
+    assert_eq!(captured[7]["audio_end_ms"], 240);
+    assert_eq!(captured[8]["item_id"], "item_user");
+    assert_eq!(captured[9]["item_id"], "item_user");
+}

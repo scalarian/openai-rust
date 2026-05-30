@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, collections::VecDeque, fmt::Write as _, sync::A
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
@@ -24,8 +24,8 @@ use crate::{
 };
 
 use super::events::{
-    RealtimeClientEvent, RealtimeOutputModality, RealtimeServerEvent, RealtimeSessionConfig,
-    RealtimeSessionType, decode_server_event_text,
+    RealtimeClientEvent, RealtimeConversationItem, RealtimeOutputModality, RealtimeServerEvent,
+    RealtimeSessionConfig, RealtimeSessionType, decode_server_event_text,
 };
 
 /// Realtime client-secret expiration settings.
@@ -575,14 +575,44 @@ impl RealtimeConnection {
         self.current_session.as_ref()
     }
 
+    /// Returns upstream-shaped session event helpers.
+    pub fn session(&mut self) -> RealtimeSessionResource<'_> {
+        RealtimeSessionResource { connection: self }
+    }
+
+    /// Returns upstream-shaped response event helpers.
+    pub fn response(&mut self) -> RealtimeResponseResource<'_> {
+        RealtimeResponseResource { connection: self }
+    }
+
+    /// Returns upstream-shaped input audio buffer event helpers.
+    pub fn input_audio_buffer(&mut self) -> RealtimeInputAudioBufferResource<'_> {
+        RealtimeInputAudioBufferResource { connection: self }
+    }
+
+    /// Returns upstream-shaped conversation event helpers.
+    pub fn conversation(&mut self) -> RealtimeConversationResource<'_> {
+        RealtimeConversationResource { connection: self }
+    }
+
+    /// Returns upstream-shaped output audio buffer event helpers.
+    pub fn output_audio_buffer(&mut self) -> RealtimeOutputAudioBufferResource<'_> {
+        RealtimeOutputAudioBufferResource { connection: self }
+    }
+
     pub async fn send(&mut self, event: RealtimeClientEvent) -> Result<(), OpenAIError> {
+        self.send_json_value(event.to_json_value()).await
+    }
+
+    /// Sends a caller-built Realtime client event JSON object.
+    pub async fn send_json_value(&mut self, event: Value) -> Result<(), OpenAIError> {
         if self.closed {
             return Err(OpenAIError::new(
                 ErrorKind::Validation,
                 "cannot send a Realtime event after the websocket has been closed",
             ));
         }
-        let payload = serde_json::to_string(&event.to_json_value()).map_err(|error| {
+        let payload = serde_json::to_string(&event).map_err(|error| {
             OpenAIError::new(
                 ErrorKind::Validation,
                 format!("failed to serialize Realtime client event: {error}"),
@@ -723,6 +753,200 @@ impl RealtimeConnection {
     }
 }
 
+/// Upstream-shaped Realtime session event helpers.
+pub struct RealtimeSessionResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl RealtimeSessionResource<'_> {
+    pub async fn update(
+        self,
+        session: RealtimeSessionConfig,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let mut object = event_object("session.update", event_id);
+        object.insert(
+            String::from("session"),
+            serde_json::to_value(session).map_err(|error| {
+                OpenAIError::new(
+                    ErrorKind::Validation,
+                    format!("failed to serialize Realtime session.update event: {error}"),
+                )
+                .with_source(error)
+            })?,
+        );
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+}
+
+/// Upstream-shaped Realtime response event helpers.
+pub struct RealtimeResponseResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl RealtimeResponseResource<'_> {
+    pub async fn create(
+        self,
+        response: Option<Value>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let mut object = event_object("response.create", event_id);
+        if let Some(response) = response {
+            object.insert(String::from("response"), response);
+        }
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+
+    pub async fn cancel(
+        self,
+        response_id: Option<String>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let mut object = event_object("response.cancel", event_id);
+        if let Some(response_id) = response_id {
+            object.insert(String::from("response_id"), Value::String(response_id));
+        }
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+}
+
+/// Upstream-shaped Realtime input audio buffer event helpers.
+pub struct RealtimeInputAudioBufferResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl RealtimeInputAudioBufferResource<'_> {
+    pub async fn clear(self, event_id: Option<String>) -> Result<(), OpenAIError> {
+        self.connection
+            .send_json_value(Value::Object(event_object(
+                "input_audio_buffer.clear",
+                event_id,
+            )))
+            .await
+    }
+
+    pub async fn commit(self, event_id: Option<String>) -> Result<(), OpenAIError> {
+        self.connection
+            .send_json_value(Value::Object(event_object(
+                "input_audio_buffer.commit",
+                event_id,
+            )))
+            .await
+    }
+
+    pub async fn append(
+        self,
+        audio: impl Into<String>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let mut object = event_object("input_audio_buffer.append", event_id);
+        object.insert(String::from("audio"), Value::String(audio.into()));
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+}
+
+/// Upstream-shaped Realtime conversation event helpers.
+pub struct RealtimeConversationResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl<'a> RealtimeConversationResource<'a> {
+    pub fn item(self) -> RealtimeConversationItemResource<'a> {
+        RealtimeConversationItemResource {
+            connection: self.connection,
+        }
+    }
+}
+
+/// Upstream-shaped Realtime conversation item event helpers.
+pub struct RealtimeConversationItemResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl RealtimeConversationItemResource<'_> {
+    pub async fn create(
+        self,
+        item: RealtimeConversationItem,
+        previous_item_id: Option<String>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let mut object = event_object("conversation.item.create", event_id);
+        object.insert(
+            String::from("item"),
+            serde_json::to_value(item).map_err(|error| {
+                OpenAIError::new(
+                    ErrorKind::Validation,
+                    format!("failed to serialize Realtime conversation.item.create event: {error}"),
+                )
+                .with_source(error)
+            })?,
+        );
+        if let Some(previous_item_id) = previous_item_id {
+            object.insert(
+                String::from("previous_item_id"),
+                Value::String(previous_item_id),
+            );
+        }
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+
+    pub async fn delete(
+        self,
+        item_id: impl Into<String>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let item_id = item_id.into();
+        validate_path_id("item_id", &item_id)?;
+        let mut object = event_object("conversation.item.delete", event_id);
+        object.insert(String::from("item_id"), Value::String(item_id));
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+
+    pub async fn truncate(
+        self,
+        item_id: impl Into<String>,
+        content_index: usize,
+        audio_end_ms: u64,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let item_id = item_id.into();
+        validate_path_id("item_id", &item_id)?;
+        let mut object = event_object("conversation.item.truncate", event_id);
+        object.insert(String::from("item_id"), Value::String(item_id));
+        object.insert(String::from("content_index"), Value::from(content_index));
+        object.insert(String::from("audio_end_ms"), Value::from(audio_end_ms));
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+
+    pub async fn retrieve(
+        self,
+        item_id: impl Into<String>,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let item_id = item_id.into();
+        validate_path_id("item_id", &item_id)?;
+        let mut object = event_object("conversation.item.retrieve", event_id);
+        object.insert(String::from("item_id"), Value::String(item_id));
+        self.connection.send_json_value(Value::Object(object)).await
+    }
+}
+
+/// Upstream-shaped Realtime output audio buffer event helpers.
+pub struct RealtimeOutputAudioBufferResource<'a> {
+    connection: &'a mut RealtimeConnection,
+}
+
+impl RealtimeOutputAudioBufferResource<'_> {
+    pub async fn clear(self, event_id: Option<String>) -> Result<(), OpenAIError> {
+        self.connection
+            .send_json_value(Value::Object(event_object(
+                "output_audio_buffer.clear",
+                event_id,
+            )))
+            .await
+    }
+}
+
 fn websocket_headers_from_config(config: &ClientConfig) -> BTreeMap<String, String> {
     let mut headers = BTreeMap::new();
     headers.insert(
@@ -743,6 +967,15 @@ fn normalize_ws_header_value(value: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
+}
+
+fn event_object(event_type: &str, event_id: Option<String>) -> Map<String, Value> {
+    let mut object = Map::new();
+    object.insert(String::from("type"), Value::String(event_type.to_string()));
+    if let Some(event_id) = event_id {
+        object.insert(String::from("event_id"), Value::String(event_id));
+    }
+    object
 }
 
 fn validate_path_id<'a>(label: &str, value: &'a str) -> Result<&'a str, OpenAIError> {
