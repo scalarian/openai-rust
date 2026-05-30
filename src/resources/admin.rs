@@ -248,7 +248,7 @@ impl OrganizationUsage {
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("costs", params)
+        get_query(&self.runtime, "/organization/costs", params)
     }
 
     pub fn embeddings(

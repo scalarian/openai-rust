@@ -10,7 +10,7 @@ use serde_json::json;
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..22)
+        (0..23)
             .map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string()))
             .collect(),
     )
@@ -39,6 +39,14 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
                 .push("start_time", 1_717_171_700)
                 .push("bucket_width", "1d")
                 .push_repeated("models", ["gpt-5.5", "gpt-5-mini"]),
+        )
+        .unwrap();
+    org.usage()
+        .costs(
+            AdminQueryParams::new()
+                .push("start_time", 1_717_171_700)
+                .push("bucket_width", "1d")
+                .push_repeated("group_by", ["project_id", "line_item"]),
         )
         .unwrap();
 
@@ -132,7 +140,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         )
         .unwrap();
 
-    let requests = server.captured_requests(22).unwrap();
+    let requests = server.captured_requests(23).unwrap();
     assert_eq!(requests[0].method, "POST");
     assert_eq!(requests[0].path, "/v1/organization/admin_api_keys");
     assert_eq!(requests[1].path, "/v1/organization/admin_api_keys/key_ops");
@@ -146,69 +154,73 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         requests[4].path,
         "/v1/organization/usage/completions?start_time=1717171700&bucket_width=1d&models=gpt-5.5&models=gpt-5-mini"
     );
-    assert_eq!(requests[5].path, "/v1/organization/users/user_admin/roles");
     assert_eq!(
-        requests[6].path,
+        requests[5].path,
+        "/v1/organization/costs?start_time=1717171700&bucket_width=1d&group_by=project_id&group_by=line_item"
+    );
+    assert_eq!(requests[6].path, "/v1/organization/users/user_admin/roles");
+    assert_eq!(
+        requests[7].path,
         "/v1/organization/groups/grp_eng/users?limit=100"
     );
-    assert_eq!(requests[7].path, "/v1/organization/certificates/activate");
-    assert_eq!(requests[8].path, "/v1/organization/projects");
-    assert_eq!(requests[9].path, "/v1/organization/projects/proj_research");
+    assert_eq!(requests[8].path, "/v1/organization/certificates/activate");
+    assert_eq!(requests[9].path, "/v1/organization/projects");
+    assert_eq!(requests[10].path, "/v1/organization/projects/proj_research");
     assert_eq!(
-        requests[10].path,
+        requests[11].path,
         "/v1/organization/projects?after=proj_prev&include_archived=true&limit=10"
     );
     assert_eq!(
-        requests[11].path,
+        requests[12].path,
         "/v1/organization/projects/proj_research/archive"
     );
     assert_eq!(
-        requests[12].path,
+        requests[13].path,
         "/v1/organization/projects/proj_research/users"
     );
     assert_eq!(
-        requests[13].path,
+        requests[14].path,
         "/v1/projects/proj_research/users/user_admin/roles/role_owner"
     );
-    assert_eq!(requests[14].path, "/v1/projects/proj_research/roles");
+    assert_eq!(requests[15].path, "/v1/projects/proj_research/roles");
     assert_eq!(
-        requests[15].path,
+        requests[16].path,
         "/v1/projects/proj_research/groups/grp_eng/roles?limit=3"
     );
     assert_eq!(
-        requests[16].path,
+        requests[17].path,
         "/v1/organization/projects/proj_research/api_keys/key_project"
     );
     assert_eq!(
-        requests[17].path,
+        requests[18].path,
         "/v1/organization/projects/proj_research/rate_limits/rl_gpt_5"
     );
     assert_eq!(
-        requests[18].path,
+        requests[19].path,
         "/v1/organization/projects/proj_research/model_permissions"
     );
     assert_eq!(
-        requests[19].path,
+        requests[20].path,
         "/v1/organization/projects/proj_research/hosted_tool_permissions"
     );
     assert_eq!(
-        requests[20].path,
+        requests[21].path,
         "/v1/organization/projects/proj_research/groups/grp_eng?group_type=group"
     );
     assert_eq!(
-        requests[21].path,
+        requests[22].path,
         "/v1/organization/projects/proj_research/certificates/deactivate"
     );
 
     let key_body: AdminValue = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(key_body["name"], json!("ops-key"));
-    let certificate_body: AdminValue = serde_json::from_slice(&requests[7].body).unwrap();
+    let certificate_body: AdminValue = serde_json::from_slice(&requests[8].body).unwrap();
     assert_eq!(certificate_body["certificate_ids"], json!(["cert_org"]));
-    let project_user_body: AdminValue = serde_json::from_slice(&requests[12].body).unwrap();
+    let project_user_body: AdminValue = serde_json::from_slice(&requests[13].body).unwrap();
     assert_eq!(project_user_body["role"], json!("owner"));
-    let project_role_body: AdminValue = serde_json::from_slice(&requests[14].body).unwrap();
+    let project_role_body: AdminValue = serde_json::from_slice(&requests[15].body).unwrap();
     assert_eq!(project_role_body["role_name"], json!("auditor"));
-    let rate_limit_body: AdminValue = serde_json::from_slice(&requests[17].body).unwrap();
+    let rate_limit_body: AdminValue = serde_json::from_slice(&requests[18].body).unwrap();
     assert_eq!(rate_limit_body["max_requests_per_1_minute"], json!(120));
 
     let blank_project = projects.retrieve(" ").unwrap_err();
