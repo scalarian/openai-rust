@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
-        ResponseConversation, ResponseConversationObject, ResponseFormatTextConfig, ResponsePrompt,
-        ResponseReasoning, ResponseToolChoice,
+        ResponseCodeInterpreterTool, ResponseConversation, ResponseConversationObject,
+        ResponseFormatTextConfig, ResponsePrompt, ResponseReasoning, ResponseTool,
+        ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -67,9 +68,17 @@ fn create_populates_output_text_helper() {
             top_p: Some(0.8),
             truncation: Some(String::from("auto")),
             user: Some(String::from("legacy-user")),
-            raw_tools: vec![
-                json!({"type": "web_search_preview", "search_context_size": "low"}),
-                json!({"type": "code_interpreter", "container": "auto"}),
+            tools: vec![
+                ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
+                    search_content_types: Vec::new(),
+                    search_context_size: Some(String::from("low")),
+                    user_location: None,
+                    extra: BTreeMap::new(),
+                }),
+                ResponseTool::CodeInterpreter(ResponseCodeInterpreterTool {
+                    container: json!("auto"),
+                    extra: BTreeMap::new(),
+                }),
             ],
             ..Default::default()
         })
@@ -174,7 +183,14 @@ fn create_populates_output_text_helper() {
     );
     assert_eq!(
         response.output().tools,
-        vec![json!({"type": "web_search_preview"})]
+        vec![ResponseTool::WebSearchPreview(
+            ResponseWebSearchPreviewTool {
+                search_content_types: Vec::new(),
+                search_context_size: None,
+                user_location: None,
+                extra: BTreeMap::new(),
+            }
+        )]
     );
     assert_eq!(response.output().top_logprobs, Some(2));
     assert_eq!(response.output().top_p, Some(0.8));

@@ -3,7 +3,7 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::responses::{
         FunctionTool, ParsedResponse, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-        ResponseStream, ResponseTextConfig,
+        ResponseStream, ResponseTextConfig, ResponseTool,
     },
 };
 use serde::Deserialize;
@@ -121,13 +121,13 @@ fn malformed_json_and_refusals_fail_at_completion_boundary() {
     let refusal_error = refusal_stream
         .parse_final::<LocationAnswer>(
             format,
-            &[FunctionTool {
+            &[ResponseTool::Function(FunctionTool {
                 name: String::from("weather"),
                 parameters: json!({"type": "object"}),
                 strict: Some(true),
                 description: None,
                 defer_loading: None,
-            }],
+            })],
         )
         .expect_err("refusal should remain explicit");
     assert_eq!(refusal_error.kind, ErrorKind::Parse);

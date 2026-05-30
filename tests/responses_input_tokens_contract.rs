@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
+
 use openai_rust::{
     OpenAI,
     resources::responses::{
-        FunctionTool, ResponseFormatTextConfig, ResponseInputTokensCountParams, ResponseTextConfig,
+        FunctionTool, ResponseFileSearchTool, ResponseFormatTextConfig,
+        ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
     },
 };
 use serde_json::{Value, json};
@@ -50,21 +53,26 @@ fn input_tokens_count_forwards_modalities_and_tools() {
                 format: Some(ResponseFormatTextConfig::Text),
                 verbosity: Some("low".into()),
             }),
-            tools: vec![FunctionTool {
-                name: "lookup_weather".into(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {"city": {"type": "string"}},
-                    "required": ["city"]
+            tools: vec![
+                ResponseTool::Function(FunctionTool {
+                    name: "lookup_weather".into(),
+                    parameters: json!({
+                        "type": "object",
+                        "properties": {"city": {"type": "string"}},
+                        "required": ["city"]
+                    }),
+                    strict: Some(true),
+                    description: Some("Weather lookup".into()),
+                    defer_loading: None,
                 }),
-                strict: Some(true),
-                description: Some("Weather lookup".into()),
-                defer_loading: None,
-            }],
-            raw_tools: vec![json!({
-                "type": "file_search",
-                "vector_store_ids": ["vs_123"]
-            })],
+                ResponseTool::FileSearch(ResponseFileSearchTool {
+                    vector_store_ids: vec![String::from("vs_123")],
+                    filters: None,
+                    max_num_results: None,
+                    ranking_options: None,
+                    extra: BTreeMap::new(),
+                }),
+            ],
             truncation: Some("auto".into()),
             ..Default::default()
         })

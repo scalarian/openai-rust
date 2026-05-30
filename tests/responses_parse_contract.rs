@@ -2,7 +2,7 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
         FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-        ResponseParseParams, ResponseTextConfig,
+        ResponseParseParams, ResponseTextConfig, ResponseTool,
     },
 };
 use serde::Deserialize;
@@ -59,20 +59,20 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
                 )),
                 verbosity: None,
             }),
-            tools: vec![FunctionTool {
+            tools: vec![ResponseTool::Function(FunctionTool {
                 name: "lookup_box_score".into(),
                 parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "game_id": {"type": "integer"}
-                    },
-                    "required": ["game_id"],
-                    "additionalProperties": false
+                        "type": "object",
+                        "properties": {
+                            "game_id": {"type": "integer"}
+                        },
+                        "required": ["game_id"],
+                        "additionalProperties": false
                 }),
                 strict: Some(true),
                 description: Some("Look up the game".into()),
                 defer_loading: None,
-            }],
+            })],
             top_p: Some(0.9),
             ..Default::default()
         })

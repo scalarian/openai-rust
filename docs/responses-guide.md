@@ -35,7 +35,7 @@ Run the structured-output example:
 cargo run --example structured_outputs
 ```
 
-The example builds `ResponseParseParams`, `ResponseTextConfig`, `ResponseFormatTextConfig`, and `FunctionTool` with the public exports shipped by `src/resources/responses.rs`.
+The example builds `ResponseParseParams`, `ResponseTextConfig`, `ResponseFormatTextConfig`, `ResponseTool`, and `FunctionTool` with the public exports shipped by `src/resources/responses.rs`.
 
 ## Response metadata
 

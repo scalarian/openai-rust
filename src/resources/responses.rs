@@ -601,7 +601,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub tools: Vec<FunctionTool>,
+    pub tools: Vec<ResponseTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
     /// interpreter, image generation, shell, or custom tool payloads.
     #[serde(skip)]
@@ -699,7 +699,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub tools: Vec<FunctionTool>,
+    pub tools: Vec<ResponseTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
     /// interpreter, image generation, shell, or custom tool payloads.
     #[serde(skip)]
@@ -827,7 +827,7 @@ pub struct ResponseInputTokensCountParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub tools: Vec<FunctionTool>,
+    pub tools: Vec<ResponseTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
     /// interpreter, image generation, shell, or custom tool payloads.
     #[serde(skip)]
@@ -1012,7 +1012,7 @@ pub struct Response {
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<ResponseToolChoice>,
-    pub tools: Vec<Value>,
+    pub tools: Vec<ResponseTool>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
     pub truncation: Option<String>,
@@ -1366,7 +1366,7 @@ pub struct ParsedResponse<T> {
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<ResponseToolChoice>,
-    pub tools: Vec<Value>,
+    pub tools: Vec<ResponseTool>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
     pub truncation: Option<String>,
@@ -1692,7 +1692,7 @@ impl ResponseStream {
     pub fn parse_final<T>(
         &mut self,
         text: Option<ResponseTextConfig>,
-        tools: &[FunctionTool],
+        tools: &[ResponseTool],
     ) -> Result<ParsedResponse<T>, OpenAIError>
     where
         T: DeserializeOwned,
@@ -2377,12 +2377,16 @@ fn remove_optional_string(
 }
 
 /// Function tool definition for non-stream parse and input-token helpers.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FunctionTool {
     pub name: String,
+    #[serde(default)]
     pub parameters: Value,
+    #[serde(default)]
     pub strict: Option<bool>,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub defer_loading: Option<bool>,
 }
 
@@ -2414,6 +2418,398 @@ impl Serialize for FunctionTool {
             defer_loading: self.defer_loading,
         }
         .serialize(serializer)
+    }
+}
+
+/// Tool definition for the Responses API.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseTool {
+    Function(FunctionTool),
+    FileSearch(ResponseFileSearchTool),
+    WebSearch(ResponseWebSearchTool),
+    WebSearch20250826(ResponseWebSearchTool),
+    WebSearchPreview(ResponseWebSearchPreviewTool),
+    WebSearchPreview20250311(ResponseWebSearchPreviewTool),
+    Computer,
+    ComputerUsePreview(ResponseComputerUsePreviewTool),
+    Mcp(ResponseMcpTool),
+    CodeInterpreter(ResponseCodeInterpreterTool),
+    ImageGeneration(ResponseImageGenerationTool),
+    LocalShell,
+    Shell(ResponseShellTool),
+    Custom(ResponseCustomTool),
+    Namespace(ResponseNamespaceTool),
+    ToolSearch(ResponseToolSearchTool),
+    ApplyPatch,
+    Other {
+        tool_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+impl ResponseTool {
+    pub fn as_function(&self) -> Option<&FunctionTool> {
+        match self {
+            Self::Function(tool) => Some(tool),
+            _ => None,
+        }
+    }
+}
+
+impl From<FunctionTool> for ResponseTool {
+    fn from(value: FunctionTool) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl Serialize for ResponseTool {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Function(tool) => serialize_response_tool(serializer, "function", tool),
+            Self::FileSearch(tool) => serialize_response_tool(serializer, "file_search", tool),
+            Self::WebSearch(tool) => serialize_response_tool(serializer, "web_search", tool),
+            Self::WebSearch20250826(tool) => {
+                serialize_response_tool(serializer, "web_search_2025_08_26", tool)
+            }
+            Self::WebSearchPreview(tool) => {
+                serialize_response_tool(serializer, "web_search_preview", tool)
+            }
+            Self::WebSearchPreview20250311(tool) => {
+                serialize_response_tool(serializer, "web_search_preview_2025_03_11", tool)
+            }
+            Self::Computer => serialize_response_tool_unit(serializer, "computer"),
+            Self::ComputerUsePreview(tool) => {
+                serialize_response_tool(serializer, "computer_use_preview", tool)
+            }
+            Self::Mcp(tool) => serialize_response_tool(serializer, "mcp", tool),
+            Self::CodeInterpreter(tool) => {
+                serialize_response_tool(serializer, "code_interpreter", tool)
+            }
+            Self::ImageGeneration(tool) => {
+                serialize_response_tool(serializer, "image_generation", tool)
+            }
+            Self::LocalShell => serialize_response_tool_unit(serializer, "local_shell"),
+            Self::Shell(tool) => serialize_response_tool(serializer, "shell", tool),
+            Self::Custom(tool) => serialize_response_tool(serializer, "custom", tool),
+            Self::Namespace(tool) => serialize_response_tool(serializer, "namespace", tool),
+            Self::ToolSearch(tool) => serialize_response_tool(serializer, "tool_search", tool),
+            Self::ApplyPatch => serialize_response_tool_unit(serializer, "apply_patch"),
+            Self::Other { tool_type, extra } => {
+                let mut object = serde_json::Map::new();
+                object.insert(String::from("type"), Value::String(tool_type.clone()));
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                Value::Object(object).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseTool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Err(serde::de::Error::custom(
+                "response tool must be a JSON object",
+            ));
+        };
+        let tool_type = object
+            .remove("type")
+            .and_then(|value| match value {
+                Value::String(value) => Some(value),
+                _ => None,
+            })
+            .ok_or_else(|| serde::de::Error::custom("response tool object missing `type`"))?;
+        deserialize_response_tool_object(tool_type, object).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseFileSearchTool {
+    #[serde(default)]
+    pub vector_store_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_num_results: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranking_options: Option<ResponseFileSearchRankingOptions>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseFileSearchRankingOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hybrid_search: Option<ResponseFileSearchHybridSearch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score_threshold: Option<f64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseFileSearchHybridSearch {
+    pub embedding_weight: f64,
+    pub text_weight: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseWebSearchTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<ResponseWebSearchFilters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_context_size: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<ResponseWebSearchUserLocation>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseWebSearchPreviewTool {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub search_content_types: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_context_size: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<ResponseWebSearchUserLocation>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseWebSearchFilters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_domains: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseWebSearchUserLocation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseComputerUsePreviewTool {
+    pub display_height: u32,
+    pub display_width: u32,
+    pub environment: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseMcpTool {
+    pub server_label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connector_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<BTreeMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require_approval: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseCodeInterpreterTool {
+    pub container: Value,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseImageGenerationTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_fidelity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_image_mask: Option<ResponseImageGenerationInputImageMask>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moderation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_compression: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partial_images: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseImageGenerationInputImageMask {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseShellTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseCustomTool {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseNamespaceTool {
+    pub description: String,
+    pub name: String,
+    #[serde(default)]
+    pub tools: Vec<ResponseTool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseToolSearchTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn serialize_response_tool<S, T>(
+    serializer: S,
+    tool_type: &'static str,
+    tool: &T,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    let mut value = serde_json::to_value(tool).map_err(serde::ser::Error::custom)?;
+    let object = value.as_object_mut().ok_or_else(|| {
+        serde::ser::Error::custom("response tool must serialize to a JSON object")
+    })?;
+    object.insert(String::from("type"), Value::String(String::from(tool_type)));
+    value.serialize(serializer)
+}
+
+fn serialize_response_tool_unit<S>(
+    serializer: S,
+    tool_type: &'static str,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut object = serde_json::Map::new();
+    object.insert(String::from("type"), Value::String(String::from(tool_type)));
+    Value::Object(object).serialize(serializer)
+}
+
+fn deserialize_response_tool_object(
+    tool_type: String,
+    object: serde_json::Map<String, Value>,
+) -> Result<ResponseTool, String> {
+    let value = Value::Object(object);
+    match tool_type.as_str() {
+        "function" => serde_json::from_value(value)
+            .map(ResponseTool::Function)
+            .map_err(|error| format!("invalid function response tool: {error}")),
+        "file_search" => serde_json::from_value(value)
+            .map(ResponseTool::FileSearch)
+            .map_err(|error| format!("invalid file_search response tool: {error}")),
+        "web_search" => serde_json::from_value(value)
+            .map(ResponseTool::WebSearch)
+            .map_err(|error| format!("invalid web_search response tool: {error}")),
+        "web_search_2025_08_26" => serde_json::from_value(value)
+            .map(ResponseTool::WebSearch20250826)
+            .map_err(|error| format!("invalid web_search_2025_08_26 response tool: {error}")),
+        "web_search_preview" => serde_json::from_value(value)
+            .map(ResponseTool::WebSearchPreview)
+            .map_err(|error| format!("invalid web_search_preview response tool: {error}")),
+        "web_search_preview_2025_03_11" => serde_json::from_value(value)
+            .map(ResponseTool::WebSearchPreview20250311)
+            .map_err(|error| {
+                format!("invalid web_search_preview_2025_03_11 response tool: {error}")
+            }),
+        "computer" => Ok(ResponseTool::Computer),
+        "computer_use_preview" => serde_json::from_value(value)
+            .map(ResponseTool::ComputerUsePreview)
+            .map_err(|error| format!("invalid computer_use_preview response tool: {error}")),
+        "mcp" => serde_json::from_value(value)
+            .map(ResponseTool::Mcp)
+            .map_err(|error| format!("invalid mcp response tool: {error}")),
+        "code_interpreter" => serde_json::from_value(value)
+            .map(ResponseTool::CodeInterpreter)
+            .map_err(|error| format!("invalid code_interpreter response tool: {error}")),
+        "image_generation" => serde_json::from_value(value)
+            .map(ResponseTool::ImageGeneration)
+            .map_err(|error| format!("invalid image_generation response tool: {error}")),
+        "local_shell" => Ok(ResponseTool::LocalShell),
+        "shell" => serde_json::from_value(value)
+            .map(ResponseTool::Shell)
+            .map_err(|error| format!("invalid shell response tool: {error}")),
+        "custom" => serde_json::from_value(value)
+            .map(ResponseTool::Custom)
+            .map_err(|error| format!("invalid custom response tool: {error}")),
+        "namespace" => serde_json::from_value(value)
+            .map(ResponseTool::Namespace)
+            .map_err(|error| format!("invalid namespace response tool: {error}")),
+        "tool_search" => serde_json::from_value(value)
+            .map(ResponseTool::ToolSearch)
+            .map_err(|error| format!("invalid tool_search response tool: {error}")),
+        "apply_patch" => Ok(ResponseTool::ApplyPatch),
+        _ => match value {
+            Value::Object(object) => Ok(ResponseTool::Other {
+                tool_type,
+                extra: object.into_iter().collect(),
+            }),
+            _ => unreachable!("response tool helper always receives an object"),
+        },
     }
 }
 
@@ -2465,7 +2861,7 @@ struct WireResponse {
     #[serde(default)]
     tool_choice: Option<ResponseToolChoice>,
     #[serde(default)]
-    tools: Vec<Value>,
+    tools: Vec<ResponseTool>,
     #[serde(default)]
     top_logprobs: Option<u64>,
     #[serde(default)]
@@ -3654,7 +4050,7 @@ fn map_response(response: ApiResponse<WireResponse>) -> ApiResponse<Response> {
 fn parse_response_output<T>(
     mut response: Response,
     text_format: Option<ResponseFormatTextConfig>,
-    tools: &[FunctionTool],
+    tools: &[ResponseTool],
 ) -> Result<ParsedResponse<T>, OpenAIError>
 where
     T: DeserializeOwned,
@@ -3688,7 +4084,11 @@ where
         let Some(arguments) = item.arguments.as_deref() else {
             continue;
         };
-        let Some(tool) = tools.iter().find(|tool| tool.name == name) else {
+        let Some(tool) = tools
+            .iter()
+            .filter_map(ResponseTool::as_function)
+            .find(|tool| tool.name == name)
+        else {
             continue;
         };
         if tool.strict == Some(true) {

@@ -1,6 +1,6 @@
 use openai_rust::{
     core::metadata::ResponseMetadata,
-    resources::responses::{FunctionTool, ResponseStream, ResponseStreamEvent},
+    resources::responses::{FunctionTool, ResponseStream, ResponseStreamEvent, ResponseTool},
 };
 use serde_json::json;
 
@@ -107,13 +107,13 @@ fn function_and_custom_tool_inputs_accumulate_until_completion() {
     let parsed = stream
         .parse_final::<serde_json::Value>(
             None,
-            &[FunctionTool {
+            &[ResponseTool::Function(FunctionTool {
                 name: String::from("weather"),
                 parameters: json!({"type": "object"}),
                 strict: Some(true),
                 description: None,
                 defer_loading: None,
-            }],
+            })],
         )
         .expect("final parse");
     assert_eq!(

@@ -1,6 +1,6 @@
 use openai_rust::resources::responses::{
     FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-    ResponseParseParams, ResponseTextConfig,
+    ResponseParseParams, ResponseTextConfig, ResponseTool,
 };
 use serde_json::json;
 
@@ -24,7 +24,7 @@ fn main() {
             )),
             verbosity: None,
         }),
-        tools: vec![FunctionTool {
+        tools: vec![ResponseTool::Function(FunctionTool {
             name: "lookup_language".into(),
             parameters: json!({
                 "type": "object",
@@ -35,7 +35,7 @@ fn main() {
             strict: Some(true),
             description: Some("Example strict tool".into()),
             defer_loading: None,
-        }],
+        })],
         ..Default::default()
     };
 
