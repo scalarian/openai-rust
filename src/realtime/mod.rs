@@ -4,6 +4,7 @@ pub mod client;
 pub mod events;
 pub mod state;
 
+pub use crate::resources::responses::ResponsePrompt;
 pub use client::{
     Calls as RealtimeCalls, PreparedRealtimeWsTarget, Realtime, RealtimeAuth,
     RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,

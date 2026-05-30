@@ -26,6 +26,7 @@ use crate::{
     },
     error::{ApiErrorKind, ErrorKind},
     helpers::multipart::MultipartBuilder,
+    resources::responses::ResponsePrompt,
 };
 
 use super::events::{
@@ -235,7 +236,7 @@ pub struct RealtimeCallAcceptParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<RealtimeReasoning>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

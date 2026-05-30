@@ -8,6 +8,7 @@ use openai_rust::{
         RealtimeConversationMessageContentPart, RealtimeMaxOutputTokens, RealtimeOutputModality,
         RealtimeReasoning, RealtimeReasoningEffort, RealtimeResponseCreateParams,
         RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice,
+        ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -526,6 +527,11 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 metadata: Some(json!({"source": "test"})),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                prompt: Some(ResponsePrompt {
+                    id: String::from("pmpt_response"),
+                    variables: Some([(String::from("topic"), json!("response"))].into()),
+                    ..Default::default()
+                }),
                 reasoning: Some(RealtimeReasoning {
                     effort: Some(RealtimeReasoningEffort::Minimal),
                     ..Default::default()
@@ -631,6 +637,11 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         json!(["text"])
     );
     assert_eq!(captured[1]["response"]["max_output_tokens"], "inf");
+    assert_eq!(captured[1]["response"]["prompt"]["id"], "pmpt_response");
+    assert_eq!(
+        captured[1]["response"]["prompt"]["variables"]["topic"],
+        "response"
+    );
     assert_eq!(captured[1]["response"]["reasoning"]["effort"], "minimal");
     assert_eq!(captured[1]["response"]["tool_choice"]["type"], "function");
     assert_eq!(

@@ -7,7 +7,7 @@ use openai_rust::{
         RealtimeReasoningEffort, RealtimeSessionConfig, RealtimeSessionTTL,
         RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice, RealtimeTracing,
         RealtimeTracingConfiguration, RealtimeTruncation, RealtimeTruncationRetentionRatio,
-        RealtimeTruncationTokenLimits,
+        RealtimeTruncationTokenLimits, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -31,6 +31,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "model": "gpt-realtime-mini",
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
+                    "prompt": {"id": "pmpt_server", "version": "2", "variables": {"topic": "parity"}},
                     "reasoning": {"effort": "xhigh"},
                     "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
                     "tracing": {"group_id": "grp_1", "workflow_name": "wf", "metadata": {"env": "test"}},
@@ -70,6 +71,12 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
+                prompt: Some(ResponsePrompt {
+                    id: String::from("pmpt_client_secret"),
+                    variables: Some([(String::from("topic"), json!("parity"))].into()),
+                    version: Some(String::from("1")),
+                    ..Default::default()
+                }),
                 reasoning: Some(RealtimeReasoning {
                     effort: Some(RealtimeReasoningEffort::Medium),
                     ..Default::default()
@@ -94,6 +101,15 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.max_output_tokens,
         Some(RealtimeMaxOutputTokens::Inf)
+    );
+    assert_eq!(
+        secret.output().session.prompt,
+        Some(ResponsePrompt {
+            id: String::from("pmpt_server"),
+            variables: Some([(String::from("topic"), json!("parity"))].into()),
+            version: Some(String::from("2")),
+            ..Default::default()
+        })
     );
     assert_eq!(
         secret.output().session.reasoning,
@@ -146,6 +162,11 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
+                prompt: Some(ResponsePrompt {
+                    id: String::from("pmpt_call_create"),
+                    version: Some(String::from("3")),
+                    ..Default::default()
+                }),
                 reasoning: Some(RealtimeReasoning {
                     effort: Some(RealtimeReasoningEffort::Low),
                     ..Default::default()
@@ -187,6 +208,11 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 instructions: Some(String::from("Stay concise.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
+                prompt: Some(ResponsePrompt {
+                    id: String::from("pmpt_accept"),
+                    variables: Some([(String::from("topic"), json!("calls"))].into()),
+                    ..Default::default()
+                }),
                 reasoning: Some(RealtimeReasoning {
                     effort: Some(RealtimeReasoningEffort::High),
                     ..Default::default()
@@ -242,6 +268,15 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
     assert_eq!(
+        client_secret_body["session"]["prompt"]["id"],
+        "pmpt_client_secret"
+    );
+    assert_eq!(client_secret_body["session"]["prompt"]["version"], "1");
+    assert_eq!(
+        client_secret_body["session"]["prompt"]["variables"]["topic"],
+        "parity"
+    );
+    assert_eq!(
         client_secret_body["session"]["reasoning"]["effort"],
         "medium"
     );
@@ -286,6 +321,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(multipart_session["type"], "realtime");
     assert_eq!(multipart_session["max_output_tokens"], "inf");
     assert_eq!(multipart_session["parallel_tool_calls"], true);
+    assert_eq!(multipart_session["prompt"]["id"], "pmpt_call_create");
+    assert_eq!(multipart_session["prompt"]["version"], "3");
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
     assert_eq!(multipart_session["tool_choice"]["type"], "function");
     assert_eq!(multipart_session["tool_choice"]["name"], "lookup_weather");
@@ -312,6 +349,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(accept_body["max_output_tokens"], 128);
+    assert_eq!(accept_body["prompt"]["id"], "pmpt_accept");
+    assert_eq!(accept_body["prompt"]["variables"]["topic"], "calls");
     assert_eq!(accept_body["tool_choice"]["type"], "mcp");
     assert_eq!(accept_body["tool_choice"]["server_label"], "remote");
     assert!(accept_body["tool_choice"].get("name").is_none());

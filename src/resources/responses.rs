@@ -1349,7 +1349,7 @@ pub struct ResponseStreamOptions {
 }
 
 /// Reference to a reusable prompt template and its variables.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ResponsePrompt {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]

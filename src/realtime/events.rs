@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 
-use crate::{OpenAIError, error::ErrorKind};
+use crate::{OpenAIError, error::ErrorKind, resources::responses::ResponsePrompt};
 
 macro_rules! realtime_string_literal_enum {
     (
@@ -604,7 +604,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<RealtimeReasoning>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -744,7 +744,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<RealtimeReasoning>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -754,6 +754,7 @@ pub struct RealtimeResponseCreateParams {
 }
 
 /// Typed client event helpers for the text/bootstrap path.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RealtimeClientEvent {
     SessionUpdate {
