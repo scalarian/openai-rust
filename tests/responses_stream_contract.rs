@@ -359,12 +359,12 @@ fn newer_response_stream_events_are_typed_and_update_snapshots() {
         .current_response()
         .expect("snapshot after new events");
     assert_eq!(
-        snapshot.output[0].extra.get("summary"),
-        Some(&json!([{"type": "summary_text", "text": "Plan done"}]))
+        snapshot.output[0].summary,
+        vec![json!({"type": "summary_text", "text": "Plan done"})]
     );
     assert_eq!(
-        snapshot.output[1].content[0].extra.get("annotations"),
-        Some(&json!([{"type": "url_citation", "url": "https://example.com"}]))
+        snapshot.output[1].content[0].annotations,
+        vec![json!({"type": "url_citation", "url": "https://example.com"})]
     );
     assert_eq!(snapshot.output[2].status.as_deref(), Some("completed"));
 

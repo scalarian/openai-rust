@@ -290,8 +290,114 @@ fn tool_and_refusal_fields_round_trip() {
             function_call.arguments.as_deref(),
             Some(r#"{"city":"Paris"}"#)
         );
+        assert_eq!(
+            function_call.arguments_json,
+            Some(json!(r#"{"city":"Paris"}"#))
+        );
         assert_eq!(function_call.call_id.as_deref(), Some("call_123"));
         assert_eq!(function_call.status.as_deref(), Some("completed"));
+        assert_eq!(function_call.namespace.as_deref(), Some("weather"));
+        assert_eq!(function_call.created_by.as_deref(), Some("assistant"));
+
+        let text_message = response
+            .output
+            .iter()
+            .find(|item| item.id.as_deref() == Some("msg_text"))
+            .expect("text message");
+        assert_eq!(text_message.status.as_deref(), Some("completed"));
+        assert_eq!(text_message.phase.as_deref(), Some("final_answer"));
+        assert_eq!(
+            text_message.content[0].annotations,
+            vec![json!({
+                "type": "url_citation",
+                "start_index": 0,
+                "end_index": 5,
+                "title": "Weather",
+                "url": "https://example.com/weather"
+            })]
+        );
+        assert_eq!(
+            text_message.content[0].logprobs,
+            Some(vec![json!({
+                "token": "Hello",
+                "bytes": [72, 101, 108, 108, 111],
+                "logprob": -0.01,
+                "top_logprobs": []
+            })])
+        );
+
+        let reasoning = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "reasoning")
+            .expect("reasoning item");
+        assert_eq!(
+            reasoning.summary,
+            vec![json!({"type": "summary_text", "text": "Checked weather"})]
+        );
+        assert_eq!(
+            reasoning.encrypted_content.as_deref(),
+            Some("enc_reasoning")
+        );
+        assert_eq!(reasoning.content[0].content_type, "reasoning_text");
+
+        let tool_search = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "tool_search_call")
+            .expect("tool_search_call item");
+        assert_eq!(tool_search.execution.as_deref(), Some("server"));
+        assert_eq!(
+            tool_search.arguments_json,
+            Some(json!({"query": "weather"}))
+        );
+        assert_eq!(
+            tool_search.arguments.as_deref(),
+            Some(r#"{"query":"weather"}"#)
+        );
+
+        let file_search = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "file_search_call")
+            .expect("file_search_call item");
+        assert_eq!(file_search.queries, vec![String::from("docs")]);
+        assert_eq!(
+            file_search.results,
+            Some(vec![
+                json!({"file_id": "file_1", "filename": "guide.md", "score": 0.9})
+            ])
+        );
+
+        let code_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "code_interpreter_call")
+            .expect("code_interpreter_call item");
+        assert_eq!(code_call.container_id.as_deref(), Some("cntr_123"));
+        assert_eq!(
+            code_call.outputs,
+            Some(vec![json!({"type": "logs", "logs": "ok"})])
+        );
+
+        let mcp_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "mcp_call")
+            .expect("mcp_call item");
+        assert_eq!(mcp_call.server_label.as_deref(), Some("weather_mcp"));
+        assert_eq!(
+            mcp_call.approval_request_id.as_deref(),
+            Some("approval_123")
+        );
+        assert_eq!(mcp_call.output, Some(json!("sunny")));
+
+        let image_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "image_generation_call")
+            .expect("image_generation_call item");
+        assert_eq!(image_call.result.as_deref(), Some("aW1n"));
 
         let refusal_message = response
             .output
@@ -595,10 +701,36 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                 "id": "msg_text",
                 "type": "message",
                 "role": "assistant",
+                "status": "completed",
+                "phase": "final_answer",
                 "content": [
-                    {"type": "output_text", "text": "Hello "},
+                    {
+                        "type": "output_text",
+                        "text": "Hello ",
+                        "annotations": [{
+                            "type": "url_citation",
+                            "start_index": 0,
+                            "end_index": 5,
+                            "title": "Weather",
+                            "url": "https://example.com/weather"
+                        }],
+                        "logprobs": [{
+                            "token": "Hello",
+                            "bytes": [72, 101, 108, 108, 111],
+                            "logprob": -0.01,
+                            "top_logprobs": []
+                        }]
+                    },
                     {"type": "output_text", "text": "world!"}
                 ]
+            },
+            {
+                "id": "reasoning_1",
+                "type": "reasoning",
+                "summary": [{"type": "summary_text", "text": "Checked weather"}],
+                "content": [{"type": "reasoning_text", "text": "Need weather lookup"}],
+                "encrypted_content": "enc_reasoning",
+                "status": "completed"
             },
             {
                 "id": "fc_123",
@@ -606,6 +738,46 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                 "name": "lookup_weather",
                 "arguments": "{\"city\":\"Paris\"}",
                 "call_id": "call_123",
+                "status": "completed",
+                "namespace": "weather",
+                "created_by": "assistant"
+            },
+            {
+                "id": "fs_123",
+                "type": "file_search_call",
+                "queries": ["docs"],
+                "status": "completed",
+                "results": [{"file_id": "file_1", "filename": "guide.md", "score": 0.9}]
+            },
+            {
+                "id": "ci_123",
+                "type": "code_interpreter_call",
+                "container_id": "cntr_123",
+                "code": "print('ok')",
+                "outputs": [{"type": "logs", "logs": "ok"}],
+                "status": "completed"
+            },
+            {
+                "id": "mcp_123",
+                "type": "mcp_call",
+                "arguments": "{\"city\":\"Paris\"}",
+                "name": "weather",
+                "server_label": "weather_mcp",
+                "approval_request_id": "approval_123",
+                "output": "sunny",
+                "status": "completed"
+            },
+            {
+                "id": "tool_search_123",
+                "type": "tool_search_call",
+                "arguments": {"query": "weather"},
+                "execution": "server",
+                "status": "completed"
+            },
+            {
+                "id": "image_123",
+                "type": "image_generation_call",
+                "result": "aW1n",
                 "status": "completed"
             },
             {

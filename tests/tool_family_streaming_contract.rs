@@ -139,8 +139,8 @@ fn tool_family_events_reconcile_with_final_state() {
     let final_response = stream.final_response().expect("final response");
     assert_eq!(final_response.output[2].code.as_deref(), Some("print(1)"));
     assert_eq!(
-        final_response.output[1].extra.get("action"),
-        Some(&json!({
+        final_response.output[1].action,
+        Some(json!({
             "type": "search",
             "query": "weather",
             "sources": [{"type": "url", "url": "https://example.com"}]

@@ -988,32 +988,196 @@ pub struct CompactedResponse {
 }
 
 /// Common item shape used by response and compaction payloads.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResponseOutputItem {
-    #[serde(default)]
     pub id: Option<String>,
-    #[serde(rename = "type")]
     pub item_type: String,
-    #[serde(default)]
     pub role: Option<String>,
-    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default)]
     pub arguments: Option<String>,
-    #[serde(default)]
+    /// Raw `arguments` payload. Most tool calls use JSON strings, while
+    /// `tool_search_call` returns an object.
+    pub arguments_json: Option<Value>,
     pub input: Option<String>,
-    #[serde(default)]
     pub code: Option<String>,
-    #[serde(default)]
     pub call_id: Option<String>,
-    #[serde(default)]
     pub status: Option<String>,
-    #[serde(default)]
+    pub phase: Option<String>,
+    pub namespace: Option<String>,
+    pub created_by: Option<String>,
+    pub action: Option<Value>,
+    pub actions: Option<Value>,
+    pub operation: Option<Value>,
+    pub environment: Option<Value>,
+    pub execution: Option<String>,
+    pub output: Option<Value>,
+    pub result: Option<String>,
+    pub queries: Vec<String>,
+    pub results: Option<Vec<Value>>,
+    pub server_label: Option<String>,
+    pub approval_request_id: Option<String>,
+    pub approve: Option<bool>,
+    pub reason: Option<String>,
+    pub error: Option<String>,
+    pub tools: Vec<Value>,
+    pub summary: Vec<Value>,
+    pub encrypted_content: Option<String>,
+    pub container_id: Option<String>,
+    pub outputs: Option<Vec<Value>>,
+    pub max_output_length: Option<u64>,
+    pub pending_safety_checks: Vec<Value>,
+    pub acknowledged_safety_checks: Vec<Value>,
     pub content: Vec<ResponseContentPart>,
-    #[serde(skip)]
     pub parsed_arguments: Option<Value>,
-    #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl<'de> Deserialize<'de> for ResponseOutputItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = WireResponseOutputItem::deserialize(deserializer)?;
+        Ok(value.into())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+struct WireResponseOutputItem {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(rename = "type")]
+    item_type: String,
+    #[serde(default)]
+    role: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<Value>,
+    #[serde(default)]
+    input: Option<String>,
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    call_id: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    phase: Option<String>,
+    #[serde(default)]
+    namespace: Option<String>,
+    #[serde(default)]
+    created_by: Option<String>,
+    #[serde(default)]
+    action: Option<Value>,
+    #[serde(default)]
+    actions: Option<Value>,
+    #[serde(default)]
+    operation: Option<Value>,
+    #[serde(default)]
+    environment: Option<Value>,
+    #[serde(default)]
+    execution: Option<String>,
+    #[serde(default)]
+    output: Option<Value>,
+    #[serde(default)]
+    result: Option<String>,
+    #[serde(default)]
+    queries: Vec<String>,
+    #[serde(default)]
+    results: Option<Vec<Value>>,
+    #[serde(default)]
+    server_label: Option<String>,
+    #[serde(default)]
+    approval_request_id: Option<String>,
+    #[serde(default)]
+    approve: Option<bool>,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    tools: Vec<Value>,
+    #[serde(default)]
+    summary: Option<Value>,
+    #[serde(default)]
+    encrypted_content: Option<String>,
+    #[serde(default)]
+    container_id: Option<String>,
+    #[serde(default)]
+    outputs: Option<Vec<Value>>,
+    #[serde(default)]
+    max_output_length: Option<u64>,
+    #[serde(default)]
+    pending_safety_checks: Vec<Value>,
+    #[serde(default)]
+    acknowledged_safety_checks: Vec<Value>,
+    #[serde(default)]
+    content: Vec<ResponseContentPart>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, Value>,
+}
+
+impl From<WireResponseOutputItem> for ResponseOutputItem {
+    fn from(value: WireResponseOutputItem) -> Self {
+        let arguments = value.arguments.as_ref().map(argument_value_to_string);
+        let mut extra = value.extra;
+        let summary = match value.summary {
+            Some(Value::Array(summary)) => summary,
+            Some(summary) => {
+                extra.insert(String::from("summary"), summary);
+                Vec::new()
+            }
+            None => Vec::new(),
+        };
+        Self {
+            id: value.id,
+            item_type: value.item_type,
+            role: value.role,
+            name: value.name,
+            arguments,
+            arguments_json: value.arguments,
+            input: value.input,
+            code: value.code,
+            call_id: value.call_id,
+            status: value.status,
+            phase: value.phase,
+            namespace: value.namespace,
+            created_by: value.created_by,
+            action: value.action,
+            actions: value.actions,
+            operation: value.operation,
+            environment: value.environment,
+            execution: value.execution,
+            output: value.output,
+            result: value.result,
+            queries: value.queries,
+            results: value.results,
+            server_label: value.server_label,
+            approval_request_id: value.approval_request_id,
+            approve: value.approve,
+            reason: value.reason,
+            error: value.error,
+            tools: value.tools,
+            summary,
+            encrypted_content: value.encrypted_content,
+            container_id: value.container_id,
+            outputs: value.outputs,
+            max_output_length: value.max_output_length,
+            pending_safety_checks: value.pending_safety_checks,
+            acknowledged_safety_checks: value.acknowledged_safety_checks,
+            content: value.content,
+            parsed_arguments: None,
+            extra,
+        }
+    }
+}
+
+fn argument_value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        value => value.to_string(),
+    }
 }
 
 /// Content part shape needed for output-text aggregation.
@@ -1025,6 +1189,10 @@ pub struct ResponseContentPart {
     pub text: Option<String>,
     #[serde(default)]
     pub refusal: Option<String>,
+    #[serde(default)]
+    pub annotations: Vec<Value>,
+    #[serde(default)]
+    pub logprobs: Option<Vec<Value>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -2814,18 +2982,28 @@ impl StreamAccumulator {
         delta: &str,
     ) -> Result<(), OpenAIError> {
         let output = self.get_output_mut(output_index, expected_types)?;
-        let target = match field {
-            "arguments" => output.arguments.get_or_insert_with(String::new),
-            "input" => output.input.get_or_insert_with(String::new),
-            "code" => output.code.get_or_insert_with(String::new),
-            _ => {
-                return Err(OpenAIError::new(
-                    ErrorKind::Validation,
-                    format!("unsupported streamed output field `{field}`"),
-                ));
+        let updated_arguments = {
+            let target = match field {
+                "arguments" => output.arguments.get_or_insert_with(String::new),
+                "input" => output.input.get_or_insert_with(String::new),
+                "code" => output.code.get_or_insert_with(String::new),
+                _ => {
+                    return Err(OpenAIError::new(
+                        ErrorKind::Validation,
+                        format!("unsupported streamed output field `{field}`"),
+                    ));
+                }
+            };
+            target.push_str(delta);
+            if field == "arguments" {
+                Some(target.clone())
+            } else {
+                None
             }
         };
-        target.push_str(delta);
+        if let Some(arguments) = updated_arguments {
+            output.arguments_json = Some(Value::String(arguments));
+        }
         Ok(())
     }
 
@@ -2838,7 +3016,10 @@ impl StreamAccumulator {
     ) -> Result<(), OpenAIError> {
         let output = self.get_output_mut(output_index, expected_types)?;
         match field {
-            "arguments" => output.arguments = Some(value.to_string()),
+            "arguments" => {
+                output.arguments = Some(value.to_string());
+                output.arguments_json = Some(Value::String(value.to_string()));
+            }
             "input" => output.input = Some(value.to_string()),
             "code" => output.code = Some(value.to_string()),
             _ => {
@@ -2871,23 +3052,13 @@ impl StreamAccumulator {
             )
         })?;
         let content = get_content_mut(snapshot, output_index, content_index, "output_text")?;
-        let annotations = content
-            .extra
-            .entry(String::from("annotations"))
-            .or_insert_with(|| Value::Array(Vec::new()));
-        let annotations = annotations.as_array_mut().ok_or_else(|| {
-            OpenAIError::new(
-                ErrorKind::Validation,
-                "stream addressed non-array output text annotations",
-            )
-        })?;
-        if annotation_index > annotations.len() {
+        if annotation_index > content.annotations.len() {
             return Err(OpenAIError::new(
                 ErrorKind::Validation,
                 format!("stream referenced missing annotation_index {annotation_index}"),
             ));
         }
-        annotations.insert(annotation_index, annotation);
+        content.annotations.insert(annotation_index, annotation);
         Ok(())
     }
 
@@ -2990,16 +3161,7 @@ impl StreamAccumulator {
         output_index: usize,
     ) -> Result<&mut Vec<Value>, OpenAIError> {
         let output = self.get_output_mut(output_index, &["reasoning"])?;
-        let summary = output
-            .extra
-            .entry(String::from("summary"))
-            .or_insert_with(|| Value::Array(Vec::new()));
-        summary.as_array_mut().ok_or_else(|| {
-            OpenAIError::new(
-                ErrorKind::Validation,
-                "stream addressed non-array reasoning summary",
-            )
-        })
+        Ok(&mut output.summary)
     }
 
     fn get_output_mut<'a>(
