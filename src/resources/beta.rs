@@ -1892,7 +1892,59 @@ impl Default for BetaRunPollOptions {
 pub struct BetaAssistantStreamEvent {
     pub event: Option<BetaAssistantStreamEventType>,
     pub data: Value,
+    pub parsed_data: BetaAssistantStreamEventData,
     pub raw_data: String,
+}
+
+/// Typed payload decoded from a deprecated beta Assistants stream event.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BetaAssistantStreamEventData {
+    Thread(Box<BetaThread>),
+    Run(Box<BetaThreadRun>),
+    RunStep(Box<BetaThreadRunStep>),
+    RunStepDelta(Box<BetaThreadRunStepDeltaEvent>),
+    Message(Box<BetaThreadMessage>),
+    MessageDelta(Box<BetaThreadMessageDeltaEvent>),
+    Error(Box<BetaAssistantStreamError>),
+    Unknown(Value),
+}
+
+/// Deprecated beta Assistants stream message-delta payload.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessageDeltaEvent {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub delta: Value,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta Assistants stream run-step-delta payload.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepDeltaEvent {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub delta: Value,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Error payload emitted on deprecated beta Assistants streams.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaAssistantStreamError {
+    #[serde(default)]
+    pub code: Option<String>,
+    pub message: String,
+    #[serde(default)]
+    pub param: Option<String>,
+    #[serde(rename = "type", default)]
+    pub error_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Stream of raw Assistants SSE events.
@@ -2059,7 +2111,7 @@ impl BetaAssistantStream {
         message: LiveBetaAssistantStreamMessage,
     ) -> Result<(), OpenAIError> {
         match message {
-            LiveBetaAssistantStreamMessage::Event(event) => self.events.push_back(event),
+            LiveBetaAssistantStreamMessage::Event(event) => self.events.push_back(*event),
             LiveBetaAssistantStreamMessage::Finished => {
                 if let Some(mut live) = self.live.take() {
                     live.join_worker();
@@ -2087,7 +2139,7 @@ impl Drop for BetaAssistantStream {
 
 #[derive(Debug)]
 enum LiveBetaAssistantStreamMessage {
-    Event(BetaAssistantStreamEvent),
+    Event(Box<BetaAssistantStreamEvent>),
     Finished,
     Error(OpenAIError),
 }
@@ -3398,11 +3450,76 @@ fn parse_beta_assistant_frame(
         )
         .with_source(error)
     })?;
+    let event = frame.event.map(BetaAssistantStreamEventType::from);
+    let parsed_data = parse_beta_assistant_event_data(event.as_ref(), data.clone());
     Ok(Some(BetaAssistantStreamEvent {
-        event: frame.event.map(BetaAssistantStreamEventType::from),
+        event,
+        parsed_data,
         raw_data: frame.data,
         data,
     }))
+}
+
+fn parse_beta_assistant_event_data(
+    event: Option<&BetaAssistantStreamEventType>,
+    data: Value,
+) -> BetaAssistantStreamEventData {
+    match event {
+        Some(BetaAssistantStreamEventType::ThreadCreated) => {
+            parse_beta_stream_data(data, BetaAssistantStreamEventData::Thread)
+        }
+        Some(
+            BetaAssistantStreamEventType::ThreadRunCreated
+            | BetaAssistantStreamEventType::ThreadRunQueued
+            | BetaAssistantStreamEventType::ThreadRunInProgress
+            | BetaAssistantStreamEventType::ThreadRunRequiresAction
+            | BetaAssistantStreamEventType::ThreadRunCompleted
+            | BetaAssistantStreamEventType::ThreadRunIncomplete
+            | BetaAssistantStreamEventType::ThreadRunFailed
+            | BetaAssistantStreamEventType::ThreadRunCancelling
+            | BetaAssistantStreamEventType::ThreadRunCancelled
+            | BetaAssistantStreamEventType::ThreadRunExpired,
+        ) => parse_beta_stream_data(data, BetaAssistantStreamEventData::Run),
+        Some(
+            BetaAssistantStreamEventType::ThreadRunStepCreated
+            | BetaAssistantStreamEventType::ThreadRunStepInProgress
+            | BetaAssistantStreamEventType::ThreadRunStepCompleted
+            | BetaAssistantStreamEventType::ThreadRunStepFailed
+            | BetaAssistantStreamEventType::ThreadRunStepCancelled
+            | BetaAssistantStreamEventType::ThreadRunStepExpired,
+        ) => parse_beta_stream_data(data, BetaAssistantStreamEventData::RunStep),
+        Some(BetaAssistantStreamEventType::ThreadRunStepDelta) => {
+            parse_beta_stream_data(data, BetaAssistantStreamEventData::RunStepDelta)
+        }
+        Some(
+            BetaAssistantStreamEventType::ThreadMessageCreated
+            | BetaAssistantStreamEventType::ThreadMessageInProgress
+            | BetaAssistantStreamEventType::ThreadMessageCompleted
+            | BetaAssistantStreamEventType::ThreadMessageIncomplete,
+        ) => parse_beta_stream_data(data, BetaAssistantStreamEventData::Message),
+        Some(BetaAssistantStreamEventType::ThreadMessageDelta) => {
+            parse_beta_stream_data(data, BetaAssistantStreamEventData::MessageDelta)
+        }
+        Some(BetaAssistantStreamEventType::Error) => {
+            parse_beta_stream_data(data, BetaAssistantStreamEventData::Error)
+        }
+        Some(BetaAssistantStreamEventType::Unknown(_)) | None => {
+            BetaAssistantStreamEventData::Unknown(data)
+        }
+    }
+}
+
+fn parse_beta_stream_data<T>(
+    data: Value,
+    into_event: impl FnOnce(Box<T>) -> BetaAssistantStreamEventData,
+) -> BetaAssistantStreamEventData
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value::<T>(data.clone())
+        .map(Box::new)
+        .map(into_event)
+        .unwrap_or(BetaAssistantStreamEventData::Unknown(data))
 }
 
 async fn consume_beta_assistant_live_stream(
@@ -3429,7 +3546,10 @@ async fn consume_beta_assistant_live_stream(
                 };
                 for frame in parser.push(chunk.as_ref())? {
                     if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
-                        if event_tx.send(LiveBetaAssistantStreamMessage::Event(event)).is_err() {
+                        if event_tx
+                            .send(LiveBetaAssistantStreamMessage::Event(Box::new(event)))
+                            .is_err()
+                        {
                             return Ok(());
                         }
                     }
@@ -3441,7 +3561,7 @@ async fn consume_beta_assistant_live_stream(
     for frame in parser.finish()? {
         if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
             if event_tx
-                .send(LiveBetaAssistantStreamMessage::Event(event))
+                .send(LiveBetaAssistantStreamMessage::Event(Box::new(event)))
                 .is_err()
             {
                 return Ok(());

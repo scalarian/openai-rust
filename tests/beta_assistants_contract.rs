@@ -12,12 +12,12 @@ use openai_rust::{
             BetaAssistantFileSearchRankingOptions, BetaAssistantFileSearchTool,
             BetaAssistantListParams, BetaAssistantResponseFormat,
             BetaAssistantResponseFormatJsonSchema, BetaAssistantStream,
-            BetaAssistantStreamEventType, BetaAssistantTool, BetaAssistantToolChoice,
-            BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams, BetaQueryParams,
-            BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
-            BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool, BetaThreadMessageContent,
-            BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageRole,
-            BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
+            BetaAssistantStreamEventData, BetaAssistantStreamEventType, BetaAssistantTool,
+            BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
+            BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
+            BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
+            BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
+            BetaThreadMessageRole, BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
             BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStatus,
             BetaThreadRunStepInclude, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
             BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
@@ -611,14 +611,16 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
         status_code: 200,
         ..Default::default()
     };
+    let run_event = serde_json::from_str::<serde_json::Value>(&run_payload("run_stream", "queued"))
+        .expect("run event payload");
     let mut stream = BetaAssistantStream::from_sse_chunks(
         metadata.clone(),
-        [concat!(
-            "event: thread.run.created\n",
-            "data: {\"id\":\"run_stream\",\"status\":\"queued\"}\n\n",
-            "event: thread.future\n",
-            "data: {\"id\":\"run_stream\",\"status\":\"future\"}\n\n",
-            "data: [DONE]\n\n"
+        [format!(
+            "event: thread.run.created\n\
+             data: {run_event}\n\n\
+             event: thread.future\n\
+             data: {{\"id\":\"run_stream\",\"status\":\"future\"}}\n\n\
+             data: [DONE]\n\n"
         )],
     )
     .expect("stream transcript");
@@ -633,10 +635,12 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
         Some(BetaAssistantStreamEventType::ThreadRunCreated)
     );
     assert_eq!(event.data["id"], json!("run_stream"));
-    assert_eq!(
-        event.raw_data,
-        "{\"id\":\"run_stream\",\"status\":\"queued\"}"
-    );
+    assert!(matches!(
+        &event.parsed_data,
+        BetaAssistantStreamEventData::Run(run)
+            if run.id == "run_stream" && run.status == Some(BetaThreadRunStatus::Queued)
+    ));
+    assert_eq!(event.raw_data, run_event.to_string());
     let unknown = stream
         .next_event()
         .expect("unknown event read")
@@ -648,6 +652,10 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
         )))
     );
     assert_eq!(unknown.data["status"], json!("future"));
+    assert!(matches!(
+        unknown.parsed_data,
+        BetaAssistantStreamEventData::Unknown(_)
+    ));
     assert!(stream.next_event().expect("eof").is_none());
 
     let error = BetaAssistantStream::from_sse_chunks(
