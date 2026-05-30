@@ -123,6 +123,33 @@ fn organization_group_update_json(id: &str) -> Value {
     })
 }
 
+fn organization_group_user_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "email": "admin@example.com",
+        "name": "Admin User"
+    })
+}
+
+fn organization_group_user_retrieve_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "email": "admin@example.com",
+        "is_service_account": false,
+        "name": "Admin User",
+        "picture": "https://example.com/admin.png",
+        "user_type": "tenant_user"
+    })
+}
+
+fn organization_group_user_create_json(group_id: &str, user_id: &str) -> Value {
+    json!({
+        "group_id": group_id,
+        "object": "group.user",
+        "user_id": user_id
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -192,6 +219,13 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .to_string(),
     );
     responses[20] = json_response(project_hosted_tool_permissions_json().to_string());
+    responses[7] = json_response(
+        json!({
+            "data": [organization_group_user_json("user_admin")],
+            "has_more": false
+        })
+        .to_string(),
+    );
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -523,6 +557,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[9] =
+        json_response(organization_group_user_create_json("grp_eng", "user_admin").to_string());
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -647,7 +683,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .unwrap();
     assert_eq!(groups.output.data[0].id, "grp_eng");
     assert_eq!(groups.output.next_after(), Some("grp_eng"));
-    org.groups()
+    let group_user = org
+        .groups()
         .users()
         .create(
             "grp_eng",
@@ -656,6 +693,9 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(group_user.output.group_id, "grp_eng");
+    assert_eq!(group_user.output.object, AdminGroupUserObject::GroupUser);
+    assert_eq!(group_user.output.user_id, "user_admin");
     org.groups()
         .roles()
         .create(
@@ -1307,6 +1347,73 @@ fn admin_group_retrieve_and_delete_return_typed_responses() {
     assert_eq!(requests[0].path, "/v1/organization/groups/grp_eng");
     assert_eq!(requests[1].method, "DELETE");
     assert_eq!(requests[1].path, "/v1/organization/groups/grp_eng");
+}
+
+#[test]
+fn admin_group_user_retrieve_list_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_group_user_retrieve_json("user_admin").to_string()),
+        json_response(
+            json!({
+                "data": [organization_group_user_json("user_admin")],
+                "has_more": true,
+                "next": "user_admin"
+            })
+            .to_string(),
+        ),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "group.user.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let group_users = client.admin().organization().groups().users();
+
+    let user = group_users.retrieve("grp_eng", "user_admin").unwrap();
+    assert_eq!(user.output.user_type, AdminGroupUserType::TenantUser);
+    assert_eq!(user.output.name, "Admin User");
+
+    let users = group_users
+        .list(
+            "grp_eng",
+            AdminGroupUserListParams {
+                limit: Some(2),
+                order: Some(ListOrder::Asc),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        users.output.data[0].email.as_deref(),
+        Some("admin@example.com")
+    );
+    assert_eq!(users.output.next_after(), Some("user_admin"));
+
+    let deleted = group_users.delete("grp_eng", "user_admin").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminGroupUserDeletedObject::GroupUserDeleted
+    );
+
+    let requests = server.captured_requests(3).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/groups/grp_eng/users/user_admin"
+    );
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/groups/grp_eng/users?limit=2&order=asc"
+    );
+    assert_eq!(requests[2].method, "DELETE");
+    assert_eq!(
+        requests[2].path,
+        "/v1/organization/groups/grp_eng/users/user_admin"
+    );
 }
 
 #[test]
