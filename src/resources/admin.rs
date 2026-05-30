@@ -186,6 +186,29 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization invite object type.
+    pub enum AdminInviteObject {
+        OrganizationInvite => "organization.invite",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization invite deletion object type.
+    pub enum AdminInviteDeletedObject {
+        OrganizationInviteDeleted => "organization.invite.deleted",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization invite status.
+    pub enum AdminInviteStatus {
+        Accepted => "accepted",
+        Expired => "expired",
+        Pending => "pending",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project membership role used by invite project grants and service accounts.
     pub enum AdminProjectMembershipRole {
         Member => "member",
@@ -742,6 +765,45 @@ impl From<AdminInviteListParams> for AdminQueryParams {
             .push_opt("limit", value.limit)
     }
 }
+
+/// Project membership granted by an organization invite response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminInviteProjectGrant {
+    pub id: String,
+    pub role: AdminProjectMembershipRole,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual invite to the organization.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminInvite {
+    pub id: String,
+    pub created_at: u64,
+    pub email: String,
+    pub object: AdminInviteObject,
+    pub projects: Vec<AdminInviteProjectGrant>,
+    pub role: AdminInviteRole,
+    pub status: AdminInviteStatus,
+    #[serde(default)]
+    pub accepted_at: Option<u64>,
+    #[serde(default)]
+    pub expires_at: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Organization invite deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminInviteDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminInviteDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminInviteListResponse = AdminConversationCursorPage<AdminInvite>;
 
 /// Organization user list query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -2094,25 +2156,45 @@ impl OrganizationInvites {
         Self { runtime }
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/invites", params)
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminInvite>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/invites",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
-    pub fn retrieve(&self, invite_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(&self, invite_id: &str) -> Result<ApiResponse<AdminInvite>, OpenAIError> {
         let invite_id = path_id("invite_id", invite_id)?;
-        get(&self.runtime, format!("/organization/invites/{invite_id}"))
+        self.runtime.execute_json(
+            "GET",
+            format!("/organization/invites/{invite_id}"),
+            RequestOptions::default(),
+        )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/invites", params)
+    ) -> Result<ApiResponse<AdminInviteListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/invites", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, invite_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        invite_id: &str,
+    ) -> Result<ApiResponse<AdminInviteDeleteResponse>, OpenAIError> {
         let invite_id = path_id("invite_id", invite_id)?;
-        delete(&self.runtime, format!("/organization/invites/{invite_id}"))
+        self.runtime.execute_json(
+            "DELETE",
+            format!("/organization/invites/{invite_id}"),
+            RequestOptions::default(),
+        )
     }
 }
 

@@ -60,6 +60,20 @@ fn project_hosted_tool_permissions_json() -> Value {
     })
 }
 
+fn organization_invite_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_171_900u64,
+        "email": "new@example.com",
+        "object": "organization.invite",
+        "projects": [{"id": "proj_1", "role": "member"}],
+        "role": "reader",
+        "status": "pending",
+        "accepted_at": null,
+        "expires_at": 1_717_258_300u64
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -432,6 +446,15 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     let mut responses = (0..24)
         .map(|index| json_response(json!({"id": format!("typed_admin_{index}")}).to_string()))
         .collect::<Vec<_>>();
+    responses[1] = json_response(organization_invite_json("invite_new").to_string());
+    responses[2] = json_response(
+        json!({
+            "data": [organization_invite_json("invite_new")],
+            "has_more": true,
+            "last_id": "invite_new"
+        })
+        .to_string(),
+    );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -459,7 +482,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .unwrap();
 
-    org.invites()
+    let invite = org
+        .invites()
         .create(AdminInviteCreateParams {
             email: String::from("new@example.com"),
             role: AdminInviteRole::Reader,
@@ -469,12 +493,22 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             }]),
         })
         .unwrap();
-    org.invites()
+    assert_eq!(invite.output.object, AdminInviteObject::OrganizationInvite);
+    assert_eq!(invite.output.role, AdminInviteRole::Reader);
+    assert_eq!(invite.output.status, AdminInviteStatus::Pending);
+    assert_eq!(
+        invite.output.projects[0].role,
+        AdminProjectMembershipRole::Member
+    );
+    let invites = org
+        .invites()
         .list(AdminInviteListParams {
             after: Some(String::from("invite_after")),
             limit: Some(6),
         })
         .unwrap();
+    assert_eq!(invites.output.data[0].id, "invite_new");
+    assert_eq!(invites.output.next_after(), Some("invite_new"));
 
     org.users()
         .list(AdminUserListParams {
@@ -1080,6 +1114,40 @@ fn admin_project_api_key_delete_returns_typed_confirmation() {
         requests[0].path,
         "/v1/organization/projects/proj_research/api_keys/key_project"
     );
+}
+
+#[test]
+fn admin_invite_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_invite_json("invite_new").to_string()),
+        json_response(
+            json!({
+                "id": "invite_new",
+                "deleted": true,
+                "object": "organization.invite.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let invites = client.admin().organization().invites();
+
+    let invite = invites.retrieve("invite_new").unwrap();
+    assert_eq!(invite.output.object, AdminInviteObject::OrganizationInvite);
+    assert_eq!(invite.output.status, AdminInviteStatus::Pending);
+
+    let deleted = invites.delete("invite_new").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminInviteDeletedObject::OrganizationInviteDeleted
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(requests[0].path, "/v1/organization/invites/invite_new");
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(requests[1].path, "/v1/organization/invites/invite_new");
 }
 
 #[test]
