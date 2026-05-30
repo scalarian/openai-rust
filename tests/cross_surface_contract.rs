@@ -1111,6 +1111,7 @@ impl MockRealtimeBootstrapHarness {
                 let (ws_stream, _) = listener.accept().await.map_err(|error| error.to_string())?;
                 let mut socket = accept_hdr_async(
                     ws_stream,
+                    #[allow(clippy::result_large_err)]
                     move |request: &WsRequest, response: WsResponse| {
                         let mut headers = BTreeMap::new();
                         for (name, value) in request.headers() {

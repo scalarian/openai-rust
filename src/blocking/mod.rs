@@ -71,6 +71,11 @@ impl OpenAI {
         self.inner.responses().clone()
     }
 
+    /// Accesses the admin family handle.
+    pub fn admin(&self) -> crate::resources::admin::Admin {
+        self.inner.admin().clone()
+    }
+
     /// Accesses the conversations family handle.
     pub fn conversations(&self) -> crate::resources::conversations::Conversations {
         self.inner.conversations().clone()

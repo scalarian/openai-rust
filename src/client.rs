@@ -76,6 +76,11 @@ impl OpenAI {
         &self.resources.responses
     }
 
+    /// Accesses the admin family handle.
+    pub fn admin(&self) -> &crate::resources::admin::Admin {
+        &self.resources.admin
+    }
+
     /// Accesses the conversations family handle.
     pub fn conversations(&self) -> &crate::resources::conversations::Conversations {
         &self.resources.conversations
