@@ -1846,7 +1846,7 @@ pub struct BetaRealtimeSessionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<BetaRealtimeModality>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
+    pub model: Option<BetaRealtimeSessionModel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1915,6 +1915,20 @@ pub enum BetaRealtimeAudioFormat {
 pub enum BetaRealtimeModality {
     Text,
     Audio,
+}
+
+beta_string_literal_enum! {
+    /// Beta realtime session models accepted by session creation.
+    pub enum BetaRealtimeSessionModel {
+        GptRealtime => "gpt-realtime",
+        GptRealtime2025_08_28 => "gpt-realtime-2025-08-28",
+        Gpt4oRealtimePreview => "gpt-4o-realtime-preview",
+        Gpt4oRealtimePreview2024_10_01 => "gpt-4o-realtime-preview-2024-10-01",
+        Gpt4oRealtimePreview2024_12_17 => "gpt-4o-realtime-preview-2024-12-17",
+        Gpt4oRealtimePreview2025_06_03 => "gpt-4o-realtime-preview-2025-06-03",
+        Gpt4oMiniRealtimePreview => "gpt-4o-mini-realtime-preview",
+        Gpt4oMiniRealtimePreview2024_12_17 => "gpt-4o-mini-realtime-preview-2024-12-17",
+    }
 }
 
 /// Realtime client-secret creation options.
@@ -1987,11 +2001,20 @@ pub struct BetaRealtimeInputAudioTranscription {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
+    pub model: Option<BetaRealtimeInputAudioTranscriptionModel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+beta_string_literal_enum! {
+    /// Models accepted by beta realtime input-audio transcription.
+    pub enum BetaRealtimeInputAudioTranscriptionModel {
+        Gpt4oTranscribe => "gpt-4o-transcribe",
+        Gpt4oMiniTranscribe => "gpt-4o-mini-transcribe",
+        Whisper1 => "whisper-1",
+    }
 }
 
 /// Realtime max response output token limit.

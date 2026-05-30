@@ -7,8 +7,9 @@ use openai_rust::{
         BetaRealtimeAudioFormat, BetaRealtimeClientSecret, BetaRealtimeClientSecretAnchor,
         BetaRealtimeClientSecretExpiresAfter, BetaRealtimeClientSecretExpiresAt,
         BetaRealtimeInputAudioNoiseReduction, BetaRealtimeInputAudioTranscription,
-        BetaRealtimeMaxResponseOutputTokens, BetaRealtimeModality, BetaRealtimeNoiseReductionType,
-        BetaRealtimeNullable, BetaRealtimeSessionCreateParams, BetaRealtimeTool,
+        BetaRealtimeInputAudioTranscriptionModel, BetaRealtimeMaxResponseOutputTokens,
+        BetaRealtimeModality, BetaRealtimeNoiseReductionType, BetaRealtimeNullable,
+        BetaRealtimeSessionCreateParams, BetaRealtimeSessionModel, BetaRealtimeTool,
         BetaRealtimeToolType, BetaRealtimeTracing, BetaRealtimeTranscriptionClientSecret,
         BetaRealtimeTranscriptionSessionCreateParams, BetaRealtimeTurnDetection,
         BetaRealtimeTurnDetectionType,
@@ -29,7 +30,7 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
     let session = realtime
         .sessions()
         .create(BetaRealtimeSessionCreateParams {
-            model: Some(String::from("gpt-realtime")),
+            model: Some(BetaRealtimeSessionModel::GptRealtime),
             modalities: Some(vec![
                 BetaRealtimeModality::Text,
                 BetaRealtimeModality::Audio,
@@ -81,7 +82,7 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
             )]),
             input_audio_transcription: Some(BetaRealtimeNullable::Value(
                 BetaRealtimeInputAudioTranscription {
-                    model: Some(String::from("gpt-4o-transcribe")),
+                    model: Some(BetaRealtimeInputAudioTranscriptionModel::Gpt4oTranscribe),
                     language: Some(String::from("en")),
                     ..Default::default()
                 },
