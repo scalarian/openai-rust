@@ -171,6 +171,8 @@ impl ChatCompletions {
         &self,
         params: ChatCompletionCreateParams,
     ) -> Result<ChatCompletionStream, OpenAIError> {
+        let response_format = params.response_format.clone();
+        let tools = params.tools.clone().unwrap_or_default();
         let body = params.into_request_body(true);
         let request = self
             .runtime
@@ -179,7 +181,7 @@ impl ChatCompletions {
             .runtime
             .resolve_request_options(&RequestOptions::default())?;
 
-        ChatCompletionStream::start_live(request, options)
+        ChatCompletionStream::start_live(request, options, response_format, tools)
     }
 
     /// Retrieves a stored chat completion by id.
@@ -2454,6 +2456,8 @@ pub struct ChatCompletionStream {
     metadata: ResponseMetadata,
     chunks: VecDeque<ChatCompletionChunk>,
     final_completion: Option<ChatCompletion>,
+    response_format: Option<ChatCompletionResponseFormat>,
+    tools: Vec<ChatCompletionTool>,
     live: Option<LiveChatCompletionStreamHandle>,
     aborted: bool,
 }
@@ -2486,9 +2490,21 @@ impl ChatCompletionStream {
             metadata,
             chunks: surfaced,
             final_completion: Some(final_completion),
+            response_format: None,
+            tools: Vec::new(),
             live: None,
             aborted: false,
         })
+    }
+
+    pub fn with_parse_context(
+        mut self,
+        response_format: Option<ChatCompletionResponseFormat>,
+        tools: Vec<ChatCompletionTool>,
+    ) -> Self {
+        self.response_format = response_format;
+        self.tools = tools;
+        self
     }
 
     pub fn next_chunk(&mut self) -> Option<ChatCompletionChunk> {
@@ -2556,6 +2572,14 @@ impl ChatCompletionStream {
             })
     }
 
+    pub fn parse_final<T>(&mut self) -> Result<ParsedChatCompletion<T>, OpenAIError>
+    where
+        T: DeserializeOwned,
+    {
+        let final_completion = self.final_completion()?.clone();
+        parse_chat_completion_output(final_completion, self.response_format.as_ref(), &self.tools)
+    }
+
     pub fn metadata(&self) -> &ResponseMetadata {
         &self.metadata
     }
@@ -2573,6 +2597,8 @@ impl ChatCompletionStream {
     fn start_live(
         request: crate::core::request::PreparedRequest,
         options: crate::core::request::ResolvedRequestOptions,
+        response_format: Option<ChatCompletionResponseFormat>,
+        tools: Vec<ChatCompletionTool>,
     ) -> Result<Self, OpenAIError> {
         let (startup_tx, startup_rx) = mpsc::channel();
         let (chunk_tx, chunk_rx) = mpsc::channel();
@@ -2631,6 +2657,8 @@ impl ChatCompletionStream {
             metadata,
             chunks: VecDeque::new(),
             final_completion: None,
+            response_format,
+            tools,
             live: Some(LiveChatCompletionStreamHandle {
                 receiver: chunk_rx,
                 abort: abort_tx,

@@ -3,18 +3,27 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::{
         chat::{
-            ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionMessageParam,
-            ChatCompletionStream,
+            ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionFunctionDefinition,
+            ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletionResponseFormat,
+            ChatCompletionResponseFormatJsonSchema, ChatCompletionStream, ChatCompletionTool,
         },
         common::ServiceTier,
     },
 };
+use serde::Deserialize;
+use serde_json::json;
 use std::{
     io::{Read, Write},
     net::{Shutdown, TcpListener, TcpStream},
     thread,
     time::{Duration, Instant},
 };
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+struct Scorecard {
+    winner: String,
+    score: u32,
+}
 
 #[test]
 fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
@@ -105,6 +114,126 @@ fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
             .unwrap()
             .reasoning_tokens,
         Some(1)
+    );
+}
+
+#[test]
+fn stream_parse_final_parses_structured_content_and_strict_tool_arguments() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+    let transcript = vec![
+        format!(
+            "data: {}\n\n",
+            json!({
+                "id": "chatcmpl_parse_stream",
+                "object": "chat.completion.chunk",
+                "created": 1,
+                "model": "gpt-4.1-mini",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "content": "{\"winner\":\"Dodgers\"",
+                        "tool_calls": [{
+                            "index": 0,
+                            "id": "call_lookup",
+                            "type": "function",
+                            "function": {
+                                "name": "lookup_box_score",
+                                "arguments": "{\"game_id\""
+                            }
+                        }]
+                    }
+                }]
+            })
+        ),
+        format!(
+            "data: {}\n\n",
+            json!({
+                "id": "chatcmpl_parse_stream",
+                "object": "chat.completion.chunk",
+                "created": 1,
+                "model": "gpt-4.1-mini",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "content": ",\"score\":4}",
+                        "tool_calls": [{
+                            "index": 0,
+                            "function": {
+                                "arguments": ":7}"
+                            }
+                        }]
+                    }
+                }]
+            })
+        ),
+        format!(
+            "data: {}\n\n",
+            json!({
+                "id": "chatcmpl_parse_stream",
+                "object": "chat.completion.chunk",
+                "created": 1,
+                "model": "gpt-4.1-mini",
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
+            })
+        ),
+        String::from("data: [DONE]\n\n"),
+    ];
+
+    let mut stream = ChatCompletionStream::from_sse_chunks(metadata, transcript)
+        .expect("parse stream transcript should parse")
+        .with_parse_context(
+            Some(ChatCompletionResponseFormat::JsonSchema(
+                ChatCompletionResponseFormatJsonSchema {
+                    name: String::from("scorecard"),
+                    schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "winner": {"type": "string"},
+                            "score": {"type": "integer"}
+                        },
+                        "required": ["winner", "score"],
+                        "additionalProperties": false
+                    }),
+                    strict: Some(true),
+                    ..Default::default()
+                },
+            )),
+            vec![ChatCompletionTool::from(ChatCompletionFunctionTool::new(
+                ChatCompletionFunctionDefinition {
+                    name: String::from("lookup_box_score"),
+                    parameters: Some(json!({
+                        "type": "object",
+                        "properties": {"game_id": {"type": "integer"}},
+                        "required": ["game_id"],
+                        "additionalProperties": false
+                    })),
+                    strict: Some(true),
+                    ..Default::default()
+                },
+            ))],
+        );
+
+    let parsed = stream
+        .parse_final::<Scorecard>()
+        .expect("final stream content should parse");
+    assert_eq!(
+        parsed.first_parsed(),
+        Some(&Scorecard {
+            winner: String::from("Dodgers"),
+            score: 4
+        })
+    );
+    assert_eq!(
+        parsed.choices[0].message.tool_calls[0]
+            .function
+            .parsed_arguments
+            .as_ref()
+            .unwrap()["game_id"],
+        json!(7)
     );
 }
 
