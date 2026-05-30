@@ -1,6 +1,6 @@
 use openai_rust::{
     core::metadata::ResponseMetadata,
-    resources::responses::{FunctionTool, ResponseStream},
+    resources::responses::{FunctionTool, ResponseStream, ResponseStreamEvent},
 };
 use serde_json::json;
 
@@ -27,8 +27,18 @@ fn function_and_custom_tool_inputs_accumulate_until_completion() {
     );
 
     let mut stream = ResponseStream::from_sse_chunks(metadata, vec![transcript]).expect("stream");
-    stream.next_event();
-    stream.next_event();
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::Created { .. })
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::FunctionCallArgumentsDelta {
+            ref item_id,
+            ref delta,
+            output_index: 0,
+        }) if item_id.as_deref() == Some("fc_1") && delta == "{\"city\":\"Pa"
+    ));
     assert_eq!(
         stream.current_response().unwrap().output[0]
             .arguments
@@ -41,7 +51,14 @@ fn function_and_custom_tool_inputs_accumulate_until_completion() {
             .is_none()
     );
 
-    stream.next_event();
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::CustomToolCallInputDelta {
+            ref item_id,
+            ref delta,
+            output_index: 1,
+        }) if item_id.as_deref() == Some("ct_1") && delta == "look"
+    ));
     assert_eq!(
         stream.current_response().unwrap().output[1]
             .input
@@ -49,7 +66,17 @@ fn function_and_custom_tool_inputs_accumulate_until_completion() {
         Some("look")
     );
 
-    stream.next_event();
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::FunctionCallArgumentsDone {
+            ref item_id,
+            ref name,
+            ref arguments,
+            output_index: 0,
+        }) if item_id.as_deref() == Some("fc_1")
+            && name == "weather"
+            && arguments == "{\"city\":\"Paris\"}"
+    ));
     assert_eq!(
         stream.current_response().unwrap().output[0]
             .arguments
@@ -62,7 +89,14 @@ fn function_and_custom_tool_inputs_accumulate_until_completion() {
             .is_none()
     );
 
-    stream.next_event();
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::CustomToolCallInputDone {
+            ref item_id,
+            ref input,
+            output_index: 1,
+        }) if item_id.as_deref() == Some("ct_1") && input == "lookup weather"
+    ));
     assert_eq!(
         stream.current_response().unwrap().output[1]
             .input

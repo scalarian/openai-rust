@@ -1066,6 +1066,26 @@ pub enum ResponseStreamEvent {
         delta: String,
     },
     AudioTranscriptDone,
+    OutputItemAdded {
+        output_index: usize,
+        item: ResponseOutputItem,
+    },
+    OutputItemDone {
+        output_index: usize,
+        item: ResponseOutputItem,
+    },
+    ContentPartAdded {
+        item_id: Option<String>,
+        output_index: usize,
+        content_index: usize,
+        part: ResponseContentPart,
+    },
+    ContentPartDone {
+        item_id: Option<String>,
+        output_index: usize,
+        content_index: usize,
+        part: ResponseContentPart,
+    },
     OutputTextDelta {
         output_index: usize,
         content_index: usize,
@@ -1095,6 +1115,52 @@ pub enum ResponseStreamEvent {
         output_index: usize,
         content_index: usize,
         text: String,
+    },
+    FunctionCallArgumentsDelta {
+        item_id: Option<String>,
+        output_index: usize,
+        delta: String,
+    },
+    FunctionCallArgumentsDone {
+        item_id: Option<String>,
+        output_index: usize,
+        name: String,
+        arguments: String,
+    },
+    CustomToolCallInputDelta {
+        item_id: Option<String>,
+        output_index: usize,
+        delta: String,
+    },
+    CustomToolCallInputDone {
+        item_id: Option<String>,
+        output_index: usize,
+        input: String,
+    },
+    CodeInterpreterCallCodeDelta {
+        item_id: Option<String>,
+        output_index: usize,
+        delta: String,
+    },
+    CodeInterpreterCallCodeDone {
+        item_id: Option<String>,
+        output_index: usize,
+        code: String,
+    },
+    McpCallArgumentsDelta {
+        item_id: Option<String>,
+        output_index: usize,
+        delta: String,
+    },
+    McpCallArgumentsDone {
+        item_id: Option<String>,
+        output_index: usize,
+        arguments: String,
+    },
+    ToolCallStatus {
+        event: String,
+        item_id: Option<String>,
+        output_index: usize,
     },
     ImageGenerationCallInProgress {
         item_id: Option<String>,
@@ -1153,6 +1219,11 @@ pub enum ResponseStreamEvent {
     },
     Incomplete {
         response: Response,
+    },
+    Error {
+        code: Option<String>,
+        message: String,
+        param: Option<String>,
     },
     Unknown {
         event: String,
@@ -1793,6 +1864,8 @@ struct StreamOutputItemPayload {
 
 #[derive(Clone, Debug, Deserialize)]
 struct StreamContentPartPayload {
+    #[serde(default)]
+    item_id: Option<String>,
     output_index: usize,
     content_index: usize,
     part: ResponseContentPart,
@@ -1801,6 +1874,8 @@ struct StreamContentPartPayload {
 #[derive(Clone, Debug, Deserialize)]
 struct StreamFunctionArgumentsDonePayload {
     output_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
     name: String,
     arguments: String,
 }
@@ -1808,12 +1883,16 @@ struct StreamFunctionArgumentsDonePayload {
 #[derive(Clone, Debug, Deserialize)]
 struct StreamToolTextDeltaPayload {
     output_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
     delta: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 struct StreamToolTextDonePayload {
     output_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
     #[serde(default)]
     text: Option<String>,
     #[serde(default)]
@@ -1875,6 +1954,15 @@ struct StreamReasoningSummaryTextDonePayload {
     #[serde(default)]
     item_id: Option<String>,
     text: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamErrorPayload {
+    #[serde(default)]
+    code: Option<String>,
+    message: String,
+    #[serde(default)]
+    param: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1976,21 +2064,19 @@ impl StreamAccumulator {
             "response.output_item.added" => {
                 let payload: StreamOutputItemPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
-                self.insert_output_item(payload.output_index, payload.item)?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                self.insert_output_item(payload.output_index, payload.item.clone())?;
+                Ok(Some(ResponseStreamEvent::OutputItemAdded {
+                    output_index: payload.output_index,
+                    item: payload.item,
                 }))
             }
             "response.output_item.done" => {
                 let payload: StreamOutputItemPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
-                self.replace_output_item(payload.output_index, payload.item)?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                self.replace_output_item(payload.output_index, payload.item.clone())?;
+                Ok(Some(ResponseStreamEvent::OutputItemDone {
+                    output_index: payload.output_index,
+                    item: payload.item,
                 }))
             }
             "response.content_part.added" => {
@@ -1999,12 +2085,13 @@ impl StreamAccumulator {
                 self.insert_content_part(
                     payload.output_index,
                     payload.content_index,
-                    payload.part,
+                    payload.part.clone(),
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::ContentPartAdded {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    part: payload.part,
                 }))
             }
             "response.content_part.done" => {
@@ -2013,12 +2100,13 @@ impl StreamAccumulator {
                 self.replace_content_part(
                     payload.output_index,
                     payload.content_index,
-                    payload.part,
+                    payload.part.clone(),
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::ContentPartDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    part: payload.part,
                 }))
             }
             "response.output_text.delta" => {
@@ -2076,10 +2164,10 @@ impl StreamAccumulator {
                     "arguments",
                     &payload.delta,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::FunctionCallArgumentsDelta {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    delta: payload.delta,
                 }))
             }
             "response.function_call_arguments.done" => {
@@ -2092,11 +2180,12 @@ impl StreamAccumulator {
                     &payload.arguments,
                 )?;
                 self.get_output_mut(payload.output_index, &["function_call"])?
-                    .name = Some(payload.name);
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                    .name = Some(payload.name.clone());
+                Ok(Some(ResponseStreamEvent::FunctionCallArgumentsDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    name: payload.name,
+                    arguments: payload.arguments,
                 }))
             }
             "response.custom_tool_call_input.delta" => {
@@ -2108,10 +2197,10 @@ impl StreamAccumulator {
                     "input",
                     &payload.delta,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::CustomToolCallInputDelta {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    delta: payload.delta,
                 }))
             }
             "response.custom_tool_call_input.done" => {
@@ -2129,10 +2218,10 @@ impl StreamAccumulator {
                     "input",
                     &input,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::CustomToolCallInputDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    input,
                 }))
             }
             "response.code_interpreter_call_code.delta" => {
@@ -2144,10 +2233,10 @@ impl StreamAccumulator {
                     "code",
                     &payload.delta,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::CodeInterpreterCallCodeDelta {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    delta: payload.delta,
                 }))
             }
             "response.code_interpreter_call_code.done" => {
@@ -2165,10 +2254,10 @@ impl StreamAccumulator {
                     "code",
                     &code,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::CodeInterpreterCallCodeDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    code,
                 }))
             }
             "response.mcp_call_arguments.delta" => {
@@ -2180,10 +2269,10 @@ impl StreamAccumulator {
                     "arguments",
                     &payload.delta,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::McpCallArgumentsDelta {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    delta: payload.delta,
                 }))
             }
             "response.mcp_call_arguments.done" => {
@@ -2201,10 +2290,10 @@ impl StreamAccumulator {
                     "arguments",
                     &arguments,
                 )?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                Ok(Some(ResponseStreamEvent::McpCallArgumentsDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    arguments,
                 }))
             }
             "response.output_text.annotation.added" => {
@@ -2410,10 +2499,10 @@ impl StreamAccumulator {
                             output_index: payload.output_index,
                         }))
                     }
-                    _ => Ok(Some(ResponseStreamEvent::Unknown {
+                    _ => Ok(Some(ResponseStreamEvent::ToolCallStatus {
                         event: event_name.to_string(),
-                        data: serde_json::from_str(data)
-                            .unwrap_or_else(|_| Value::String(data.to_string())),
+                        item_id: payload.item_id,
+                        output_index: payload.output_index,
                     })),
                 }
             }
@@ -2425,6 +2514,15 @@ impl StreamAccumulator {
                     output_index: payload.output_index,
                     partial_image_b64: payload.partial_image_b64,
                     partial_image_index: payload.partial_image_index,
+                }))
+            }
+            "error" => {
+                let payload: StreamErrorPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                Ok(Some(ResponseStreamEvent::Error {
+                    code: payload.code,
+                    message: payload.message,
+                    param: payload.param,
                 }))
             }
             other => {

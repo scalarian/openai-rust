@@ -1,4 +1,7 @@
-use openai_rust::{core::metadata::ResponseMetadata, resources::responses::ResponseStream};
+use openai_rust::{
+    core::metadata::ResponseMetadata,
+    resources::responses::{ResponseStream, ResponseStreamEvent},
+};
 use serde_json::json;
 
 #[test]
@@ -34,9 +37,45 @@ fn tool_family_events_reconcile_with_final_state() {
     );
 
     let mut stream = ResponseStream::from_sse_chunks(metadata, vec![transcript]).expect("stream");
-    for _ in 0..5 {
-        stream.next_event();
-    }
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::Created { .. })
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 0,
+        }) if event == "response.file_search_call.searching"
+            && item_id.as_deref() == Some("fs_1")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 1,
+        }) if event == "response.web_search_call.searching"
+            && item_id.as_deref() == Some("ws_1")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::CodeInterpreterCallCodeDelta {
+            ref item_id,
+            ref delta,
+            output_index: 2,
+        }) if item_id.as_deref() == Some("ci_1") && delta == "print(1)"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::McpCallArgumentsDelta {
+            ref item_id,
+            ref delta,
+            output_index: 3,
+        }) if item_id.as_deref() == Some("mcp_1")
+            && delta == "{\"server\":\"docs\"}"
+    ));
     let snapshot = stream.current_response().unwrap();
     assert_eq!(snapshot.output[0].status.as_deref(), Some("searching"));
     assert_eq!(snapshot.output[1].status.as_deref(), Some("searching"));
@@ -46,9 +85,51 @@ fn tool_family_events_reconcile_with_final_state() {
         Some("{\"server\":\"docs\"}")
     );
 
-    for _ in 0..5 {
-        stream.next_event();
-    }
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 0,
+        }) if event == "response.file_search_call.completed"
+            && item_id.as_deref() == Some("fs_1")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 1,
+        }) if event == "response.web_search_call.completed"
+            && item_id.as_deref() == Some("ws_1")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 2,
+        }) if event == "response.code_interpreter_call.completed"
+            && item_id.as_deref() == Some("ci_1")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::McpCallArgumentsDone {
+            ref item_id,
+            ref arguments,
+            output_index: 3,
+        }) if item_id.as_deref() == Some("mcp_1")
+            && arguments == "{\"server\":\"docs\"}"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ToolCallStatus {
+            ref event,
+            ref item_id,
+            output_index: 3,
+        }) if event == "response.mcp_call.completed"
+            && item_id.as_deref() == Some("mcp_1")
+    ));
     let snapshot = stream.current_response().unwrap();
     assert_eq!(snapshot.output[0].status.as_deref(), Some("completed"));
     assert_eq!(snapshot.output[1].status.as_deref(), Some("completed"));
