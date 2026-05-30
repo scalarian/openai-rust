@@ -316,6 +316,20 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project user object type.
+    pub enum AdminProjectUserObject {
+        OrganizationProjectUser => "organization.project.user",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project user deletion object type.
+    pub enum AdminProjectUserDeletedObject {
+        OrganizationProjectUserDeleted => "organization.project.user.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1664,6 +1678,33 @@ pub struct AdminProject {
 
 pub type AdminProjectListResponse = AdminConversationCursorPage<AdminProject>;
 
+/// Represents an individual user in a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectUser {
+    pub id: String,
+    pub added_at: u64,
+    pub object: AdminProjectUserObject,
+    pub role: String,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting a project user.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectUserDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminProjectUserDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectUserListResponse = AdminConversationCursorPage<AdminProjectUser>;
+
 /// Project user creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectUserCreateParams {
@@ -1718,6 +1759,11 @@ impl From<AdminProjectUserRoleListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+pub type AdminProjectUserRoleCreateResponse = AdminUserRoleCreateResponse;
+pub type AdminProjectUserRoleRetrieveResponse = AdminRoleAssignment;
+pub type AdminProjectUserRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
+pub type AdminProjectUserRoleDeleteResponse = AdminRoleAssignmentDeleteResponse;
 
 /// Project service-account creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -3502,12 +3548,13 @@ impl ProjectUsers {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUser>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/users"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -3515,12 +3562,13 @@ impl ProjectUsers {
         &self,
         project_id: &str,
         user_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUser>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/users/{user_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -3529,13 +3577,14 @@ impl ProjectUsers {
         project_id: &str,
         user_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUser>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/users/{user_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -3543,12 +3592,12 @@ impl ProjectUsers {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/users"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(format!("/organization/projects/{project_id}/users"), params),
+            RequestOptions::default(),
         )
     }
 
@@ -3556,12 +3605,13 @@ impl ProjectUsers {
         &self,
         project_id: &str,
         user_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/users/{user_id}"),
+            RequestOptions::default(),
         )
     }
 }
@@ -3582,13 +3632,14 @@ impl ProjectUserRoles {
         project_id: &str,
         user_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserRoleCreateResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/projects/{project_id}/users/{user_id}/roles"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -3597,13 +3648,14 @@ impl ProjectUserRoles {
         project_id: &str,
         user_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserRoleRetrieveResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
         let role_id = path_id("role_id", role_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/projects/{project_id}/users/{user_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -3612,13 +3664,16 @@ impl ProjectUserRoles {
         project_id: &str,
         user_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserRoleListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
-        get_query(
-            &self.runtime,
-            format!("/projects/{project_id}/users/{user_id}/roles"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/projects/{project_id}/users/{user_id}/roles"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -3627,13 +3682,14 @@ impl ProjectUserRoles {
         project_id: &str,
         user_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectUserRoleDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let user_id = path_id("user_id", user_id)?;
         let role_id = path_id("role_id", role_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/projects/{project_id}/users/{user_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 }

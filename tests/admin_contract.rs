@@ -253,6 +253,17 @@ fn project_json(id: &str, name: &str, status: &str, archived_at: Option<u64>) ->
     })
 }
 
+fn project_user_json(id: &str, role: &str) -> Value {
+    json!({
+        "id": id,
+        "added_at": 1_717_172_000u64,
+        "object": "organization.project.user",
+        "role": role,
+        "email": "ops@example.com",
+        "name": "Ops User"
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -405,6 +416,14 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         )
         .to_string(),
     );
+    responses[13] = json_response(project_user_json("user_admin", "owner").to_string());
+    responses[14] = json_response(
+        json!({
+            "deleted": true,
+            "object": "user.role.deleted"
+        })
+        .to_string(),
+    );
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -531,7 +550,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let archived_project = projects.archive("proj_research").unwrap();
     assert_eq!(archived_project.output.status.as_deref(), Some("archived"));
     assert_eq!(archived_project.output.archived_at, Some(1_717_172_000));
-    projects
+    let project_user = projects
         .users()
         .create(
             "proj_research",
@@ -542,11 +561,18 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        project_user.output.object,
+        AdminProjectUserObject::OrganizationProjectUser
+    );
+    assert_eq!(project_user.output.role, "owner");
+    let deleted_project_user_role = projects
         .users()
         .roles()
         .delete("proj_research", "user_admin", "role_owner")
         .unwrap();
+    assert!(deleted_project_user_role.output.deleted);
+    assert_eq!(deleted_project_user_role.output.object, "user.role.deleted");
     projects
         .roles()
         .create(
@@ -1224,6 +1250,26 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     let mut responses = (0..21)
         .map(|index| json_response(json!({"id": format!("typed_project_{index}")}).to_string()))
         .collect::<Vec<_>>();
+    responses[0] = json_response(
+        json!({
+            "data": [project_user_json("user_admin", "owner")],
+            "has_more": true,
+            "last_id": "user_admin"
+        })
+        .to_string(),
+    );
+    responses[1] = json_response(project_user_json("user_admin", "member").to_string());
+    responses[2] = json_response(
+        organization_user_role_create_json("user_admin", "role_project_viewer").to_string(),
+    );
+    responses[3] = json_response(
+        json!({
+            "data": [organization_role_assignment_json("role_project_viewer")],
+            "has_more": true,
+            "next": "role_project_viewer"
+        })
+        .to_string(),
+    );
     responses[7] = json_response(
         json!({
             "data": [project_api_key_json("key_project")],
@@ -1274,7 +1320,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     let client = client(&server.url());
     let projects = client.admin().organization().projects();
 
-    projects
+    let project_users = projects
         .users()
         .list(
             "proj_research",
@@ -1284,7 +1330,12 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        project_users.output.data[0].object,
+        AdminProjectUserObject::OrganizationProjectUser
+    );
+    assert_eq!(project_users.output.next_after(), Some("user_admin"));
+    let updated_project_user = projects
         .users()
         .update(
             "proj_research",
@@ -1294,7 +1345,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(updated_project_user.output.role, "member");
+    let created_project_user_role = projects
         .users()
         .roles()
         .create(
@@ -1305,7 +1357,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        created_project_user_role.output.object,
+        AdminUserRoleObject::UserRole
+    );
+    let project_user_roles = projects
         .users()
         .roles()
         .list(
@@ -1318,6 +1374,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(project_user_roles.output.data[0].id, "role_project_viewer");
+    assert_eq!(
+        project_user_roles.output.next_after(),
+        Some("role_project_viewer")
+    );
 
     projects
         .service_accounts()
@@ -2088,6 +2149,89 @@ fn admin_project_retrieve_returns_typed_response() {
 
     let requests = server.captured_requests(1).unwrap();
     assert_eq!(requests[0].path, "/v1/organization/projects/proj_research");
+}
+
+#[test]
+fn admin_project_user_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(project_user_json("user_admin", "owner").to_string()),
+        json_response(
+            json!({
+                "id": "user_admin",
+                "deleted": true,
+                "object": "organization.project.user.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let users = client.admin().organization().projects().users();
+
+    let user = users.retrieve("proj_research", "user_admin").unwrap();
+    assert_eq!(
+        user.output.object,
+        AdminProjectUserObject::OrganizationProjectUser
+    );
+    assert_eq!(user.output.email.as_deref(), Some("ops@example.com"));
+
+    let deleted = users.delete("proj_research", "user_admin").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminProjectUserDeletedObject::OrganizationProjectUserDeleted
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/projects/proj_research/users/user_admin"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/projects/proj_research/users/user_admin"
+    );
+}
+
+#[test]
+fn admin_project_user_role_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_role_assignment_json("role_project_viewer").to_string()),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "user.role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let roles = client.admin().organization().projects().users().roles();
+
+    let role = roles
+        .retrieve("proj_research", "user_admin", "role_project_viewer")
+        .unwrap();
+    assert_eq!(role.output.id, "role_project_viewer");
+    assert_eq!(role.output.permissions, vec![String::from("logs.read")]);
+
+    let deleted = roles
+        .delete("proj_research", "user_admin", "role_project_viewer")
+        .unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, "user.role.deleted");
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/projects/proj_research/users/user_admin/roles/role_project_viewer"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/projects/proj_research/users/user_admin/roles/role_project_viewer"
+    );
 }
 
 #[test]
