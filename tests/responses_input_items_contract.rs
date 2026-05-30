@@ -44,6 +44,30 @@ fn input_items_list_exposes_typed_items_and_cursor_termination() {
         first_page.output().data[0].content[0].content_type,
         "input_text"
     );
+    assert_eq!(
+        first_page.output().data[1].content[0].image_url.as_deref(),
+        Some("https://example.com/cat.png")
+    );
+    assert_eq!(
+        first_page.output().data[1].content[0].detail.as_deref(),
+        Some("high")
+    );
+    assert_eq!(
+        first_page.output().data[1].content[1].file_id.as_deref(),
+        Some("file_123")
+    );
+    assert_eq!(
+        first_page.output().data[1].content[1].filename.as_deref(),
+        Some("notes.pdf")
+    );
+    assert_eq!(
+        first_page.output().data[1].content[1].file_data.as_deref(),
+        Some("ZmlsZQ==")
+    );
+    assert_eq!(
+        first_page.output().data[1].content[1].file_url.as_deref(),
+        Some("https://example.com/notes.pdf")
+    );
     assert_eq!(first_page.output().first_id.as_deref(), Some("item_1"));
     assert_eq!(first_page.output().last_id.as_deref(), Some("item_2"));
     assert_eq!(first_page.output().next_after(), Some("item_2"));
@@ -111,7 +135,19 @@ fn first_page_payload() -> String {
                 "type": "message",
                 "role": "user",
                 "content": [
-                    {"type": "input_image", "image_url": "https://example.com/cat.png"}
+                    {
+                        "type": "input_image",
+                        "image_url": "https://example.com/cat.png",
+                        "detail": "high"
+                    },
+                    {
+                        "type": "input_file",
+                        "file_id": "file_123",
+                        "filename": "notes.pdf",
+                        "file_data": "ZmlsZQ==",
+                        "file_url": "https://example.com/notes.pdf",
+                        "detail": "low"
+                    }
                 ]
             }
         ],

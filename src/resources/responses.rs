@@ -1193,6 +1193,20 @@ pub struct ResponseContentPart {
     pub annotations: Vec<Value>,
     #[serde(default)]
     pub logprobs: Option<Vec<Value>>,
+    #[serde(default)]
+    pub detail: Option<String>,
+    #[serde(default)]
+    pub file_data: Option<String>,
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub file_url: Option<String>,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub image_url: Option<String>,
+    #[serde(default)]
+    pub input_audio: Option<Value>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
