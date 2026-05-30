@@ -6,8 +6,8 @@ use openai_rust::{
     resources::fine_tuning::{
         AutoOrNumber, FineTuningCheckpointListParams, FineTuningCheckpointPermissionCreateParams,
         FineTuningCheckpointPermissionListParams, FineTuningCheckpointPermissionOrder,
-        FineTuningJobCreateParams, FineTuningJobIntegration, FineTuningJobListParams,
-        FineTuningJobStatus, FineTuningMethod, FineTuningWandbIntegration,
+        FineTuningJobCreateParams, FineTuningJobIntegration, FineTuningJobIntegrationType,
+        FineTuningJobListParams, FineTuningJobStatus, FineTuningMethod, FineTuningWandbIntegration,
     },
 };
 use serde_json::json;
@@ -38,7 +38,7 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
             suffix: Some(String::from("weather-mini")),
             seed: Some(7),
             integrations: Some(vec![FineTuningJobIntegration {
-                integration_type: String::from("wandb"),
+                integration_type: FineTuningJobIntegrationType::Wandb,
                 wandb: FineTuningWandbIntegration {
                     project: String::from("weather"),
                     tags: vec![String::from("nightly")],

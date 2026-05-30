@@ -5,9 +5,9 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::fine_tuning::{
         AutoOrNumber, FineTuningGrader, FineTuningJobCreateParams, FineTuningJobEventLevel,
-        FineTuningJobEventListParams, FineTuningMethod, FineTuningMethodConfig,
-        FineTuningReinforcementHyperparameters, FineTuningReinforcementReasoningEffort,
-        FineTuningSupervisedHyperparameters,
+        FineTuningJobEventListParams, FineTuningJobEventType, FineTuningMethod,
+        FineTuningMethodConfig, FineTuningReinforcementHyperparameters,
+        FineTuningReinforcementReasoningEffort, FineTuningSupervisedHyperparameters,
     },
 };
 use serde_json::json;
@@ -114,7 +114,12 @@ fn method_variants_and_job_controls_remain_distinct() {
         .unwrap();
     assert_eq!(events.output.data.len(), 2);
     assert_eq!(events.output.data[0].level, FineTuningJobEventLevel::Info);
+    assert_eq!(
+        events.output.data[0].event_type.as_ref(),
+        Some(&FineTuningJobEventType::Message)
+    );
     assert_eq!(events.output.data[1].message, "job metrics available");
+    assert_eq!(events.output.data[1].event_type(), Some("metrics"));
 
     let paused = client
         .fine_tuning()
