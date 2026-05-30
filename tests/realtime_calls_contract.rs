@@ -93,6 +93,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 session_type: RealtimeSessionType::Realtime,
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                parallel_tool_calls: Some(true),
+                reasoning: Some(json!({"effort": "low"})),
                 ..Default::default()
             }),
         })
@@ -112,6 +114,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 instructions: Some(String::from("Stay concise.")),
+                parallel_tool_calls: Some(true),
+                reasoning: Some(json!({"effort": "low"})),
                 ..Default::default()
             },
         )
@@ -187,10 +191,11 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     );
     assert_eq!(parsed.parts[0].body, b"v=0\r\n");
     assert_eq!(parsed.parts[1].name.as_deref(), Some("session"));
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&parsed.parts[1].body).unwrap()["type"],
-        "realtime"
-    );
+    let multipart_session: serde_json::Value =
+        serde_json::from_slice(&parsed.parts[1].body).unwrap();
+    assert_eq!(multipart_session["type"], "realtime");
+    assert_eq!(multipart_session["parallel_tool_calls"], true);
+    assert_eq!(multipart_session["reasoning"]["effort"], "low");
 
     let accept_body: serde_json::Value =
         serde_json::from_slice(&requests[3].body).expect("accept json body");
@@ -201,6 +206,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     );
     assert_eq!(accept_body["type"], "realtime");
     assert_eq!(accept_body["output_modalities"][0], "text");
+    assert_eq!(accept_body["parallel_tool_calls"], true);
+    assert_eq!(accept_body["reasoning"]["effort"], "low");
 
     assert_eq!(requests[4].path, "/v1/realtime/calls/call_hangup/hangup");
     assert!(requests[4].body.is_empty());

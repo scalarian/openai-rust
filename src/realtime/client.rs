@@ -123,7 +123,11 @@ pub struct RealtimeCallAcceptParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_modalities: Option<Vec<RealtimeOutputModality>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -146,7 +150,9 @@ impl Default for RealtimeCallAcceptParams {
             max_output_tokens: None,
             model: None,
             output_modalities: None,
+            parallel_tool_calls: None,
             prompt: None,
+            reasoning: None,
             tool_choice: None,
             tools: None,
             tracing: None,
