@@ -1,6 +1,8 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
+use std::collections::BTreeMap;
+
 use openai_rust::{
     OpenAI,
     resources::{
@@ -70,7 +72,10 @@ fn graders_validate_configs_and_run_tiny_samples() {
                 reference: String::from("sunny"),
             },
             model_sample: String::from("sunny"),
-            item: Some(json!({"reference": "sunny"})),
+            item: Some(BTreeMap::from([(
+                String::from("reference"),
+                json!("sunny"),
+            )])),
         })
         .unwrap();
 
@@ -120,7 +125,10 @@ fn graders_validate_configs_and_run_tiny_samples() {
         .run(FineTuningGraderRunParams {
             grader: label_model,
             model_sample: String::from("weather forecast: sunny"),
-            item: Some(json!({"reference": "sunny"})),
+            item: Some(BTreeMap::from([(
+                String::from("reference"),
+                json!("sunny"),
+            )])),
         })
         .unwrap();
     assert_eq!(label_run.output.reward, 1.0);

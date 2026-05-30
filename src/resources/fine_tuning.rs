@@ -1023,7 +1023,7 @@ pub struct FineTuningGraderRunParams {
     pub grader: FineTuningGrader,
     pub model_sample: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub item: Option<Value>,
+    pub item: Option<BTreeMap<String, Value>>,
 }
 
 /// Validate-grader response.

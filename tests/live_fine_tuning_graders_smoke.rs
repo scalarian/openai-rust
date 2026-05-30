@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
     resources::fine_tuning::{
@@ -41,7 +43,10 @@ fn live_fine_tuning_graders_smoke_captures_request_ids_and_scores() {
         .run(FineTuningGraderRunParams {
             grader,
             model_sample: String::from("sunny"),
-            item: Some(serde_json::json!({"reference": "sunny"})),
+            item: Some(BTreeMap::from([(
+                String::from("reference"),
+                serde_json::json!("sunny"),
+            )])),
         })
         .expect("live grader run should succeed");
     let run_request_id = run
