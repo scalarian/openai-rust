@@ -34,7 +34,12 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
         .responses()
         .parse::<Scorecard>(ResponseParseParams {
             model: "gpt-4.1-nano".into(),
+            include: vec![String::from("message.output_text.logprobs")],
             input: Some(json!("who won?")),
+            max_output_tokens: Some(128),
+            prompt_cache_key: Some(String::from("parse-cache")),
+            prompt_cache_retention: Some(String::from("24h")),
+            service_tier: Some(String::from("default")),
             text: Some(ResponseTextConfig {
                 format: Some(ResponseFormatTextConfig::JsonSchema(
                     ResponseFormatTextJSONSchemaConfig {
@@ -68,6 +73,7 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
                 description: Some("Look up the game".into()),
                 defer_loading: None,
             }],
+            top_p: Some(0.9),
             ..Default::default()
         })
         .unwrap();
@@ -76,10 +82,16 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
     assert_eq!(request.method, "POST");
     assert_eq!(request.path, "/v1/responses");
     let body: Value = serde_json::from_slice(&request.body).unwrap();
+    assert_eq!(body["include"], json!(["message.output_text.logprobs"]));
+    assert_eq!(body["max_output_tokens"], 128);
+    assert_eq!(body["prompt_cache_key"], "parse-cache");
+    assert_eq!(body["prompt_cache_retention"], "24h");
+    assert_eq!(body["service_tier"], "default");
     assert_eq!(body["stream"], false);
     assert_eq!(body["text"]["format"]["type"], "json_schema");
     assert_eq!(body["tools"][0]["type"], "function");
     assert_eq!(body["tools"][0]["strict"], true);
+    assert_eq!(body["top_p"], 0.9);
 
     assert_eq!(
         response.output().output_parsed(),

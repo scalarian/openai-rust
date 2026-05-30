@@ -555,23 +555,45 @@ impl ResponsesConnection {
 pub struct ResponseCreateParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub context_management: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<Value>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub include: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub previous_response_id: Option<String>,
+    pub max_output_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub store: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub background: Option<bool>,
+    pub max_tool_calls: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_response_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub store: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -579,7 +601,13 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_logprobs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -617,23 +645,45 @@ impl ResponseCreateParams {
 pub struct ResponseParseParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub context_management: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<Value>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub include: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub previous_response_id: Option<String>,
+    pub max_output_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub store: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub background: Option<bool>,
+    pub max_tool_calls: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_response_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub store: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -641,7 +691,13 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_logprobs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -650,19 +706,33 @@ impl ResponseParseParams {
     fn into_create_params(self) -> ResponseCreateParams {
         ResponseCreateParams {
             model: self.model,
+            background: self.background,
+            context_management: self.context_management,
+            conversation: self.conversation,
+            include: self.include,
             input: self.input,
             instructions: self.instructions,
-            previous_response_id: self.previous_response_id,
-            conversation: self.conversation,
-            store: self.store,
-            background: self.background,
+            max_output_tokens: self.max_output_tokens,
+            max_tool_calls: self.max_tool_calls,
             metadata: self.metadata,
             parallel_tool_calls: self.parallel_tool_calls,
+            previous_response_id: self.previous_response_id,
+            prompt: self.prompt,
+            prompt_cache_key: self.prompt_cache_key,
+            prompt_cache_retention: self.prompt_cache_retention,
             reasoning: self.reasoning,
+            safety_identifier: self.safety_identifier,
+            service_tier: self.service_tier,
+            store: self.store,
+            stream_options: self.stream_options,
+            temperature: self.temperature,
             text: self.text,
             tool_choice: self.tool_choice,
             tools: self.tools,
+            top_logprobs: self.top_logprobs,
+            top_p: self.top_p,
             truncation: self.truncation,
+            user: self.user,
             extra: self.extra,
         }
     }
@@ -711,6 +781,10 @@ pub struct ResponseCompactParams {
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_retention: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_tier: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

@@ -24,10 +24,30 @@ fn create_populates_output_text_helper() {
         .responses()
         .create(openai_rust::resources::responses::ResponseCreateParams {
             model: "gpt-4.1-nano".into(),
+            background: Some(true),
+            context_management: vec![json!({"type": "auto"})],
+            include: vec![String::from("message.output_text.logprobs")],
             input: Some(json!("hello")),
+            instructions: Some(String::from("Be concise.")),
+            max_output_tokens: Some(512),
+            max_tool_calls: Some(4),
+            metadata: Some(json!({"trace": "resp_create"})),
+            parallel_tool_calls: Some(false),
             previous_response_id: Some("resp_prev".into()),
             conversation: Some(json!("conv_123")),
+            prompt: Some(json!({"id": "pmpt_123", "variables": {"topic": "Rust"}})),
+            prompt_cache_key: Some(String::from("cache-key")),
+            prompt_cache_retention: Some(String::from("24h")),
+            reasoning: Some(json!({"effort": "low"})),
+            safety_identifier: Some(String::from("user_hash")),
+            service_tier: Some(String::from("priority")),
             store: Some(true),
+            stream_options: Some(json!({"include_usage": true})),
+            temperature: Some(0.2),
+            top_logprobs: Some(2),
+            top_p: Some(0.8),
+            truncation: Some(String::from("auto")),
+            user: Some(String::from("legacy-user")),
             ..Default::default()
         })
         .unwrap();
@@ -37,11 +57,32 @@ fn create_populates_output_text_helper() {
     assert_eq!(request.path, "/v1/responses");
     let body: Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(body["model"], "gpt-4.1-nano");
+    assert_eq!(body["background"], true);
+    assert_eq!(body["context_management"][0]["type"], "auto");
+    assert_eq!(body["include"], json!(["message.output_text.logprobs"]));
     assert_eq!(body["input"], "hello");
+    assert_eq!(body["instructions"], "Be concise.");
+    assert_eq!(body["max_output_tokens"], 512);
+    assert_eq!(body["max_tool_calls"], 4);
+    assert_eq!(body["metadata"]["trace"], "resp_create");
+    assert_eq!(body["parallel_tool_calls"], false);
     assert_eq!(body["previous_response_id"], "resp_prev");
     assert_eq!(body["conversation"], "conv_123");
+    assert_eq!(body["prompt"]["id"], "pmpt_123");
+    assert_eq!(body["prompt"]["variables"]["topic"], "Rust");
+    assert_eq!(body["prompt_cache_key"], "cache-key");
+    assert_eq!(body["prompt_cache_retention"], "24h");
+    assert_eq!(body["reasoning"]["effort"], "low");
+    assert_eq!(body["safety_identifier"], "user_hash");
+    assert_eq!(body["service_tier"], "priority");
     assert_eq!(body["store"], true);
+    assert_eq!(body["stream_options"]["include_usage"], true);
+    assert_eq!(body["temperature"], 0.2);
     assert_eq!(body["stream"], false);
+    assert_eq!(body["top_logprobs"], 2);
+    assert_eq!(body["top_p"], 0.8);
+    assert_eq!(body["truncation"], "auto");
+    assert_eq!(body["user"], "legacy-user");
     assert_eq!(response.output().id, "resp_create");
     assert_eq!(
         response.output().previous_response_id.as_deref(),
@@ -261,6 +302,9 @@ fn compact_returns_compaction_object() {
             model: "gpt-4.1-nano".into(),
             input: Some(json!("follow-up")),
             previous_response_id: Some("resp_prev".into()),
+            prompt_cache_key: Some(String::from("compact-cache")),
+            prompt_cache_retention: Some(String::from("in_memory")),
+            service_tier: Some(String::from("flex")),
             ..Default::default()
         })
         .unwrap();
@@ -272,6 +316,9 @@ fn compact_returns_compaction_object() {
     assert_eq!(request_body["model"], "gpt-4.1-nano");
     assert_eq!(request_body["input"], "follow-up");
     assert_eq!(request_body["previous_response_id"], "resp_prev");
+    assert_eq!(request_body["prompt_cache_key"], "compact-cache");
+    assert_eq!(request_body["prompt_cache_retention"], "in_memory");
+    assert_eq!(request_body["service_tier"], "flex");
     assert_eq!(response.output().object, "response.compaction");
     assert_eq!(response.output().output.len(), 2);
     assert_eq!(response.output().output[0].item_type, "message");
