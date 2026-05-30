@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use tokio::runtime::Builder;
 
@@ -244,6 +244,87 @@ pub struct CompletionStreamOptions {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Reason a legacy text-completion choice stopped generating.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CompletionFinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+    Unknown(String),
+}
+
+impl CompletionFinishReason {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Stop => "stop",
+            Self::Length => "length",
+            Self::ContentFilter => "content_filter",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for CompletionFinishReason {
+    fn from(value: &str) -> Self {
+        match value {
+            "stop" => Self::Stop,
+            "length" => Self::Length,
+            "content_filter" => Self::ContentFilter,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for CompletionFinishReason {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "stop" => Self::Stop,
+            "length" => Self::Length,
+            "content_filter" => Self::ContentFilter,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+impl AsRef<str> for CompletionFinishReason {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for CompletionFinishReason {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for CompletionFinishReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for CompletionFinishReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for CompletionFinishReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
 /// Typed legacy text-completion object.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Completion {
@@ -267,7 +348,7 @@ pub struct Completion {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct CompletionChoice {
     #[serde(default)]
-    pub finish_reason: Option<String>,
+    pub finish_reason: Option<CompletionFinishReason>,
     pub index: usize,
     #[serde(default)]
     pub logprobs: Option<CompletionLogprobs>,
@@ -523,7 +604,7 @@ impl CompletionAccumulator {
 
 #[derive(Clone, Debug, Default)]
 struct AccumulatedCompletionChoice {
-    finish_reason: Option<String>,
+    finish_reason: Option<CompletionFinishReason>,
     logprobs: Option<CompletionLogprobs>,
     text: String,
 }
