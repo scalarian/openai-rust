@@ -16,7 +16,7 @@ use crate::{
     },
     error::ErrorKind,
     resources::files::{
-        FileCreateParams, FilePurpose, FileUpload, Files, encode_path_id, validate_path_id,
+        FileCreateParams, FileCreatePurpose, FileUpload, Files, encode_path_id, validate_path_id,
     },
 };
 
@@ -361,7 +361,7 @@ impl VectorStoreFiles {
         validate_path_id("vector_store_id", vector_store_id)?;
         let file = Files::new(self.runtime.clone()).create(FileCreateParams {
             file: params.file,
-            purpose: FilePurpose::Assistants,
+            purpose: FileCreatePurpose::Assistants,
             expires_after: None,
         })?;
         self.create(
@@ -586,7 +586,7 @@ impl VectorStoreFileBatches {
                     Files::new(runtime)
                         .create(FileCreateParams {
                             file,
-                            purpose: FilePurpose::Assistants,
+                            purpose: FileCreatePurpose::Assistants,
                             expires_after: None,
                         })
                         .map(|uploaded| uploaded.output.id)

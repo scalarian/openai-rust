@@ -1,6 +1,6 @@
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
-    resources::files::{FileCreateParams, FilePurpose, FileUpload},
+    resources::files::{FileCreateParams, FileCreatePurpose, FileUpload},
 };
 
 #[test]
@@ -20,7 +20,7 @@ fn live_files_smoke_exercises_create_retrieve_content_and_delete() {
                 "application/jsonl",
                 br#"{"custom_id":"live-files-smoke","method":"GET","url":"/v1/models"}"#.to_vec(),
             ),
-            purpose: FilePurpose::Batch,
+            purpose: FileCreatePurpose::Batch,
             expires_after: None,
         })
         .expect("live file create should succeed");

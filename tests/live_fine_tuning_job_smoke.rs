@@ -3,7 +3,7 @@ use std::time::Duration;
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
     resources::{
-        files::{FileCreateParams, FilePurpose, FileUpload, WaitForProcessingOptions},
+        files::{FileCreateParams, FileCreatePurpose, FileUpload, WaitForProcessingOptions},
         fine_tuning::{FineTuningJobCreateParams, FineTuningJobListParams, FineTuningJobStatus},
     },
 };
@@ -26,7 +26,7 @@ fn live_fine_tuning_job_smoke_proves_create_retrieve_list_cancel() {
                 br#"{"messages":[{"role":"system","content":"You answer in one word."},{"role":"user","content":"Weather?"},{"role":"assistant","content":"sunny"}]}"#
                     .to_vec(),
             ),
-            purpose: FilePurpose::FineTune,
+            purpose: FileCreatePurpose::FineTune,
             expires_after: None,
         })
         .expect("live fine-tuning training file upload should succeed");

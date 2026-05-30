@@ -180,7 +180,7 @@ impl FileUpload {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileCreateParams {
     pub file: FileUpload,
-    pub purpose: FilePurpose,
+    pub purpose: FileCreatePurpose,
     pub expires_after: Option<FileExpiresAfter>,
 }
 
@@ -210,10 +210,46 @@ pub struct FileListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
     pub order: Option<String>,
-    pub purpose: Option<FilePurpose>,
+    pub purpose: Option<String>,
 }
 
-/// Public file purpose enum shared with uploads.
+/// Purpose values accepted when uploading a new file.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum FileCreatePurpose {
+    #[serde(rename = "assistants")]
+    Assistants,
+    #[serde(rename = "batch")]
+    Batch,
+    #[serde(rename = "fine-tune")]
+    FineTune,
+    #[serde(rename = "vision")]
+    Vision,
+    #[serde(rename = "user_data")]
+    UserData,
+    #[serde(rename = "evals")]
+    Evals,
+}
+
+impl FileCreatePurpose {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Assistants => "assistants",
+            Self::Batch => "batch",
+            Self::FineTune => "fine-tune",
+            Self::Vision => "vision",
+            Self::UserData => "user_data",
+            Self::Evals => "evals",
+        }
+    }
+}
+
+impl fmt::Display for FileCreatePurpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Purpose values returned on file objects.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FilePurpose {
     #[serde(rename = "assistants")]
@@ -232,8 +268,6 @@ pub enum FilePurpose {
     Vision,
     #[serde(rename = "user_data")]
     UserData,
-    #[serde(rename = "evals")]
-    Evals,
 }
 
 impl FilePurpose {
@@ -247,7 +281,6 @@ impl FilePurpose {
             Self::FineTuneResults => "fine-tune-results",
             Self::Vision => "vision",
             Self::UserData => "user_data",
-            Self::Evals => "evals",
         }
     }
 }

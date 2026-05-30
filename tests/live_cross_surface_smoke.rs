@@ -9,7 +9,7 @@ use openai_rust::{
     },
     resources::{
         chat::ChatCompletionCreateParams,
-        files::{FileCreateParams, FilePurpose, FileUpload},
+        files::{FileCreateParams, FileCreatePurpose, FileUpload},
         responses::ResponseCreateParams,
     },
 };
@@ -69,7 +69,7 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
                 "text/plain",
                 b"cross-surface live smoke".to_vec(),
             ),
-            purpose: FilePurpose::UserData,
+            purpose: FileCreatePurpose::UserData,
             expires_after: None,
         })
         .expect("live file create should succeed");

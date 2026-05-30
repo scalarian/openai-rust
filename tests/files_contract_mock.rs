@@ -8,7 +8,7 @@ use std::time::Duration;
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::files::{
-        FileCreateParams, FileDeleteResponse, FileExpiresAfter, FileListParams, FilePurpose,
+        FileCreateParams, FileCreatePurpose, FileDeleteResponse, FileExpiresAfter, FileListParams,
         FileStatus, FileUpload, WaitForProcessingOptions,
     },
 };
@@ -29,7 +29,7 @@ fn create_preserves_multipart_semantics() {
                 "application/jsonl",
                 br#"{"messages":[]}"#.to_vec(),
             ),
-            purpose: FilePurpose::FineTune,
+            purpose: FileCreatePurpose::FineTune,
             expires_after: Some(FileExpiresAfter {
                 anchor: String::from("created_at"),
                 seconds: 3600,
@@ -77,7 +77,7 @@ fn list_preserves_cursor_pagination_and_filters() {
             after: Some(String::from("file-0")),
             limit: Some(2),
             order: Some(String::from("asc")),
-            purpose: Some(FilePurpose::Batch),
+            purpose: Some(String::from("batch")),
         })
         .unwrap();
     assert_eq!(first.output.data.len(), 2);
@@ -90,7 +90,7 @@ fn list_preserves_cursor_pagination_and_filters() {
             after: first.output.next_after().map(String::from),
             limit: Some(2),
             order: Some(String::from("asc")),
-            purpose: Some(FilePurpose::Batch),
+            purpose: Some(String::from("batch")),
         })
         .unwrap();
     assert_eq!(second.output.data.len(), 1);

@@ -23,7 +23,7 @@ use openai_rust::{
     },
     resources::{
         chat::ChatCompletionCreateParams,
-        files::{FileCreateParams, FilePurpose, FileUpload},
+        files::{FileCreateParams, FileCreatePurpose, FileUpload},
         multimodal::{ResponseInputMessage, ResponseInputPart},
         responses::{
             ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
@@ -285,7 +285,7 @@ fn file_ids_flow_directly_into_input_file_without_manual_identifier_rewriting() 
         .files()
         .create(FileCreateParams {
             file: FileUpload::new("brief.txt", "text/plain", b"brief".to_vec()),
-            purpose: FilePurpose::UserData,
+            purpose: FileCreatePurpose::UserData,
             expires_after: None,
         })
         .unwrap();
@@ -837,7 +837,7 @@ fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCrossSurf
                         "text/plain",
                         b"cross-surface live smoke".to_vec(),
                     ),
-                    purpose: FilePurpose::UserData,
+                    purpose: FileCreatePurpose::UserData,
                     expires_after: None,
                 })
                 .expect("mock files.create");

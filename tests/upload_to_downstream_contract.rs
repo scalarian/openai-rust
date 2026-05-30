@@ -9,7 +9,7 @@ use openai_rust::{
     OpenAI,
     resources::{
         batches::{BatchCompletionWindow, BatchCreateParams, BatchEndpoint},
-        files::{FileCreateParams, FilePurpose, FileUpload},
+        files::{FileCreateParams, FileCreatePurpose, FileUpload},
         vector_stores::{
             VectorStoreFileBatchCreateParams, VectorStoreFileBatchPollOptions,
             VectorStoreFileBatchStatus,
@@ -36,7 +36,7 @@ fn files_flow_into_downstream_batches_and_poll_helpers_honor_server_intervals() 
         .files()
         .create(FileCreateParams {
             file: FileUpload::new("batch-input.jsonl", "application/jsonl", b"{}".to_vec()),
-            purpose: FilePurpose::Batch,
+            purpose: FileCreatePurpose::Batch,
             expires_after: None,
         })
         .unwrap();
