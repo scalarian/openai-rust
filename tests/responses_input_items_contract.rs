@@ -1,6 +1,6 @@
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::{common::ListOrder, responses::ResponseIncludable},
+    resources::{common::ListOrder, multimodal::InputAudioFormat, responses::ResponseIncludable},
 };
 use serde_json::json;
 
@@ -71,6 +71,12 @@ fn input_items_list_exposes_typed_items_and_cursor_termination() {
         first_page.output().data[1].content[1].file_url.as_deref(),
         Some("https://example.com/notes.pdf")
     );
+    let input_audio = first_page.output().data[1].content[2]
+        .input_audio
+        .as_ref()
+        .expect("input audio data");
+    assert_eq!(input_audio.data, "UklGRg==");
+    assert_eq!(input_audio.format, InputAudioFormat::Mp3);
     assert_eq!(first_page.output().first_id.as_deref(), Some("item_1"));
     assert_eq!(first_page.output().last_id.as_deref(), Some("item_2"));
     assert_eq!(first_page.output().next_after(), Some("item_2"));
@@ -150,6 +156,13 @@ fn first_page_payload() -> String {
                         "file_data": "ZmlsZQ==",
                         "file_url": "https://example.com/notes.pdf",
                         "detail": "low"
+                    },
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": "UklGRg==",
+                            "format": "mp3"
+                        }
                     }
                 ]
             }

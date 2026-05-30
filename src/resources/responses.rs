@@ -40,7 +40,7 @@ use crate::{
             ImageBackground, ImageGenerateSize, ImageInputFidelity, ImageModeration,
             ImageOutputFormat, ImageStreamQuality,
         },
-        multimodal::ImageDetail,
+        multimodal::{ImageDetail, InputAudioFormat},
     },
 };
 
@@ -3090,7 +3090,7 @@ pub struct ResponseTextTopLogprob {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ResponseInputAudioData {
     pub data: String,
-    pub format: String,
+    pub format: InputAudioFormat,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
