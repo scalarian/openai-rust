@@ -8,11 +8,12 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::beta::{
         BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
-        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions, BetaThreadCreateParams,
-        BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
-        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
-        BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
-        BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
+        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions,
+        BetaThreadCreateAndRunParams, BetaThreadCreateParams, BetaThreadMessageCreateParams,
+        BetaThreadMessageListParams, BetaThreadMessageUpdateParams, BetaThreadRunCreateParams,
+        BetaThreadRunListParams, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+        BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput, BetaThreadRunUpdateParams,
+        BetaThreadUpdateParams,
     },
 };
 use serde_json::json;
@@ -149,10 +150,21 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         threads
-            .create_and_run(json!({
-                "assistant_id": "asst_123",
-                "thread": {"messages": [{"role": "user", "content": "Hello"}]}
-            }))
+            .create_and_run(BetaThreadCreateAndRunParams {
+                assistant_id: String::from("asst_123"),
+                max_prompt_tokens: Some(512),
+                parallel_tool_calls: Some(true),
+                thread: Some(BetaThreadCreateParams {
+                    messages: Some(vec![BetaThreadMessageCreateParams {
+                        role: String::from("user"),
+                        content: json!("Hello"),
+                        attachments: None,
+                        metadata: None,
+                    }]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
             .unwrap()
             .output["id"],
         json!("run_created")
@@ -411,6 +423,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         thread_update_body["tool_resources"]["file_search"]["vector_store_ids"][0],
         json!("vs_123")
     );
+    let thread_run_body: serde_json::Value = serde_json::from_slice(&requests[10].body).unwrap();
+    assert_eq!(thread_run_body["assistant_id"], json!("asst_123"));
+    assert_eq!(thread_run_body["max_prompt_tokens"], json!(512));
+    assert_eq!(thread_run_body["parallel_tool_calls"], json!(true));
+    assert_eq!(
+        thread_run_body["thread"]["messages"][0]["content"],
+        json!("Hello")
+    );
     let message_body: serde_json::Value = serde_json::from_slice(&requests[11].body).unwrap();
     assert_eq!(message_body["role"], json!("user"));
     assert_eq!(message_body["attachments"][0]["file_id"], json!("file_123"));
@@ -523,10 +543,14 @@ fn beta_assistants_stream_helpers_preserve_routes_headers_and_stream_bodies() {
     assert!(run_stream.next_event().expect("run eof").is_none());
 
     let mut thread_stream = threads
-        .create_and_run_stream(json!({
-            "assistant_id": "asst_123",
-            "thread": {"messages": []}
-        }))
+        .create_and_run_stream(BetaThreadCreateAndRunParams {
+            assistant_id: String::from("asst_123"),
+            thread: Some(BetaThreadCreateParams {
+                messages: Some(vec![]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
         .expect("thread run stream");
     assert_eq!(
         thread_stream.metadata().request_id(),
@@ -644,7 +668,14 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
 
     let thread_created = threads
         .create_and_run_poll(
-            json!({"assistant_id": "asst_123", "thread": {"messages": []}}),
+            BetaThreadCreateAndRunParams {
+                assistant_id: String::from("asst_123"),
+                thread: Some(BetaThreadCreateParams {
+                    messages: Some(vec![]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
             poll_options,
         )
         .expect("create thread and poll");
