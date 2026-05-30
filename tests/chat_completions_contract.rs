@@ -1,8 +1,11 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::chat::{
-        ChatCompletionAudioParams, ChatCompletionPredictionContent, ChatCompletionResponseFormat,
-        ChatCompletionStreamOptions, ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
+        ChatCompletionAudioParams, ChatCompletionFunction, ChatCompletionFunctionCall,
+        ChatCompletionFunctionDefinition, ChatCompletionFunctionTool,
+        ChatCompletionPredictionContent, ChatCompletionResponseFormat, ChatCompletionStreamOptions,
+        ChatCompletionTool, ChatCompletionToolChoice, ChatCompletionVoice, ChatStop,
+        ChatWebSearchOptions,
     },
 };
 use serde_json::{Value, json};
@@ -43,11 +46,12 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 extra: BTreeMap::new(),
             }),
             frequency_penalty: Some(0.1),
-            function_call: Some(json!("auto")),
-            functions: Some(vec![json!({
-                "name": "legacy_lookup",
-                "parameters": {"type": "object"}
-            })]),
+            function_call: Some(ChatCompletionFunctionCall::Auto),
+            functions: Some(vec![ChatCompletionFunction {
+                name: String::from("legacy_lookup"),
+                parameters: Some(json!({"type": "object"})),
+                ..Default::default()
+            }]),
             logit_bias: Some(BTreeMap::from([(String::from("42"), -1)])),
             logprobs: Some(true),
             max_completion_tokens: Some(128),
@@ -76,11 +80,14 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 ..Default::default()
             }),
             temperature: Some(0.3),
-            tool_choice: Some(json!("auto")),
-            tools: Some(vec![json!({
-                "type": "function",
-                "function": {"name": "lookup", "parameters": {"type": "object"}}
-            })]),
+            tool_choice: Some(ChatCompletionToolChoice::Auto),
+            tools: Some(vec![ChatCompletionTool::from(
+                ChatCompletionFunctionTool::new(ChatCompletionFunctionDefinition {
+                    name: String::from("lookup"),
+                    parameters: Some(json!({"type": "object"})),
+                    ..Default::default()
+                }),
+            )]),
             top_logprobs: Some(2),
             top_p: Some(0.9),
             user: Some(String::from("legacy-user")),

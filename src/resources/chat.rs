@@ -174,9 +174,9 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_call: Option<Value>,
+    pub function_call: Option<ChatCompletionFunctionCall>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub functions: Option<Vec<Value>>,
+    pub functions: Option<Vec<ChatCompletionFunction>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logit_bias: Option<BTreeMap<String, i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -222,9 +222,9 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ChatCompletionToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<ChatCompletionTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -530,6 +530,290 @@ pub struct ChatWebSearchUserLocationApproximate {
     pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated function-call selector for legacy chat function definitions.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ChatCompletionFunctionCall {
+    None,
+    Auto,
+    Named(ChatCompletionFunctionCallOption),
+}
+
+impl Serialize for ChatCompletionFunctionCall {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::None => serializer.serialize_str("none"),
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Named(option) => option.serialize(serializer),
+        }
+    }
+}
+
+/// Named legacy function-call selector.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionFunctionCallOption {
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated legacy function definition for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionFunction {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool-choice selector for chat completions.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ChatCompletionToolChoice {
+    None,
+    Auto,
+    Required,
+    Function(ChatCompletionNamedToolChoiceFunction),
+    Custom(ChatCompletionNamedToolChoiceCustom),
+    AllowedTools(ChatCompletionAllowedToolChoice),
+}
+
+impl Serialize for ChatCompletionToolChoice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::None => serializer.serialize_str("none"),
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Required => serializer.serialize_str("required"),
+            Self::Function(function) => {
+                #[derive(Serialize)]
+                struct FunctionChoice<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'a str,
+                    function: &'a ChatCompletionNamedToolChoiceFunction,
+                }
+
+                FunctionChoice {
+                    choice_type: "function",
+                    function,
+                }
+                .serialize(serializer)
+            }
+            Self::Custom(custom) => {
+                #[derive(Serialize)]
+                struct CustomChoice<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'a str,
+                    custom: &'a ChatCompletionNamedToolChoiceCustom,
+                }
+
+                CustomChoice {
+                    choice_type: "custom",
+                    custom,
+                }
+                .serialize(serializer)
+            }
+            Self::AllowedTools(allowed_tools) => allowed_tools.serialize(serializer),
+        }
+    }
+}
+
+/// Function name used by a named chat tool choice.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionNamedToolChoiceFunction {
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Custom tool name used by a named chat tool choice.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionNamedToolChoiceCustom {
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Allowed-tool choice wrapper for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionAllowedToolChoice {
+    pub allowed_tools: ChatCompletionAllowedTools,
+    #[serde(rename = "type")]
+    pub choice_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionAllowedToolChoice {
+    pub fn new(allowed_tools: ChatCompletionAllowedTools) -> Self {
+        Self {
+            allowed_tools,
+            choice_type: String::from("allowed_tools"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Set of tools allowed by a constrained chat tool choice.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionAllowedTools {
+    pub mode: String,
+    pub tools: Vec<BTreeMap<String, Value>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool definition accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionTool {
+    Function(ChatCompletionFunctionTool),
+    Custom(ChatCompletionCustomTool),
+}
+
+impl From<ChatCompletionFunctionTool> for ChatCompletionTool {
+    fn from(value: ChatCompletionFunctionTool) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl From<ChatCompletionCustomTool> for ChatCompletionTool {
+    fn from(value: ChatCompletionCustomTool) -> Self {
+        Self::Custom(value)
+    }
+}
+
+/// Function tool definition for chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionFunctionTool {
+    pub function: ChatCompletionFunctionDefinition,
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionFunctionTool {
+    pub fn new(function: ChatCompletionFunctionDefinition) -> Self {
+        Self {
+            function,
+            tool_type: String::from("function"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Function definition nested in a chat tool.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionFunctionDefinition {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Custom tool definition for chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionCustomTool {
+    pub custom: ChatCompletionCustomToolConfig,
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionCustomTool {
+    pub fn new(custom: ChatCompletionCustomToolConfig) -> Self {
+        Self {
+            custom,
+            tool_type: String::from("custom"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Custom tool properties for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionCustomToolConfig {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<ChatCompletionCustomToolFormat>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Input format for chat custom tools.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ChatCompletionCustomToolFormat {
+    Text,
+    Grammar(ChatCompletionCustomToolGrammarFormat),
+}
+
+impl Serialize for ChatCompletionCustomToolFormat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text => {
+                #[derive(Serialize)]
+                struct TextFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                TextFormat {
+                    format_type: "text",
+                }
+                .serialize(serializer)
+            }
+            Self::Grammar(grammar) => grammar.serialize(serializer),
+        }
+    }
+}
+
+/// Grammar input format for chat custom tools.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionCustomToolGrammarFormat {
+    pub grammar: ChatCompletionCustomToolGrammar,
+    #[serde(rename = "type")]
+    pub format_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionCustomToolGrammarFormat {
+    pub fn new(grammar: ChatCompletionCustomToolGrammar) -> Self {
+        Self {
+            grammar,
+            format_type: String::from("grammar"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Grammar definition for chat custom tools.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionCustomToolGrammar {
+    pub definition: String,
+    pub syntax: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
