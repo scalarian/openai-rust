@@ -1012,7 +1012,7 @@ impl ProjectUserRoles {
         let user_id = path_id("user_id", user_id)?;
         post_body(
             &self.runtime,
-            format!("/organization/projects/{project_id}/users/{user_id}/roles"),
+            format!("/projects/{project_id}/users/{user_id}/roles"),
             params,
         )
     }
@@ -1028,7 +1028,7 @@ impl ProjectUserRoles {
         let role_id = path_id("role_id", role_id)?;
         get(
             &self.runtime,
-            format!("/organization/projects/{project_id}/users/{user_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/users/{user_id}/roles/{role_id}"),
         )
     }
 
@@ -1042,7 +1042,7 @@ impl ProjectUserRoles {
         let user_id = path_id("user_id", user_id)?;
         get_query(
             &self.runtime,
-            format!("/organization/projects/{project_id}/users/{user_id}/roles"),
+            format!("/projects/{project_id}/users/{user_id}/roles"),
             params,
         )
     }
@@ -1058,7 +1058,7 @@ impl ProjectUserRoles {
         let role_id = path_id("role_id", role_id)?;
         delete(
             &self.runtime,
-            format!("/organization/projects/{project_id}/users/{user_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/users/{user_id}/roles/{role_id}"),
         )
     }
 }
@@ -1398,7 +1398,7 @@ impl ProjectGroupRoles {
         let group_id = path_id("group_id", group_id)?;
         post_body(
             &self.runtime,
-            format!("/organization/projects/{project_id}/groups/{group_id}/roles"),
+            format!("/projects/{project_id}/groups/{group_id}/roles"),
             params,
         )
     }
@@ -1414,7 +1414,7 @@ impl ProjectGroupRoles {
         let role_id = path_id("role_id", role_id)?;
         get(
             &self.runtime,
-            format!("/organization/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
         )
     }
 
@@ -1428,7 +1428,7 @@ impl ProjectGroupRoles {
         let group_id = path_id("group_id", group_id)?;
         get_query(
             &self.runtime,
-            format!("/organization/projects/{project_id}/groups/{group_id}/roles"),
+            format!("/projects/{project_id}/groups/{group_id}/roles"),
             params,
         )
     }
@@ -1444,7 +1444,7 @@ impl ProjectGroupRoles {
         let role_id = path_id("role_id", role_id)?;
         delete(
             &self.runtime,
-            format!("/organization/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
         )
     }
 }
@@ -1468,7 +1468,7 @@ impl ProjectRoles {
         let project_id = path_id("project_id", project_id)?;
         post_body(
             &self.runtime,
-            format!("/organization/projects/{project_id}/roles"),
+            format!("/projects/{project_id}/roles"),
             params,
         )
     }
@@ -1482,7 +1482,7 @@ impl ProjectRoles {
         let role_id = path_id("role_id", role_id)?;
         get(
             &self.runtime,
-            format!("/organization/projects/{project_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/roles/{role_id}"),
         )
     }
 
@@ -1496,7 +1496,7 @@ impl ProjectRoles {
         let role_id = path_id("role_id", role_id)?;
         post_body(
             &self.runtime,
-            format!("/organization/projects/{project_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/roles/{role_id}"),
             params,
         )
     }
@@ -1509,7 +1509,7 @@ impl ProjectRoles {
         let project_id = path_id("project_id", project_id)?;
         get_query(
             &self.runtime,
-            format!("/organization/projects/{project_id}/roles"),
+            format!("/projects/{project_id}/roles"),
             params,
         )
     }
@@ -1523,7 +1523,7 @@ impl ProjectRoles {
         let role_id = path_id("role_id", role_id)?;
         delete(
             &self.runtime,
-            format!("/organization/projects/{project_id}/roles/{role_id}"),
+            format!("/projects/{project_id}/roles/{role_id}"),
         )
     }
 }

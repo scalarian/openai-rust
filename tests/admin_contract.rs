@@ -10,7 +10,7 @@ use serde_json::json;
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..20)
+        (0..22)
             .map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string()))
             .collect(),
     )
@@ -81,6 +81,22 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .delete("proj_research", "user_admin", "role_owner")
         .unwrap();
     projects
+        .roles()
+        .create(
+            "proj_research",
+            json!({"role_name": "auditor", "permissions": ["logs.read"]}),
+        )
+        .unwrap();
+    projects
+        .groups()
+        .roles()
+        .list(
+            "proj_research",
+            "grp_eng",
+            AdminQueryParams::new().push("limit", 3),
+        )
+        .unwrap();
+    projects
         .api_keys()
         .retrieve("proj_research", "key_project")
         .unwrap();
@@ -116,7 +132,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         )
         .unwrap();
 
-    let requests = server.captured_requests(20).unwrap();
+    let requests = server.captured_requests(22).unwrap();
     assert_eq!(requests[0].method, "POST");
     assert_eq!(requests[0].path, "/v1/organization/admin_api_keys");
     assert_eq!(requests[1].path, "/v1/organization/admin_api_keys/key_ops");
@@ -152,30 +168,35 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     );
     assert_eq!(
         requests[13].path,
-        "/v1/organization/projects/proj_research/users/user_admin/roles/role_owner"
+        "/v1/projects/proj_research/users/user_admin/roles/role_owner"
     );
-    assert_eq!(
-        requests[14].path,
-        "/v1/organization/projects/proj_research/api_keys/key_project"
-    );
+    assert_eq!(requests[14].path, "/v1/projects/proj_research/roles");
     assert_eq!(
         requests[15].path,
-        "/v1/organization/projects/proj_research/rate_limits/rl_gpt_5"
+        "/v1/projects/proj_research/groups/grp_eng/roles?limit=3"
     );
     assert_eq!(
         requests[16].path,
-        "/v1/organization/projects/proj_research/model_permissions"
+        "/v1/organization/projects/proj_research/api_keys/key_project"
     );
     assert_eq!(
         requests[17].path,
-        "/v1/organization/projects/proj_research/hosted_tool_permissions"
+        "/v1/organization/projects/proj_research/rate_limits/rl_gpt_5"
     );
     assert_eq!(
         requests[18].path,
-        "/v1/organization/projects/proj_research/groups/grp_eng?group_type=group"
+        "/v1/organization/projects/proj_research/model_permissions"
     );
     assert_eq!(
         requests[19].path,
+        "/v1/organization/projects/proj_research/hosted_tool_permissions"
+    );
+    assert_eq!(
+        requests[20].path,
+        "/v1/organization/projects/proj_research/groups/grp_eng?group_type=group"
+    );
+    assert_eq!(
+        requests[21].path,
         "/v1/organization/projects/proj_research/certificates/deactivate"
     );
 
@@ -185,7 +206,9 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     assert_eq!(certificate_body["certificate_ids"], json!(["cert_org"]));
     let project_user_body: AdminValue = serde_json::from_slice(&requests[12].body).unwrap();
     assert_eq!(project_user_body["role"], json!("owner"));
-    let rate_limit_body: AdminValue = serde_json::from_slice(&requests[15].body).unwrap();
+    let project_role_body: AdminValue = serde_json::from_slice(&requests[14].body).unwrap();
+    assert_eq!(project_role_body["role_name"], json!("auditor"));
+    let rate_limit_body: AdminValue = serde_json::from_slice(&requests[17].body).unwrap();
     assert_eq!(rate_limit_body["max_requests_per_1_minute"], json!(120));
 
     let blank_project = projects.retrieve(" ").unwrap_err();
