@@ -202,16 +202,32 @@ fn create_populates_output_text_helper() {
         .find(|item| item.item_type == "mcp_list_tools")
         .expect("mcp list tools item");
     assert_eq!(mcp_list.server_label.as_deref(), Some("deepwiki"));
-    assert_eq!(mcp_list.tools[0].name, "search_docs");
-    assert_eq!(mcp_list.tools[0].input_schema["type"], "object");
-    assert_eq!(
-        mcp_list.tools[0].annotations.as_ref().unwrap()["readOnlyHint"],
-        true
-    );
-    assert_eq!(
-        mcp_list.tools[0].description.as_deref(),
-        Some("Search docs")
-    );
+    let mcp_tool = mcp_list.tools[0].as_mcp_list().expect("mcp list tool");
+    assert_eq!(mcp_tool.name, "search_docs");
+    assert_eq!(mcp_tool.input_schema["type"], "object");
+    assert_eq!(mcp_tool.annotations.as_ref().unwrap()["readOnlyHint"], true);
+    assert_eq!(mcp_tool.description.as_deref(), Some("Search docs"));
+    let tool_search = response
+        .output()
+        .output
+        .iter()
+        .find(|item| item.item_type == "tool_search_output")
+        .expect("tool search output item");
+    assert_eq!(tool_search.call_id.as_deref(), Some("call_tool_search"));
+    assert_eq!(tool_search.execution.as_deref(), Some("server"));
+    assert_eq!(tool_search.created_by.as_deref(), Some("assistant"));
+    assert!(matches!(
+        tool_search.tools[0].as_definition(),
+        Some(ResponseTool::Function(tool))
+            if tool.name == "lookup_weather"
+                && tool.parameters["type"] == "object"
+                && tool.description.as_deref() == Some("Lookup weather")
+    ));
+    assert!(matches!(
+        tool_search.tools[1].as_definition(),
+        Some(ResponseTool::WebSearchPreview(tool))
+            if tool.search_context_size.as_deref() == Some("low")
+    ));
     let computer_call = response
         .output()
         .output
@@ -909,6 +925,26 @@ fn response_payload(
                     "annotations": {"readOnlyHint": true},
                     "description": "Search docs"
                 }]
+            },
+            {
+                "id": "tool_search_output_1",
+                "type": "tool_search_output",
+                "call_id": "call_tool_search",
+                "execution": "server",
+                "status": "completed",
+                "created_by": "assistant",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "lookup_weather",
+                        "parameters": {"type": "object"},
+                        "description": "Lookup weather"
+                    },
+                    {
+                        "type": "web_search_preview",
+                        "search_context_size": "low"
+                    }
+                ]
             },
             {
                 "id": "computer_1",

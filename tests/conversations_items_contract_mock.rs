@@ -2,7 +2,7 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
         ResponseApplyPatchOperation, ResponseComputerAction, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome,
+        ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
     },
 };
 use serde_json::{Value, json};
@@ -220,6 +220,7 @@ fn typed_known_fields_are_not_lost() {
             local_shell_call_item("local_shell_1"),
             shell_call_item("shell_1"),
             apply_patch_call_item("patch_1"),
+            tool_search_output_item("tool_search_output_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -293,16 +294,11 @@ fn typed_known_fields_are_not_lost() {
     let mcp_tools = &listed.output().data[2];
     assert_eq!(mcp_tools.item_type, "mcp_list_tools");
     assert_eq!(mcp_tools.server_label.as_deref(), Some("deepwiki"));
-    assert_eq!(mcp_tools.tools[0].name, "search_docs");
-    assert_eq!(mcp_tools.tools[0].input_schema["type"], "object");
-    assert_eq!(
-        mcp_tools.tools[0].annotations.as_ref().unwrap()["readOnlyHint"],
-        true
-    );
-    assert_eq!(
-        mcp_tools.tools[0].description.as_deref(),
-        Some("Search docs")
-    );
+    let mcp_tool = mcp_tools.tools[0].as_mcp_list().expect("mcp list tool");
+    assert_eq!(mcp_tool.name, "search_docs");
+    assert_eq!(mcp_tool.input_schema["type"], "object");
+    assert_eq!(mcp_tool.annotations.as_ref().unwrap()["readOnlyHint"], true);
+    assert_eq!(mcp_tool.description.as_deref(), Some("Search docs"));
 
     let computer_call = &listed.output().data[3];
     assert_eq!(computer_call.item_type, "computer_call");
@@ -402,6 +398,27 @@ fn typed_known_fields_are_not_lost() {
         apply_patch_call.operation.as_ref(),
         Some(ResponseApplyPatchOperation::CreateFile(operation))
             if operation.path == "src/new.rs" && operation.diff == "@@ +hello"
+    ));
+
+    let tool_search = listed
+        .output()
+        .data
+        .iter()
+        .find(|item| item.item_type == "tool_search_output")
+        .expect("tool search output item");
+    assert_eq!(tool_search.call_id.as_deref(), Some("call_tool_search"));
+    assert_eq!(tool_search.execution.as_deref(), Some("server"));
+    assert!(matches!(
+        tool_search.tools[0].as_definition(),
+        Some(ResponseTool::Function(tool))
+            if tool.name == "lookup_weather"
+                && tool.parameters["type"] == "object"
+                && tool.description.as_deref() == Some("Lookup weather")
+    ));
+    assert!(matches!(
+        tool_search.tools[1].as_definition(),
+        Some(ResponseTool::WebSearchPreview(tool))
+            if tool.search_context_size.as_deref() == Some("low")
     ));
 
     let retrieved_function_call = retrieved.output();
@@ -519,6 +536,29 @@ fn mcp_list_tools_item(id: &str) -> Value {
             "annotations": {"readOnlyHint": true},
             "description": "Search docs"
         }]
+    })
+}
+
+fn tool_search_output_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "tool_search_output",
+        "call_id": "call_tool_search",
+        "execution": "server",
+        "status": "completed",
+        "created_by": "assistant",
+        "tools": [
+            {
+                "type": "function",
+                "name": "lookup_weather",
+                "parameters": {"type": "object"},
+                "description": "Lookup weather"
+            },
+            {
+                "type": "web_search_preview",
+                "search_context_size": "low"
+            }
+        ]
     })
 }
 

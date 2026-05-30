@@ -10,8 +10,8 @@ use crate::{
     resources::responses::{
         ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
         ResponseFileSearchResult, ResponseInputAudioData, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponseReasoningSummaryPart,
-        ResponseTextAnnotation, ResponseTextLogprob,
+        ResponseItemEnvironment, ResponseItemOutput, ResponseItemTool,
+        ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
     },
 };
 
@@ -338,7 +338,7 @@ pub struct ConversationItem {
     pub approve: Option<bool>,
     pub reason: Option<String>,
     pub error: Option<String>,
-    pub tools: Vec<ConversationMcpListTool>,
+    pub tools: Vec<ResponseItemTool>,
     pub summary: Vec<ResponseReasoningSummaryPart>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
@@ -350,19 +350,8 @@ pub struct ConversationItem {
     pub extra: BTreeMap<String, Value>,
 }
 
-/// Tool entry returned by an MCP list-tools conversation item.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-pub struct ConversationMcpListTool {
-    #[serde(default)]
-    pub input_schema: Value,
-    pub name: String,
-    #[serde(default)]
-    pub annotations: Option<Value>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, Value>,
-}
+/// MCP list-tools entry inside a conversation item.
+pub type ConversationMcpListTool = crate::resources::responses::ResponseMcpListTool;
 
 /// Safety check entry used by computer-call conversation items.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -441,7 +430,7 @@ struct WireConversationItem {
     #[serde(default)]
     error: Option<String>,
     #[serde(default)]
-    tools: Vec<ConversationMcpListTool>,
+    tools: Vec<ResponseItemTool>,
     #[serde(default)]
     summary: Option<Value>,
     #[serde(default)]

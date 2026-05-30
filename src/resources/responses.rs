@@ -1141,7 +1141,7 @@ pub struct ResponseOutputItem {
     pub approve: Option<bool>,
     pub reason: Option<String>,
     pub error: Option<String>,
-    pub tools: Vec<ResponseMcpListTool>,
+    pub tools: Vec<ResponseItemTool>,
     pub summary: Vec<ResponseReasoningSummaryPart>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
@@ -1166,6 +1166,56 @@ pub struct ResponseMcpListTool {
     pub description: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool entry returned on response output items.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseItemTool {
+    McpList(ResponseMcpListTool),
+    Definition(ResponseTool),
+    Json(Value),
+}
+
+impl ResponseItemTool {
+    pub fn as_mcp_list(&self) -> Option<&ResponseMcpListTool> {
+        match self {
+            Self::McpList(tool) => Some(tool),
+            _ => None,
+        }
+    }
+
+    pub fn as_definition(&self) -> Option<&ResponseTool> {
+        match self {
+            Self::Definition(tool) => Some(tool),
+            _ => None,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseItemTool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::Object(object) => {
+                let has_tool_type = object.get("type").and_then(Value::as_str).is_some();
+                let value = Value::Object(object);
+                if has_tool_type {
+                    serde_json::from_value(value)
+                        .map(Self::Definition)
+                        .map_err(serde::de::Error::custom)
+                } else {
+                    match serde_json::from_value(value.clone()) {
+                        Ok(tool) => Ok(Self::McpList(tool)),
+                        Err(_) => Ok(Self::Json(value)),
+                    }
+                }
+            }
+            value => Ok(Self::Json(value)),
+        }
+    }
 }
 
 /// Result item returned by a file-search tool call.
@@ -1878,7 +1928,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     error: Option<String>,
     #[serde(default)]
-    tools: Vec<ResponseMcpListTool>,
+    tools: Vec<ResponseItemTool>,
     #[serde(default)]
     summary: Option<Value>,
     #[serde(default)]
