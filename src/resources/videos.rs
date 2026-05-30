@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    fmt,
     sync::Arc,
     thread,
     time::{Duration, Instant},
@@ -377,22 +378,61 @@ impl VideoExtendSeconds {
 }
 
 /// Supported video sizes.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VideoSize {
     Portrait720,
     Landscape720,
     Portrait1024,
     Landscape1792,
+    Unknown(String),
 }
 
 impl VideoSize {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Portrait720 => "720x1280",
             Self::Landscape720 => "1280x720",
             Self::Portrait1024 => "1024x1792",
             Self::Landscape1792 => "1792x1024",
+            Self::Unknown(value) => value.as_str(),
         }
+    }
+}
+
+impl Default for VideoSize {
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+
+impl fmt::Display for VideoSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for VideoSize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for VideoSize {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "720x1280" => Self::Portrait720,
+            "1280x720" => Self::Landscape720,
+            "1024x1792" => Self::Portrait1024,
+            "1792x1024" => Self::Landscape1792,
+            _ => Self::Unknown(value),
+        })
     }
 }
 
@@ -401,6 +441,9 @@ impl VideoSize {
 pub enum VideoModel {
     Sora2,
     Sora2Pro,
+    Sora2Version20251006,
+    Sora2ProVersion20251006,
+    Sora2Version20251208,
     Custom(String),
 }
 
@@ -409,8 +452,136 @@ impl VideoModel {
         match self {
             Self::Sora2 => "sora-2",
             Self::Sora2Pro => "sora-2-pro",
+            Self::Sora2Version20251006 => "sora-2-2025-10-06",
+            Self::Sora2ProVersion20251006 => "sora-2-pro-2025-10-06",
+            Self::Sora2Version20251208 => "sora-2-2025-12-08",
             Self::Custom(value) => value.as_str(),
         }
+    }
+}
+
+impl Default for VideoModel {
+    fn default() -> Self {
+        Self::Custom(String::new())
+    }
+}
+
+impl fmt::Display for VideoModel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for VideoModel {
+    fn from(value: &str) -> Self {
+        match value {
+            "sora-2" => Self::Sora2,
+            "sora-2-pro" => Self::Sora2Pro,
+            "sora-2-2025-10-06" => Self::Sora2Version20251006,
+            "sora-2-pro-2025-10-06" => Self::Sora2ProVersion20251006,
+            "sora-2-2025-12-08" => Self::Sora2Version20251208,
+            _ => Self::Custom(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for VideoModel {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "sora-2" => Self::Sora2,
+            "sora-2-pro" => Self::Sora2Pro,
+            "sora-2-2025-10-06" => Self::Sora2Version20251006,
+            "sora-2-pro-2025-10-06" => Self::Sora2ProVersion20251006,
+            "sora-2-2025-12-08" => Self::Sora2Version20251208,
+            _ => Self::Custom(value),
+        }
+    }
+}
+
+impl PartialEq<&str> for VideoModel {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<VideoModel> for &str {
+    fn eq(&self, other: &VideoModel) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl Serialize for VideoModel {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for VideoModel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
+/// Duration returned on video jobs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum VideoSeconds {
+    S4,
+    S8,
+    S12,
+    Unknown(String),
+}
+
+impl VideoSeconds {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::S4 => "4",
+            Self::S8 => "8",
+            Self::S12 => "12",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Default for VideoSeconds {
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+
+impl fmt::Display for VideoSeconds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for VideoSeconds {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for VideoSeconds {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "4" => Self::S4,
+            "8" => Self::S8,
+            "12" => Self::S12,
+            _ => Self::Unknown(value),
+        })
     }
 }
 
@@ -654,7 +825,7 @@ pub struct Video {
     #[serde(default)]
     pub expires_at: Option<u64>,
     #[serde(default)]
-    pub model: String,
+    pub model: VideoModel,
     #[serde(default)]
     pub object: String,
     #[serde(default)]
@@ -664,9 +835,9 @@ pub struct Video {
     #[serde(default)]
     pub remixed_from_video_id: Option<String>,
     #[serde(default)]
-    pub seconds: String,
+    pub seconds: VideoSeconds,
     #[serde(default)]
-    pub size: String,
+    pub size: VideoSize,
     #[serde(default)]
     pub status: VideoStatus,
     #[serde(flatten)]

@@ -11,7 +11,7 @@ use openai_rust::{
         VideoCharacter, VideoCreateCharacterParams, VideoCreateParams, VideoCreateReference,
         VideoCreateSeconds, VideoEditParams, VideoExtendParams, VideoExtendSeconds,
         VideoListParams, VideoModel, VideoOrder, VideoPollOptions, VideoReferenceAsset,
-        VideoRemixParams, VideoSize, VideoSource, VideoStatus, VideoUpload,
+        VideoRemixParams, VideoSeconds, VideoSize, VideoSource, VideoStatus, VideoUpload,
     },
 };
 use serde_json::json;
@@ -84,6 +84,9 @@ fn video_job_lifecycle_and_transforms_preserve_typed_ids_polling_and_character_f
     assert_eq!(created.output.id, "vid_create");
     assert_eq!(created.output.status, VideoStatus::Queued);
     assert_eq!(created.output.progress, 5);
+    assert_eq!(created.output.model, VideoModel::Sora2);
+    assert_eq!(created.output.seconds, VideoSeconds::S8);
+    assert_eq!(created.output.size, VideoSize::Landscape720);
 
     let polled = client
         .videos()
@@ -109,6 +112,7 @@ fn video_job_lifecycle_and_transforms_preserve_typed_ids_polling_and_character_f
     let retrieved = client.videos().retrieve("vid_create").unwrap();
     assert_eq!(retrieved.output.id, "vid_create");
     assert_eq!(retrieved.output.expires_at, Some(1_717_172_999));
+    assert_eq!(retrieved.output.model.as_str(), "sora-2");
 
     let listed = client
         .videos()
@@ -348,7 +352,7 @@ fn create_request_shape_preserves_nested_reference_configuration_without_flatten
                 file_id: Some(String::from("file_nested")),
                 image_url: Some(String::from("data:image/png;base64,AAAA")),
             })),
-            model: Some(VideoModel::Custom(String::from("sora-2-2025-12-08"))),
+            model: Some(VideoModel::Sora2Version20251208),
             seconds: Some(VideoCreateSeconds::S12),
             size: Some(VideoSize::Portrait1024),
         })
@@ -370,6 +374,33 @@ fn create_request_shape_preserves_nested_reference_configuration_without_flatten
     assert_text_part(&multipart, "model", "sora-2-2025-12-08");
     assert_text_part(&multipart, "seconds", "12");
     assert_text_part(&multipart, "size", "1024x1792");
+
+    let future_video = serde_json::from_str::<openai_rust::resources::videos::Video>(
+        &json!({
+            "id": "vid_future",
+            "object": "video",
+            "created_at": 1_717_171_717u64,
+            "model": "sora-future",
+            "progress": 0,
+            "seconds": "16",
+            "size": "future-size",
+            "status": "queued"
+        })
+        .to_string(),
+    )
+    .unwrap();
+    assert_eq!(
+        future_video.model,
+        VideoModel::Custom(String::from("sora-future"))
+    );
+    assert_eq!(
+        future_video.seconds,
+        VideoSeconds::Unknown(String::from("16"))
+    );
+    assert_eq!(
+        future_video.size,
+        VideoSize::Unknown(String::from("future-size"))
+    );
 }
 
 fn assert_text_part(multipart: &multipart_support::ParsedMultipart, name: &str, value: &str) {
