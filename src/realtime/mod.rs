@@ -17,7 +17,8 @@ pub use events::{
     RealtimeClientEvent, RealtimeConversationContentType, RealtimeConversationItem,
     RealtimeConversationItemRole, RealtimeConversationItemStatus, RealtimeConversationItemType,
     RealtimeConversationMessageContentPart, RealtimeErrorInfo, RealtimeInclude,
-    RealtimeOutputModality, RealtimeResponseCreateParams, RealtimeServerEvent,
-    RealtimeSessionConfig, RealtimeSessionType, decode_server_event, decode_server_event_text,
+    RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeResponseCreateParams,
+    RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, decode_server_event,
+    decode_server_event_text,
 };
 pub use state::{RealtimeAudioBufferState, RealtimeEventState, RealtimeResponseState};

@@ -3,7 +3,7 @@ use openai_rust::{
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
-        RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
+        RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
         RealtimeSessionTTLAnchor, RealtimeSessionType,
     },
 };
@@ -26,6 +26,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "id": "sess_client_secret",
                     "type": "realtime",
                     "model": "gpt-realtime-mini",
+                    "max_output_tokens": "inf",
                     "output_modalities": ["text"],
                     "instructions": "Answer tersely."
                 }
@@ -61,6 +62,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
+                max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
                 ..Default::default()
             }),
         })
@@ -74,6 +76,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.output_modalities,
         Some(vec![RealtimeOutputModality::Text])
+    );
+    assert_eq!(
+        secret.output().session.max_output_tokens,
+        Some(RealtimeMaxOutputTokens::Inf)
     );
 
     let sdp_only = client
@@ -95,6 +101,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 session_type: RealtimeSessionType::Realtime,
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
                 ..Default::default()
@@ -117,6 +124,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Stay concise.")),
+                max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
                 ..Default::default()
@@ -165,6 +173,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         client_secret_body["session"]["include"][0],
         "item.input_audio_transcription.logprobs"
     );
+    assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
     assert_eq!(
@@ -201,6 +210,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     let multipart_session: serde_json::Value =
         serde_json::from_slice(&parsed.parts[1].body).unwrap();
     assert_eq!(multipart_session["type"], "realtime");
+    assert_eq!(multipart_session["max_output_tokens"], "inf");
     assert_eq!(multipart_session["parallel_tool_calls"], true);
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
 
@@ -217,6 +227,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         accept_body["include"][0],
         "item.input_audio_transcription.logprobs"
     );
+    assert_eq!(accept_body["max_output_tokens"], 128);
     assert_eq!(accept_body["parallel_tool_calls"], true);
     assert_eq!(accept_body["reasoning"]["effort"], "low");
 

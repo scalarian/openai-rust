@@ -5,7 +5,7 @@ use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
         RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
-        RealtimeConversationMessageContentPart, RealtimeOutputModality,
+        RealtimeConversationMessageContentPart, RealtimeMaxOutputTokens, RealtimeOutputModality,
         RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
         RealtimeSessionType,
     },
@@ -523,6 +523,7 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         .response()
         .create_params(
             RealtimeResponseCreateParams {
+                max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 metadata: Some(json!({"source": "test"})),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 ..Default::default()
@@ -624,6 +625,7 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         captured[1]["response"]["output_modalities"],
         json!(["text"])
     );
+    assert_eq!(captured[1]["response"]["max_output_tokens"], "inf");
     assert_eq!(captured[2]["response_id"], "resp_cancel");
     assert_eq!(captured[3]["audio"], "AQID");
     assert_eq!(captured[6]["previous_item_id"], "root");

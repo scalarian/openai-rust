@@ -122,6 +122,64 @@ pub enum RealtimeOutputModality {
     Audio,
 }
 
+/// Realtime max-output token limit.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeMaxOutputTokens {
+    Tokens(u64),
+    Inf,
+    Unknown(String),
+}
+
+impl From<u64> for RealtimeMaxOutputTokens {
+    fn from(value: u64) -> Self {
+        Self::Tokens(value)
+    }
+}
+
+impl From<u32> for RealtimeMaxOutputTokens {
+    fn from(value: u32) -> Self {
+        Self::Tokens(u64::from(value))
+    }
+}
+
+impl From<usize> for RealtimeMaxOutputTokens {
+    fn from(value: usize) -> Self {
+        Self::Tokens(value as u64)
+    }
+}
+
+impl Serialize for RealtimeMaxOutputTokens {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Tokens(tokens) => serializer.serialize_u64(*tokens),
+            Self::Inf => serializer.serialize_str("inf"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeMaxOutputTokens {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::Number(number) => number
+                .as_u64()
+                .map(Self::Tokens)
+                .ok_or_else(|| serde::de::Error::custom("max_output_tokens must be unsigned")),
+            Value::String(value) if value == "inf" => Ok(Self::Inf),
+            Value::String(value) => Ok(Self::Unknown(value)),
+            _ => Err(serde::de::Error::custom(
+                "max_output_tokens must be an integer or string",
+            )),
+        }
+    }
+}
+
 realtime_string_literal_enum! {
     /// Additional Realtime fields that can be requested in server outputs.
     pub enum RealtimeInclude {
@@ -193,7 +251,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<RealtimeInclude>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<Value>,
+    pub max_output_tokens: Option<RealtimeMaxOutputTokens>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -329,7 +387,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<Value>,
+    pub max_output_tokens: Option<RealtimeMaxOutputTokens>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
