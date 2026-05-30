@@ -10,6 +10,8 @@ fn client_scaffold_exposes_primary_resource_families() {
     let client = OpenAI::new();
 
     let _ = client.responses();
+    let _ = client.admin();
+    let _ = client.beta();
     let _ = client.conversations();
     let _ = client.chat();
     let _ = client.images();

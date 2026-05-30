@@ -54,7 +54,7 @@ If you want a zero-cost configuration check before making a live request, use `c
 ## Capability Overview
 
 - Responses-first request and streaming flows, including structured outputs and tool schemas.
-- Coverage for chat completions, legacy completions, embeddings, files, uploads, vector stores, images, audio, evals, fine-tuning, moderations, webhooks, and admin organization operations.
+- Coverage for chat completions, legacy completions, embeddings, files, uploads, vector stores, images, audio, evals, fine-tuning, moderations, webhooks, admin organization operations, and beta ChatKit.
 - Realtime session models plus an opt-in blocking facade for synchronous integrations.
 - Example-driven docs and contract tests that keep the published API aligned with the repository.
 
@@ -502,6 +502,7 @@ This note tracks the public surface that is already shipped in the crate.
 - `src/resources/images.rs`
 - `src/resources/audio.rs`
 - `src/resources/admin.rs` — admin organization operations for audit logs, admin API keys, usage, invites, users, groups, roles, data retention, spend alerts, certificates, projects, and nested project permissions — `tests/admin_contract.rs`
+- `src/resources/beta.rs` — beta ChatKit sessions and threads, including the required `OpenAI-Beta` header — `tests/chatkit_contract.rs`
 - `src/resources/fine_tuning.rs`
 - `src/resources/evals.rs`
 - `src/resources/containers.rs`

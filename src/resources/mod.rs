@@ -7,6 +7,7 @@ use crate::core::runtime::ClientRuntime;
 pub mod admin;
 pub mod audio;
 pub mod batches;
+pub mod beta;
 pub mod chat;
 pub mod completions;
 pub mod containers;
@@ -31,6 +32,7 @@ pub mod webhooks;
 pub struct ResourceFamilies {
     pub(crate) responses: responses::Responses,
     pub(crate) admin: admin::Admin,
+    pub(crate) beta: beta::Beta,
     pub(crate) conversations: conversations::Conversations,
     pub(crate) chat: chat::Chat,
     pub(crate) completions: completions::Completions,
@@ -56,6 +58,7 @@ impl ResourceFamilies {
         Self {
             responses: responses::Responses::new(runtime.clone()),
             admin: admin::Admin::new(runtime.clone()),
+            beta: beta::Beta::new(runtime.clone()),
             conversations: conversations::Conversations::new(runtime.clone()),
             chat: chat::Chat::new(runtime.clone()),
             completions: completions::Completions::new(runtime.clone()),

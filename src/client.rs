@@ -81,6 +81,11 @@ impl OpenAI {
         &self.resources.admin
     }
 
+    /// Accesses the beta family handle.
+    pub fn beta(&self) -> &crate::resources::beta::Beta {
+        &self.resources.beta
+    }
+
     /// Accesses the conversations family handle.
     pub fn conversations(&self) -> &crate::resources::conversations::Conversations {
         &self.resources.conversations
