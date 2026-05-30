@@ -2101,6 +2101,9 @@ impl From<AdminProjectCertificateListParams> for AdminQueryParams {
     }
 }
 
+pub type AdminProjectCertificateListResponse = AdminConversationCursorPage<AdminCertificate>;
+pub type AdminProjectCertificateActionResponse = AdminPage<AdminCertificate>;
+
 /// Organization audio speeches usage query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminUsageAudioSpeechesParams {
@@ -4202,12 +4205,15 @@ impl ProjectCertificates {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectCertificateListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/certificates"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/certificates"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -4215,12 +4221,13 @@ impl ProjectCertificates {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectCertificateActionResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/certificates/activate"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4228,12 +4235,13 @@ impl ProjectCertificates {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectCertificateActionResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/certificates/deactivate"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 }

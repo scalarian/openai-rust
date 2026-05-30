@@ -345,6 +345,16 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .to_string(),
     );
     responses[20] = json_response(project_hosted_tool_permissions_json().to_string());
+    responses[22] = json_response(
+        certificate_action_page_json(certificate_json(
+            "cert_project",
+            "organization.project.certificate",
+            "project-cert",
+            Some(false),
+            None,
+        ))
+        .to_string(),
+    );
     responses[7] = json_response(
         json!({
             "data": [organization_group_user_json("user_admin")],
@@ -567,7 +577,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    let deactivated_project_certificates = projects
         .certificates()
         .deactivate(
             "proj_research",
@@ -576,6 +586,14 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert_eq!(
+        deactivated_project_certificates.output.data[0].object,
+        AdminCertificateObject::OrganizationProjectCertificate
+    );
+    assert_eq!(
+        deactivated_project_certificates.output.data[0].active,
+        Some(false)
+    );
 
     let requests = server.captured_requests(23).unwrap();
     assert_eq!(requests[0].method, "POST");
@@ -1180,6 +1198,32 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .to_string(),
     );
     responses[18] = json_response(project_spend_alert_json("alert_project", 40_000).to_string());
+    responses[19] = json_response(
+        json!({
+            "data": [
+                certificate_json(
+                    "cert_project",
+                    "organization.project.certificate",
+                    "project-cert",
+                    Some(true),
+                    None
+                )
+            ],
+            "has_more": true,
+            "last_id": "cert_project"
+        })
+        .to_string(),
+    );
+    responses[20] = json_response(
+        certificate_action_page_json(certificate_json(
+            "cert_project",
+            "organization.project.certificate",
+            "project-cert",
+            Some(true),
+            None,
+        ))
+        .to_string(),
+    );
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let projects = client.admin().organization().projects();
@@ -1434,7 +1478,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .unwrap();
     assert_eq!(updated_alert.output.threshold_amount, 40_000);
 
-    projects
+    let project_certificates = projects
         .certificates()
         .list(
             "proj_research",
@@ -1445,7 +1489,12 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(project_certificates.output.data[0].id, "cert_project");
+    assert_eq!(
+        project_certificates.output.next_after(),
+        Some("cert_project")
+    );
+    let activated_project_certificates = projects
         .certificates()
         .activate(
             "proj_research",
@@ -1454,6 +1503,10 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(
+        activated_project_certificates.output.data[0].object,
+        AdminCertificateObject::OrganizationProjectCertificate
+    );
 
     let requests = server.captured_requests(21).unwrap();
     let paths = requests
