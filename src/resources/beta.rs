@@ -1677,13 +1677,170 @@ impl ChatKitThreadPage {
     }
 }
 
+/// ChatKit thread item variants.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+pub enum ChatKitThreadItem {
+    #[serde(rename = "chatkit.user_message")]
+    UserMessage {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        #[serde(default)]
+        attachments: Vec<ChatKitAttachment>,
+        content: Vec<ChatKitUserMessageContent>,
+        #[serde(default)]
+        inference_options: Option<ChatKitInferenceOptions>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    #[serde(rename = "chatkit.assistant_message")]
+    AssistantMessage {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        content: Vec<ChatKitResponseOutputText>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    #[serde(rename = "chatkit.widget")]
+    Widget {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        widget: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    #[serde(rename = "chatkit.client_tool_call")]
+    ClientToolCall {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        arguments: String,
+        call_id: String,
+        name: String,
+        #[serde(default)]
+        output: Option<String>,
+        status: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    #[serde(rename = "chatkit.task")]
+    Task {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        #[serde(default)]
+        heading: Option<String>,
+        #[serde(default)]
+        summary: Option<String>,
+        task_type: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    #[serde(rename = "chatkit.task_group")]
+    TaskGroup {
+        id: String,
+        object: String,
+        created_at: u64,
+        thread_id: String,
+        tasks: Vec<ChatKitTaskGroupTask>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// ChatKit attachment metadata included on thread items.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitAttachment {
+    pub id: String,
+    pub mime_type: String,
+    pub name: String,
+    #[serde(default)]
+    pub preview_url: Option<String>,
+    #[serde(rename = "type")]
+    pub attachment_type: String,
+}
+
+/// User-authored ChatKit message content.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+pub enum ChatKitUserMessageContent {
+    #[serde(rename = "input_text")]
+    InputText { text: String },
+    #[serde(rename = "quoted_text")]
+    QuotedText { text: String },
+}
+
+/// ChatKit inference overrides applied to a user message.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitInferenceOptions {
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub tool_choice: Option<ChatKitInferenceToolChoice>,
+}
+
+/// Preferred ChatKit tool choice.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitInferenceToolChoice {
+    pub id: String,
+}
+
+/// Assistant response text with annotations.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitResponseOutputText {
+    #[serde(default)]
+    pub annotations: Vec<ChatKitResponseAnnotation>,
+    pub text: String,
+}
+
+/// Annotation attached to ChatKit response text.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+pub enum ChatKitResponseAnnotation {
+    #[serde(rename = "file")]
+    File { source: ChatKitFileAnnotationSource },
+    #[serde(rename = "url")]
+    Url { source: ChatKitUrlAnnotationSource },
+}
+
+/// File annotation source.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitFileAnnotationSource {
+    pub filename: String,
+}
+
+/// URL annotation source.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitUrlAnnotationSource {
+    pub url: String,
+}
+
+/// Task entry within a ChatKit task group.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitTaskGroupTask {
+    #[serde(default)]
+    pub heading: Option<String>,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(rename = "type")]
+    pub task_type: String,
+}
+
 /// ChatKit thread item list page.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ChatKitThreadItemPage {
     #[serde(default)]
     pub object: String,
     #[serde(default)]
-    pub data: Vec<Value>,
+    pub data: Vec<ChatKitThreadItem>,
     #[serde(default)]
     pub first_id: Option<String>,
     #[serde(default)]

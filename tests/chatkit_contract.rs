@@ -9,9 +9,9 @@ use openai_rust::{
         ChatKitAutomaticThreadTitlingParam, ChatKitConfigurationParam, ChatKitFileUploadParam,
         ChatKitHistoryParam, ChatKitOrder, ChatKitSessionCreateParams,
         ChatKitSessionExpiresAfterParam, ChatKitSessionExpiryAnchor, ChatKitSessionRateLimitsParam,
-        ChatKitSessionStatus, ChatKitSessionWorkflowParam, ChatKitStateValue,
+        ChatKitSessionStatus, ChatKitSessionWorkflowParam, ChatKitStateValue, ChatKitThreadItem,
         ChatKitThreadItemListParams, ChatKitThreadListParams, ChatKitThreadStatus,
-        ChatKitWorkflowTracingParam,
+        ChatKitUserMessageContent, ChatKitWorkflowTracingParam,
     },
 };
 use serde_json::json;
@@ -119,7 +119,11 @@ fn chatkit_beta_sessions_and_threads_preserve_routes_headers_and_shapes() {
             },
         )
         .unwrap();
-    assert_eq!(items.output.data[0]["type"], json!("chatkit.user_message"));
+    assert!(matches!(
+        items.output.data.first(),
+        Some(ChatKitThreadItem::UserMessage { content, .. })
+            if matches!(content.first(), Some(ChatKitUserMessageContent::InputText { text }) if text == "hello")
+    ));
 
     let requests = server.captured_requests(6).unwrap();
     assert_eq!(requests[0].method, "POST");
