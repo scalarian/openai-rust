@@ -1609,6 +1609,30 @@ response_string_literal_enum! {
     }
 }
 
+response_string_literal_enum! {
+    /// Error codes returned on failed response objects.
+    pub enum ResponseErrorCode {
+        ServerError => "server_error",
+        RateLimitExceeded => "rate_limit_exceeded",
+        InvalidPrompt => "invalid_prompt",
+        VectorStoreTimeout => "vector_store_timeout",
+        InvalidImage => "invalid_image",
+        InvalidImageFormat => "invalid_image_format",
+        InvalidBase64Image => "invalid_base64_image",
+        InvalidImageUrl => "invalid_image_url",
+        ImageTooLarge => "image_too_large",
+        ImageTooSmall => "image_too_small",
+        ImageParseError => "image_parse_error",
+        ImageContentPolicyViolation => "image_content_policy_violation",
+        InvalidImageMode => "invalid_image_mode",
+        ImageFileTooLarge => "image_file_too_large",
+        UnsupportedImageMediaType => "unsupported_image_media_type",
+        EmptyImageFile => "empty_image_file",
+        FailedToDownloadImage => "failed_to_download_image",
+        ImageFileNotFound => "image_file_not_found",
+    }
+}
+
 /// Role attached to message-like response and conversation items.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponseItemRole {
@@ -1966,7 +1990,7 @@ pub struct ResponseOutputTokensDetails {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ResponseError {
     #[serde(default)]
-    pub code: Option<String>,
+    pub code: Option<ResponseErrorCode>,
     #[serde(default)]
     pub message: String,
     #[serde(flatten)]

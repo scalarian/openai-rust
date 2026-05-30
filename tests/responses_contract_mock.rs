@@ -12,7 +12,7 @@ use openai_rust::{
             ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseCompactServiceTier,
             ResponseComputerAction, ResponseContextManagement, ResponseConversation,
             ResponseConversationObject, ResponseCustomTool, ResponseCustomToolGrammar,
-            ResponseCustomToolGrammarSyntax, ResponseCustomToolInputFormat,
+            ResponseCustomToolGrammarSyntax, ResponseCustomToolInputFormat, ResponseErrorCode,
             ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
             ResponseFileSearchFilterValue, ResponseFileSearchRanker, ResponseFormatTextConfig,
             ResponseIncludable, ResponseInput, ResponseInputContentPart, ResponseInputItem,
@@ -959,6 +959,56 @@ fn tool_and_refusal_fields_round_trip() {
 }
 
 #[test]
+fn response_error_codes_are_typed_and_forward_compatible() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(failed_response_payload("invalid_prompt")),
+        json_response(failed_response_payload("future_response_error")),
+    ])
+    .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+    let known = client
+        .responses()
+        .create(openai_rust::resources::responses::ResponseCreateParams {
+            model: String::from("gpt-4.1-mini"),
+            input: Some(ResponseInput::text("fail")),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        known
+            .output()
+            .error
+            .as_ref()
+            .and_then(|error| error.code.as_ref()),
+        Some(&ResponseErrorCode::InvalidPrompt)
+    );
+
+    let unknown = client
+        .responses()
+        .create(openai_rust::resources::responses::ResponseCreateParams {
+            model: String::from("gpt-4.1-mini"),
+            input: Some(ResponseInput::text("future fail")),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        unknown
+            .output()
+            .error
+            .as_ref()
+            .and_then(|error| error.code.as_ref()),
+        Some(&ResponseErrorCode::Unknown(String::from(
+            "future_response_error"
+        )))
+    );
+}
+
+#[test]
 fn compact_returns_compaction_object() {
     let body = json!({
         "id": "cmp_123",
@@ -1167,6 +1217,22 @@ fn json_response(body: String) -> mock_http::ScriptedResponse {
 
 fn json_value_response(body: Value) -> mock_http::ScriptedResponse {
     json_response(body.to_string())
+}
+
+fn failed_response_payload(code: &str) -> String {
+    json!({
+        "id": "resp_failed",
+        "object": "response",
+        "created_at": 1.25,
+        "status": "failed",
+        "model": "gpt-4.1-mini",
+        "output": [],
+        "error": {
+            "code": code,
+            "message": "response failed"
+        }
+    })
+    .to_string()
 }
 
 fn response_payload(
