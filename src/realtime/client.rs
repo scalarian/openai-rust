@@ -30,9 +30,9 @@ use crate::{
 
 use super::events::{
     RealtimeClientEvent, RealtimeConversationItem, RealtimeInclude, RealtimeMaxOutputTokens,
-    RealtimeOutputModality, RealtimeResponseCreateParams, RealtimeServerEvent,
-    RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice, RealtimeTruncation,
-    decode_server_event_text,
+    RealtimeNullable, RealtimeOutputModality, RealtimeResponseCreateParams, RealtimeServerEvent,
+    RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice, RealtimeTracing,
+    RealtimeTruncation, decode_server_event_text,
 };
 
 /// Realtime client-secret expiration anchor.
@@ -243,7 +243,7 @@ pub struct RealtimeCallAcceptParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tracing: Option<Value>,
+    pub tracing: Option<RealtimeNullable<RealtimeTracing>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncation: Option<RealtimeTruncation>,
     #[serde(flatten)]

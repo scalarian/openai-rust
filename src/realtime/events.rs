@@ -326,6 +326,78 @@ pub struct RealtimeToolChoiceOther {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Nullable Realtime config slot, used when `null` disables an active config.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RealtimeNullable<T> {
+    Value(T),
+    Null,
+}
+
+impl<T> From<T> for RealtimeNullable<T> {
+    fn from(value: T) -> Self {
+        Self::Value(value)
+    }
+}
+
+/// Realtime tracing config.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeTracing {
+    Auto,
+    Configuration(Box<RealtimeTracingConfiguration>),
+    UnknownString(String),
+}
+
+impl RealtimeTracing {
+    pub fn configuration(config: RealtimeTracingConfiguration) -> Self {
+        Self::Configuration(Box::new(config))
+    }
+}
+
+/// Granular Realtime tracing configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeTracingConfiguration {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl Serialize for RealtimeTracing {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Configuration(config) => config.serialize(serializer),
+            Self::UnknownString(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeTracing {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::String(value) if value == "auto" => Ok(Self::Auto),
+            Value::String(value) => Ok(Self::UnknownString(value)),
+            Value::Object(object) => serde_json::from_value(Value::Object(object))
+                .map(|config| Self::Configuration(Box::new(config)))
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom(
+                "tracing must be a string or object",
+            )),
+        }
+    }
+}
+
 impl Serialize for RealtimeToolChoice {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -520,7 +592,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tracing: Option<Value>,
+    pub tracing: Option<RealtimeNullable<RealtimeTracing>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncation: Option<RealtimeTruncation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

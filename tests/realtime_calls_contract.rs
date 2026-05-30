@@ -3,8 +3,9 @@ use openai_rust::{
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
-        RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
-        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice, RealtimeTruncation,
+        RealtimeMaxOutputTokens, RealtimeNullable, RealtimeOutputModality, RealtimeSessionConfig,
+        RealtimeSessionTTL, RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice,
+        RealtimeTracing, RealtimeTracingConfiguration, RealtimeTruncation,
         RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits,
     },
 };
@@ -30,6 +31,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
                     "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
+                    "tracing": {"group_id": "grp_1", "workflow_name": "wf", "metadata": {"env": "test"}},
                     "truncation": "auto",
                     "instructions": "Answer tersely."
                 }
@@ -67,6 +69,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 instructions: Some(String::from("Answer tersely.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
                 tool_choice: Some(RealtimeToolChoice::Required),
+                tracing: Some(RealtimeNullable::Value(RealtimeTracing::Auto)),
                 truncation: Some(RealtimeTruncation::Disabled),
                 ..Default::default()
             }),
@@ -97,6 +100,17 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
             Some(String::from("lookup"))
         ))
     );
+    assert_eq!(
+        secret.output().session.tracing,
+        Some(RealtimeNullable::Value(RealtimeTracing::configuration(
+            RealtimeTracingConfiguration {
+                group_id: Some(String::from("grp_1")),
+                metadata: Some(json!({"env": "test"})),
+                workflow_name: Some(String::from("wf")),
+                ..Default::default()
+            }
+        )))
+    );
 
     let sdp_only = client
         .realtime()
@@ -121,6 +135,13 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
                 tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
+                tracing: Some(RealtimeNullable::Value(RealtimeTracing::configuration(
+                    RealtimeTracingConfiguration {
+                        group_id: Some(String::from("grp_2")),
+                        workflow_name: Some(String::from("call-create")),
+                        ..Default::default()
+                    },
+                ))),
                 truncation: Some(RealtimeTruncation::from(RealtimeTruncationRetentionRatio {
                     token_limits: Some(RealtimeTruncationTokenLimits {
                         post_instructions: Some(5_000),
@@ -152,6 +173,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
                 tool_choice: Some(RealtimeToolChoice::mcp("remote", None)),
+                tracing: Some(RealtimeNullable::Null),
                 truncation: Some(RealtimeTruncation::Auto),
                 ..Default::default()
             },
@@ -201,6 +223,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
     assert_eq!(client_secret_body["session"]["tool_choice"], "required");
+    assert_eq!(client_secret_body["session"]["tracing"], "auto");
     assert_eq!(client_secret_body["session"]["truncation"], "disabled");
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
@@ -243,6 +266,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
     assert_eq!(multipart_session["tool_choice"]["type"], "function");
     assert_eq!(multipart_session["tool_choice"]["name"], "lookup_weather");
+    assert_eq!(multipart_session["tracing"]["group_id"], "grp_2");
+    assert_eq!(multipart_session["tracing"]["workflow_name"], "call-create");
     assert_eq!(multipart_session["truncation"]["type"], "retention_ratio");
     assert_eq!(multipart_session["truncation"]["retention_ratio"], 0.8);
     assert_eq!(
@@ -267,6 +292,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(accept_body["tool_choice"]["type"], "mcp");
     assert_eq!(accept_body["tool_choice"]["server_label"], "remote");
     assert!(accept_body["tool_choice"].get("name").is_none());
+    assert!(accept_body["tracing"].is_null());
     assert_eq!(accept_body["truncation"], "auto");
     assert_eq!(accept_body["parallel_tool_calls"], true);
     assert_eq!(accept_body["reasoning"]["effort"], "low");
