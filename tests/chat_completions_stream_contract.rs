@@ -19,13 +19,14 @@ fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
     };
     let transcript = vec![
         concat!(
-            r#"data: {"id":"chatcmpl_stream","object":"chat.completion.chunk","created":1,"model":"gpt-4.1-mini","choices":[{"index":0,"delta":{"role":"assistant","content":"Hel","function_call":{"name":"lookup_weather","arguments":"{\"city\":\"Pa"},"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup_weather","arguments":"{\"city\":\"Pa"}}]}}]}"#,
+            r#"data: {"id":"chatcmpl_stream","object":"chat.completion.chunk","created":1,"model":"gpt-4.1-mini","service_tier":"default","system_fingerprint":"fp_stream","choices":[{"index":0,"delta":{"role":"assistant","content":"Hel","refusal":"No","function_call":{"name":"lookup_weather","arguments":"{\"city\":\"Pa"},"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup_weather","arguments":"{\"city\":\"Pa"}}]}}]}"#,
             "\n\n",
-            r#"data: {"id":"chatcmpl_stream","object":"chat.completion.chunk","created":1,"model":"gpt-4.1-mini","choices":[{"index":0,"delta":{"content":"lo","function_call":{"arguments":"ris\"}"},"tool_calls":[{"index":0,"function":{"arguments":"ris\"}"}}]}}]}"#,
+            r#"data: {"id":"chatcmpl_stream","object":"chat.completion.chunk","created":1,"model":"gpt-4.1-mini","choices":[{"index":0,"delta":{"content":"lo","refusal":"pe","function_call":{"arguments":"ris\"}"},"tool_calls":[{"index":0,"function":{"arguments":"ris\"}"}}]}}]}"#,
             "\n\n",
         ),
         concat!(
             "data: {\"id\":\"chatcmpl_stream\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"gpt-4.1-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            "data: {\"id\":\"chatcmpl_stream\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"gpt-4.1-mini\",\"choices\":[],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2,\"total_tokens\":5,\"completion_tokens_details\":{\"reasoning_tokens\":1},\"prompt_tokens_details\":{\"cached_tokens\":1}}}\n\n",
             "data: [DONE]\n\n"
         ),
     ];
@@ -45,11 +46,17 @@ fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
         stream.next_chunk(),
         Some(ChatCompletionChunk { .. })
     ));
+    assert!(matches!(
+        stream.next_chunk(),
+        Some(ChatCompletionChunk { choices, usage, .. })
+            if choices.is_empty() && usage.as_ref().map(|usage| usage.total_tokens) == Some(5)
+    ));
     assert!(stream.next_chunk().is_none());
 
     let final_message = stream.final_message(0).expect("final message snapshot");
     assert_eq!(final_message.role.as_deref(), Some("assistant"));
     assert_eq!(final_message.content.as_deref(), Some("Hello"));
+    assert_eq!(final_message.refusal.as_deref(), Some("Nope"));
     assert_eq!(
         final_message
             .function_call
@@ -69,6 +76,24 @@ fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
     assert_eq!(
         final_message.tool_calls[0].function.arguments.as_deref(),
         Some(r#"{"city":"Paris"}"#)
+    );
+    let final_completion = stream.final_completion().unwrap();
+    assert_eq!(final_completion.service_tier.as_deref(), Some("default"));
+    assert_eq!(
+        final_completion.system_fingerprint.as_deref(),
+        Some("fp_stream")
+    );
+    assert_eq!(final_completion.usage.as_ref().unwrap().total_tokens, 5);
+    assert_eq!(
+        final_completion
+            .usage
+            .as_ref()
+            .unwrap()
+            .completion_tokens_details
+            .as_ref()
+            .unwrap()
+            .reasoning_tokens,
+        Some(1)
     );
 }
 

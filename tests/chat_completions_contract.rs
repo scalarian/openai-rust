@@ -78,6 +78,50 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
         created.output().choices[0].message.content.as_deref(),
         Some("stored hello")
     );
+    assert_eq!(created.output().service_tier.as_deref(), Some("priority"));
+    assert_eq!(
+        created.output().system_fingerprint.as_deref(),
+        Some("fp_chat_123")
+    );
+    assert_eq!(created.output().usage.as_ref().unwrap().total_tokens, 5);
+    assert_eq!(
+        created
+            .output()
+            .usage
+            .as_ref()
+            .unwrap()
+            .completion_tokens_details
+            .as_ref()
+            .unwrap()
+            .reasoning_tokens,
+        Some(1)
+    );
+    assert_eq!(
+        created.output().choices[0]
+            .logprobs
+            .as_ref()
+            .unwrap()
+            .content[0]
+            .token,
+        "stored"
+    );
+    assert_eq!(
+        created.output().choices[0].message.annotations[0]
+            .url_citation
+            .as_ref()
+            .unwrap()
+            .url,
+        "https://example.com/source"
+    );
+    assert_eq!(
+        created.output().choices[0]
+            .message
+            .audio
+            .as_ref()
+            .unwrap()
+            .transcript,
+        "stored hello"
+    );
 
     let retrieved = client
         .chat()
@@ -279,13 +323,57 @@ fn chat_completion_payload(id: &str, text: &str) -> String {
             {
                 "index": 0,
                 "finish_reason": "stop",
+                "logprobs": {
+                    "content": [{
+                        "token": "stored",
+                        "bytes": [115, 116, 111, 114, 101, 100],
+                        "logprob": -0.1,
+                        "top_logprobs": [{
+                            "token": "stored",
+                            "bytes": [115, 116, 111, 114, 101, 100],
+                            "logprob": -0.1
+                        }]
+                    }],
+                    "refusal": []
+                },
                 "message": {
                     "role": "assistant",
-                    "content": text
+                    "content": text,
+                    "annotations": [{
+                        "type": "url_citation",
+                        "url_citation": {
+                            "start_index": 0,
+                            "end_index": 6,
+                            "title": "source",
+                            "url": "https://example.com/source"
+                        }
+                    }],
+                    "audio": {
+                        "id": "audio_123",
+                        "data": "UklGRg==",
+                        "expires_at": 1_717_171_999,
+                        "transcript": text
+                    }
                 }
             }
         ],
-        "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}
+        "service_tier": "priority",
+        "system_fingerprint": "fp_chat_123",
+        "usage": {
+            "prompt_tokens": 3,
+            "completion_tokens": 2,
+            "total_tokens": 5,
+            "completion_tokens_details": {
+                "reasoning_tokens": 1,
+                "audio_tokens": 0,
+                "accepted_prediction_tokens": 0,
+                "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens_details": {
+                "audio_tokens": 0,
+                "cached_tokens": 1
+            }
+        }
     })
     .to_string()
 }

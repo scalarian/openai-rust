@@ -340,7 +340,11 @@ pub struct ChatCompletion {
     #[serde(default)]
     pub choices: Vec<ChatCompletionChoice>,
     #[serde(default)]
-    pub usage: Option<Value>,
+    pub service_tier: Option<String>,
+    #[serde(default)]
+    pub system_fingerprint: Option<String>,
+    #[serde(default)]
+    pub usage: Option<ChatCompletionUsage>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -353,7 +357,7 @@ pub struct ChatCompletionChoice {
     pub finish_reason: Option<String>,
     pub message: ChatCompletionMessage,
     #[serde(default)]
-    pub logprobs: Option<Value>,
+    pub logprobs: Option<ChatCompletionChoiceLogprobs>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -366,9 +370,56 @@ pub struct ChatCompletionMessage {
     #[serde(default)]
     pub content: Option<String>,
     #[serde(default)]
+    pub refusal: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
+    pub annotations: Vec<ChatCompletionAnnotation>,
+    #[serde(default)]
+    pub audio: Option<ChatCompletionAudio>,
+    #[serde(default)]
     pub function_call: Option<LegacyFunctionCall>,
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub tool_calls: Vec<ChatCompletionMessageToolCall>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// URL citation annotation attached to a chat-completion message.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionAnnotation {
+    #[serde(default, rename = "type")]
+    pub annotation_type: Option<String>,
+    #[serde(default)]
+    pub url_citation: Option<ChatCompletionUrlCitation>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// URL-citation details for a chat-completion annotation.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionUrlCitation {
+    #[serde(default)]
+    pub end_index: i64,
+    #[serde(default)]
+    pub start_index: i64,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Audio response metadata for chat completions.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionAudio {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub data: String,
+    #[serde(default)]
+    pub expires_at: i64,
+    #[serde(default)]
+    pub transcript: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -406,6 +457,88 @@ pub struct ToolCallFunction {
     pub name: Option<String>,
     #[serde(default)]
     pub arguments: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Usage statistics for chat completions and chat streaming usage chunks.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionUsage {
+    #[serde(default)]
+    pub completion_tokens: u64,
+    #[serde(default)]
+    pub prompt_tokens: u64,
+    #[serde(default)]
+    pub total_tokens: u64,
+    #[serde(default)]
+    pub completion_tokens_details: Option<ChatCompletionTokensDetails>,
+    #[serde(default)]
+    pub prompt_tokens_details: Option<ChatPromptTokensDetails>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Completion-token breakdown for chat usage.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionTokensDetails {
+    #[serde(default)]
+    pub accepted_prediction_tokens: Option<u64>,
+    #[serde(default)]
+    pub audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(default)]
+    pub rejected_prediction_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Prompt-token breakdown for chat usage.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatPromptTokensDetails {
+    #[serde(default)]
+    pub audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub cached_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Logprob payload for a chat completion choice.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionChoiceLogprobs {
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
+    pub content: Vec<ChatCompletionTokenLogprob>,
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
+    pub refusal: Vec<ChatCompletionTokenLogprob>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Per-token logprob data for chat completions.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionTokenLogprob {
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub bytes: Option<Vec<i64>>,
+    #[serde(default)]
+    pub logprob: f64,
+    #[serde(default)]
+    pub top_logprobs: Vec<ChatCompletionTopLogprob>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Top-logprob alternative for one chat token.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionTopLogprob {
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub bytes: Option<Vec<i64>>,
+    #[serde(default)]
+    pub logprob: f64,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -511,6 +644,12 @@ pub struct ChatCompletionChunk {
     pub model: Option<String>,
     #[serde(default)]
     pub choices: Vec<ChatCompletionChunkChoice>,
+    #[serde(default)]
+    pub service_tier: Option<String>,
+    #[serde(default)]
+    pub system_fingerprint: Option<String>,
+    #[serde(default)]
+    pub usage: Option<ChatCompletionUsage>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -523,6 +662,8 @@ pub struct ChatCompletionChunkChoice {
     pub delta: ChatCompletionChunkDelta,
     #[serde(default)]
     pub finish_reason: Option<String>,
+    #[serde(default)]
+    pub logprobs: Option<ChatCompletionChoiceLogprobs>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -535,8 +676,10 @@ pub struct ChatCompletionChunkDelta {
     #[serde(default)]
     pub content: Option<String>,
     #[serde(default)]
-    pub function_call: Option<LegacyFunctionCall>,
+    pub refusal: Option<String>,
     #[serde(default)]
+    pub function_call: Option<LegacyFunctionCall>,
+    #[serde(default, deserialize_with = "deserialize_null_default_vec")]
     pub tool_calls: Vec<ChatCompletionMessageToolCall>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -788,7 +931,7 @@ impl ChatCompletionStream {
     fn process_live_message(&mut self, message: LiveChatCompletionMessage) {
         match message {
             LiveChatCompletionMessage::Chunk(chunk) => {
-                self.chunks.push_back(chunk);
+                self.chunks.push_back(*chunk);
             }
             LiveChatCompletionMessage::Finished => {
                 if let Some(live) = self.live.as_mut() {
@@ -821,7 +964,7 @@ impl Drop for ChatCompletionStream {
 
 #[derive(Debug)]
 enum LiveChatCompletionMessage {
-    Chunk(ChatCompletionChunk),
+    Chunk(Box<ChatCompletionChunk>),
     Finished,
     Error(OpenAIError),
 }
@@ -898,6 +1041,9 @@ struct ChatCompletionAccumulator {
     id: Option<String>,
     created: Option<i64>,
     model: Option<String>,
+    service_tier: Option<String>,
+    system_fingerprint: Option<String>,
+    usage: Option<ChatCompletionUsage>,
     choices: Vec<AccumulatedChoice>,
     seen_done: bool,
     seen_terminal_chunk: bool,
@@ -934,6 +1080,15 @@ impl ChatCompletionAccumulator {
         if self.model.is_none() {
             self.model = chunk.model.clone();
         }
+        if self.service_tier.is_none() {
+            self.service_tier = chunk.service_tier.clone();
+        }
+        if self.system_fingerprint.is_none() {
+            self.system_fingerprint = chunk.system_fingerprint.clone();
+        }
+        if chunk.usage.is_some() {
+            self.usage = chunk.usage.clone();
+        }
 
         for choice in &chunk.choices {
             while self.choices.len() <= choice.index {
@@ -958,6 +1113,13 @@ impl ChatCompletionAccumulator {
                     .content
                     .get_or_insert_with(String::new)
                     .push_str(content);
+            }
+            if let Some(refusal) = &choice.delta.refusal {
+                entry
+                    .message
+                    .refusal
+                    .get_or_insert_with(String::new)
+                    .push_str(refusal);
             }
             if let Some(function_call) = &choice.delta.function_call {
                 let call = entry
@@ -1027,6 +1189,8 @@ impl ChatCompletionAccumulator {
             object: String::from("chat.completion"),
             created: self.created.unwrap_or_default(),
             model: self.model,
+            service_tier: self.service_tier,
+            system_fingerprint: self.system_fingerprint,
             choices: self
                 .choices
                 .into_iter()
@@ -1039,7 +1203,7 @@ impl ChatCompletionAccumulator {
                     extra: BTreeMap::new(),
                 })
                 .collect(),
-            usage: None,
+            usage: self.usage,
             extra: BTreeMap::new(),
         })
     }
@@ -1139,7 +1303,10 @@ async fn consume_live_stream(
                 };
                 for frame in parser.push(chunk.as_ref())? {
                     if let Some(parsed) = accumulator.ingest_frame(frame)? {
-                        if chunk_tx.send(LiveChatCompletionMessage::Chunk(parsed)).is_err() {
+                        if chunk_tx
+                            .send(LiveChatCompletionMessage::Chunk(Box::new(parsed)))
+                            .is_err()
+                        {
                             return Ok(());
                         }
                     }
@@ -1151,7 +1318,7 @@ async fn consume_live_stream(
     for frame in parser.finish()? {
         if let Some(parsed) = accumulator.ingest_frame(frame)? {
             if chunk_tx
-                .send(LiveChatCompletionMessage::Chunk(parsed))
+                .send(LiveChatCompletionMessage::Chunk(Box::new(parsed)))
                 .is_err()
             {
                 return Ok(());
