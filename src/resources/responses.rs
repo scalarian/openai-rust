@@ -30,7 +30,13 @@ use crate::{
     },
     error::{ApiErrorKind, ErrorKind},
     helpers::sse::{SseFrame, SseParser},
-    resources::containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
+    resources::{
+        common::{
+            PromptCacheRetention, ReasoningEffort, ReasoningSummary, ServiceTier, Truncation,
+            Verbosity,
+        },
+        containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
+    },
 };
 
 /// Primary Responses API family.
@@ -582,13 +588,13 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ResponseReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -612,7 +618,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncation: Option<String>,
+    pub truncation: Option<Truncation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten)]
@@ -685,13 +691,13 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ResponseReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -713,7 +719,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncation: Option<String>,
+    pub truncation: Option<Truncation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten)]
@@ -802,11 +808,38 @@ pub struct ResponseCompactParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ResponseCompactServiceTier>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Service tier literal accepted by response compaction.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseCompactServiceTier {
+    Auto,
+    Default,
+    Flex,
+    Priority,
+}
+
+impl ResponseCompactServiceTier {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Default => "default",
+            Self::Flex => "flex",
+            Self::Priority => "priority",
+        }
+    }
+}
+
+impl AsRef<str> for ResponseCompactServiceTier {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 /// Input-token count helper params mirroring response creation fields.
@@ -837,7 +870,7 @@ pub struct ResponseInputTokensCountParams {
     #[serde(skip)]
     pub raw_tools: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncation: Option<String>,
+    pub truncation: Option<Truncation>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1207,11 +1240,11 @@ pub struct ResponsePrompt {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ResponseReasoning {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub effort: Option<String>,
+    pub effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub generate_summary: Option<String>,
+    pub generate_summary: Option<ReasoningSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
+    pub summary: Option<ReasoningSummary>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1244,17 +1277,17 @@ pub struct Response {
     pub max_tool_calls: Option<u64>,
     pub prompt: Option<ResponsePrompt>,
     pub prompt_cache_key: Option<String>,
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     pub reasoning: Option<ResponseReasoning>,
     pub safety_identifier: Option<String>,
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<ResponseToolChoice>,
     pub tools: Vec<ResponseTool>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
-    pub truncation: Option<String>,
+    pub truncation: Option<Truncation>,
     pub user: Option<String>,
     pub usage: Option<ResponseUsage>,
     pub error: Option<ResponseError>,
@@ -2475,17 +2508,17 @@ pub struct ParsedResponse<T> {
     pub max_tool_calls: Option<u64>,
     pub prompt: Option<ResponsePrompt>,
     pub prompt_cache_key: Option<String>,
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     pub reasoning: Option<ResponseReasoning>,
     pub safety_identifier: Option<String>,
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<ResponseToolChoice>,
     pub tools: Vec<ResponseTool>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
-    pub truncation: Option<String>,
+    pub truncation: Option<Truncation>,
     pub user: Option<String>,
     pub usage: Option<ResponseUsage>,
     pub error: Option<ResponseError>,
@@ -3108,7 +3141,7 @@ pub struct ResponseTextConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<ResponseFormatTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub verbosity: Option<String>,
+    pub verbosity: Option<Verbosity>,
 }
 
 /// Response text format variants.
@@ -4549,13 +4582,13 @@ struct WireResponse {
     #[serde(default)]
     prompt_cache_key: Option<String>,
     #[serde(default)]
-    prompt_cache_retention: Option<String>,
+    prompt_cache_retention: Option<PromptCacheRetention>,
     #[serde(default)]
     reasoning: Option<ResponseReasoning>,
     #[serde(default)]
     safety_identifier: Option<String>,
     #[serde(default)]
-    service_tier: Option<String>,
+    service_tier: Option<ServiceTier>,
     #[serde(default)]
     temperature: Option<f64>,
     #[serde(default)]
@@ -4569,7 +4602,7 @@ struct WireResponse {
     #[serde(default)]
     top_p: Option<f64>,
     #[serde(default)]
-    truncation: Option<String>,
+    truncation: Option<Truncation>,
     #[serde(default)]
     user: Option<String>,
     #[serde(default)]

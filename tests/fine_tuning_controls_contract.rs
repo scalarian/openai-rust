@@ -6,7 +6,8 @@ use openai_rust::{
     resources::fine_tuning::{
         AutoOrNumber, FineTuningGrader, FineTuningJobCreateParams, FineTuningJobEventLevel,
         FineTuningJobEventListParams, FineTuningMethod, FineTuningMethodConfig,
-        FineTuningReinforcementHyperparameters, FineTuningSupervisedHyperparameters,
+        FineTuningReinforcementHyperparameters, FineTuningReinforcementReasoningEffort,
+        FineTuningSupervisedHyperparameters,
     },
 };
 use serde_json::json;
@@ -88,7 +89,7 @@ fn method_variants_and_job_controls_remain_distinct() {
                         },
                         hyperparameters: Some(FineTuningReinforcementHyperparameters {
                             eval_interval: Some(AutoOrNumber::Number(5)),
-                            reasoning_effort: Some(String::from("low")),
+                            reasoning_effort: Some(FineTuningReinforcementReasoningEffort::Low),
                             ..Default::default()
                         }),
                     },

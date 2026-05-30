@@ -1,8 +1,11 @@
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::responses::{
-        FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig, ResponseInput,
-        ResponseParseParams, ResponseTextConfig, ResponseTool,
+    resources::{
+        common::{PromptCacheRetention, ServiceTier},
+        responses::{
+            FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
+            ResponseInput, ResponseParseParams, ResponseTextConfig, ResponseTool,
+        },
     },
 };
 use serde::Deserialize;
@@ -38,8 +41,8 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
             input: Some(ResponseInput::text("who won?")),
             max_output_tokens: Some(128),
             prompt_cache_key: Some(String::from("parse-cache")),
-            prompt_cache_retention: Some(String::from("24h")),
-            service_tier: Some(String::from("default")),
+            prompt_cache_retention: Some(PromptCacheRetention::TwentyFourHours),
+            service_tier: Some(ServiceTier::Default),
             text: Some(ResponseTextConfig {
                 format: Some(ResponseFormatTextConfig::JsonSchema(
                     ResponseFormatTextJSONSchemaConfig {

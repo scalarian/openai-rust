@@ -1,11 +1,14 @@
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::chat::{
-        ChatCompletionAudioParams, ChatCompletionFunction, ChatCompletionFunctionCall,
-        ChatCompletionFunctionDefinition, ChatCompletionFunctionTool, ChatCompletionMessageParam,
-        ChatCompletionPredictionContent, ChatCompletionResponseFormat, ChatCompletionStreamOptions,
-        ChatCompletionTool, ChatCompletionToolChoice, ChatCompletionVoice, ChatStop,
-        ChatWebSearchOptions,
+    resources::{
+        chat::{
+            ChatCompletionAudioParams, ChatCompletionFunction, ChatCompletionFunctionCall,
+            ChatCompletionFunctionDefinition, ChatCompletionFunctionTool,
+            ChatCompletionMessageParam, ChatCompletionPredictionContent,
+            ChatCompletionResponseFormat, ChatCompletionStreamOptions, ChatCompletionTool,
+            ChatCompletionToolChoice, ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
+        },
+        common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Verbosity},
     },
 };
 use serde_json::{Value, json};
@@ -64,12 +67,12 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             prediction: Some(ChatCompletionPredictionContent::text("stored hello")),
             presence_penalty: Some(0.2),
             prompt_cache_key: Some(String::from("chat-cache")),
-            prompt_cache_retention: Some(String::from("24h")),
-            reasoning_effort: Some(String::from("low")),
+            prompt_cache_retention: Some(PromptCacheRetention::TwentyFourHours),
+            reasoning_effort: Some(ReasoningEffort::Low),
             response_format: Some(ChatCompletionResponseFormat::JsonObject),
             safety_identifier: Some(String::from("user_hash")),
             seed: Some(7),
-            service_tier: Some(String::from("priority")),
+            service_tier: Some(ServiceTier::Priority),
             stop: Some(ChatStop::Strings(vec![String::from("END")])),
             stream: Some(false),
             stream_options: Some(ChatCompletionStreamOptions {
@@ -88,7 +91,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             top_logprobs: Some(2),
             top_p: Some(0.9),
             user: Some(String::from("legacy-user")),
-            verbosity: Some(String::from("medium")),
+            verbosity: Some(Verbosity::Medium),
             web_search_options: Some(ChatWebSearchOptions {
                 search_context_size: Some(String::from("low")),
                 ..Default::default()
@@ -101,7 +104,14 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
         created.output().choices[0].message.content.as_deref(),
         Some("stored hello")
     );
-    assert_eq!(created.output().service_tier.as_deref(), Some("priority"));
+    assert_eq!(
+        created
+            .output()
+            .service_tier
+            .as_ref()
+            .map(ServiceTier::as_str),
+        Some("priority")
+    );
     assert_eq!(
         created.output().system_fingerprint.as_deref(),
         Some("fp_chat_123")

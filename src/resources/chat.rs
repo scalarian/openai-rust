@@ -18,6 +18,7 @@ use crate::{
     },
     error::ErrorKind,
     helpers::sse::{SseFrame, SseParser},
+    resources::common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Verbosity},
 };
 
 /// Chat namespace for compatibility surfaces.
@@ -200,9 +201,9 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt_cache_retention: Option<String>,
+    pub prompt_cache_retention: Option<PromptCacheRetention>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ChatCompletionResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -210,7 +211,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop: Option<ChatStop>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -232,7 +233,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub verbosity: Option<String>,
+    pub verbosity: Option<Verbosity>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_search_options: Option<ChatWebSearchOptions>,
     #[serde(flatten)]
@@ -1487,7 +1488,7 @@ pub struct ChatCompletion {
     #[serde(default)]
     pub choices: Vec<ChatCompletionChoice>,
     #[serde(default)]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     #[serde(default)]
     pub system_fingerprint: Option<String>,
     #[serde(default)]
@@ -1792,7 +1793,7 @@ pub struct ChatCompletionChunk {
     #[serde(default)]
     pub choices: Vec<ChatCompletionChunkChoice>,
     #[serde(default)]
-    pub service_tier: Option<String>,
+    pub service_tier: Option<ServiceTier>,
     #[serde(default)]
     pub system_fingerprint: Option<String>,
     #[serde(default)]
@@ -2188,7 +2189,7 @@ struct ChatCompletionAccumulator {
     id: Option<String>,
     created: Option<i64>,
     model: Option<String>,
-    service_tier: Option<String>,
+    service_tier: Option<ServiceTier>,
     system_fingerprint: Option<String>,
     usage: Option<ChatCompletionUsage>,
     choices: Vec<AccumulatedChoice>,

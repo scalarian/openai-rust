@@ -1,9 +1,12 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
-    resources::chat::{
-        ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionMessageParam,
-        ChatCompletionStream,
+    resources::{
+        chat::{
+            ChatCompletionChunk, ChatCompletionCreateParams, ChatCompletionMessageParam,
+            ChatCompletionStream,
+        },
+        common::ServiceTier,
     },
 };
 use std::{
@@ -80,7 +83,13 @@ fn compatibility_stream_accumulates_legacy_function_and_tool_call_arguments() {
         Some(r#"{"city":"Paris"}"#)
     );
     let final_completion = stream.final_completion().unwrap();
-    assert_eq!(final_completion.service_tier.as_deref(), Some("default"));
+    assert_eq!(
+        final_completion
+            .service_tier
+            .as_ref()
+            .map(ServiceTier::as_str),
+        Some("default")
+    );
     assert_eq!(
         final_completion.system_fingerprint.as_deref(),
         Some("fp_stream")

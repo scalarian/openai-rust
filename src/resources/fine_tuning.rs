@@ -7,6 +7,7 @@ use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     resources::{
+        common::ReasoningEffort,
         files::{encode_path_id, validate_path_id},
         graders::GraderMessageContent,
     },
@@ -557,7 +558,33 @@ pub struct FineTuningReinforcementHyperparameters {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n_epochs: Option<AutoOrNumber>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<FineTuningReinforcementReasoningEffort>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FineTuningReinforcementReasoningEffort {
+    Default,
+    Low,
+    Medium,
+    High,
+}
+
+impl FineTuningReinforcementReasoningEffort {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+impl AsRef<str> for FineTuningReinforcementReasoningEffort {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 /// Weights and Biases integration settings for fine-tuning jobs.
@@ -1002,7 +1029,7 @@ pub struct FineTuningGraderSamplingParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_completions_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]

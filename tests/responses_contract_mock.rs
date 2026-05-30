@@ -3,20 +3,21 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::{
+        common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Truncation},
         containers::{ContainerMemoryLimit, ContainerNetworkPolicy},
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
-            ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
-            ResponseContextManagement, ResponseConversation, ResponseConversationObject,
-            ResponseCustomTool, ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
-            ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
-            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseInput,
-            ResponseInstructions, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
-            ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
-            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
-            ResponseStreamOptions, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
-            ResponseWebSearchPreviewTool,
+            ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseCompactServiceTier,
+            ResponseComputerAction, ResponseContextManagement, ResponseConversation,
+            ResponseConversationObject, ResponseCustomTool, ResponseCustomToolGrammar,
+            ResponseCustomToolInputFormat, ResponseFileSearchAttributeValue,
+            ResponseFileSearchFilter, ResponseFileSearchFilterValue, ResponseFormatTextConfig,
+            ResponseInput, ResponseInstructions, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseMcpAllowedTools, ResponseMcpApprovalFilter,
+            ResponseMcpRequireApproval, ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt,
+            ResponseReasoning, ResponseShellEnvironment, ResponseShellOutputOutcome,
+            ResponseShellTool, ResponseStreamOptions, ResponseTextAnnotation, ResponseTool,
+            ResponseToolChoice, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -69,13 +70,13 @@ fn create_populates_output_text_helper() {
                 ..Default::default()
             }),
             prompt_cache_key: Some(String::from("cache-key")),
-            prompt_cache_retention: Some(String::from("24h")),
+            prompt_cache_retention: Some(PromptCacheRetention::TwentyFourHours),
             reasoning: Some(ResponseReasoning {
-                effort: Some(String::from("low")),
+                effort: Some(ReasoningEffort::Low),
                 ..Default::default()
             }),
             safety_identifier: Some(String::from("user_hash")),
-            service_tier: Some(String::from("priority")),
+            service_tier: Some(ServiceTier::Priority),
             store: Some(true),
             stream: Some(false),
             stream_options: Some(ResponseStreamOptions {
@@ -88,7 +89,7 @@ fn create_populates_output_text_helper() {
             }),
             top_logprobs: Some(2),
             top_p: Some(0.8),
-            truncation: Some(String::from("auto")),
+            truncation: Some(Truncation::Auto),
             user: Some(String::from("legacy-user")),
             tools: vec![
                 ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
@@ -289,7 +290,11 @@ fn create_populates_output_text_helper() {
         Some("response-cache-key")
     );
     assert_eq!(
-        response.output().prompt_cache_retention.as_deref(),
+        response
+            .output()
+            .prompt_cache_retention
+            .as_ref()
+            .map(PromptCacheRetention::as_str),
         Some("24h")
     );
     assert_eq!(
@@ -297,14 +302,22 @@ fn create_populates_output_text_helper() {
             .output()
             .reasoning
             .as_ref()
-            .and_then(|reasoning| reasoning.effort.as_deref()),
+            .and_then(|reasoning| reasoning.effort.as_ref())
+            .map(ReasoningEffort::as_str),
         Some("low")
     );
     assert_eq!(
         response.output().safety_identifier.as_deref(),
         Some("response_user_hash")
     );
-    assert_eq!(response.output().service_tier.as_deref(), Some("priority"));
+    assert_eq!(
+        response
+            .output()
+            .service_tier
+            .as_ref()
+            .map(ServiceTier::as_str),
+        Some("priority")
+    );
     assert_eq!(response.output().temperature, Some(0.2));
     assert_eq!(
         response
@@ -474,7 +487,14 @@ fn create_populates_output_text_helper() {
     ));
     assert_eq!(response.output().top_logprobs, Some(2));
     assert_eq!(response.output().top_p, Some(0.8));
-    assert_eq!(response.output().truncation.as_deref(), Some("auto"));
+    assert_eq!(
+        response
+            .output()
+            .truncation
+            .as_ref()
+            .map(Truncation::as_str),
+        Some("auto")
+    );
     assert_eq!(response.output().user.as_deref(), Some("legacy-user"));
     assert_eq!(
         response.output().metadata,
@@ -937,8 +957,8 @@ fn compact_returns_compaction_object() {
             input: Some(ResponseInput::text("follow-up")),
             previous_response_id: Some("resp_prev".into()),
             prompt_cache_key: Some(String::from("compact-cache")),
-            prompt_cache_retention: Some(String::from("in_memory")),
-            service_tier: Some(String::from("flex")),
+            prompt_cache_retention: Some(PromptCacheRetention::InMemory),
+            service_tier: Some(ResponseCompactServiceTier::Flex),
             ..Default::default()
         })
         .unwrap();

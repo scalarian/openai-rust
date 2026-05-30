@@ -7,6 +7,7 @@ use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     resources::{
+        common::ReasoningEffort,
         files::{encode_path_id, validate_path_id},
         graders::GraderMessageContent,
         responses::ResponseTool,
@@ -555,7 +556,7 @@ pub enum EvalRunSource {
         #[serde(skip_serializing_if = "Option::is_none")]
         model: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        reasoning_effort: Option<String>,
+        reasoning_effort: Option<ReasoningEffort>,
         #[serde(skip_serializing_if = "Option::is_none")]
         temperature: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -581,7 +582,7 @@ pub struct EvalRunSamplingParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_completion_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]

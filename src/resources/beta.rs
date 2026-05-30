@@ -20,7 +20,10 @@ use crate::{
     },
     error::ErrorKind,
     helpers::sse::{SseFrame, SseParser},
-    resources::files::{encode_path_id, validate_path_id},
+    resources::{
+        common::ReasoningEffort,
+        files::{encode_path_id, validate_path_id},
+    },
 };
 
 const CHATKIT_BETA_HEADER: &str = "chatkit_beta=v1";
@@ -127,7 +130,7 @@ pub struct BetaAssistantCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,7 +157,7 @@ pub struct BetaAssistantUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1111,7 +1114,7 @@ pub struct BetaThreadRunCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning_effort: Option<String>,
+    pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]

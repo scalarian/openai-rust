@@ -9,6 +9,7 @@ pub mod audio;
 pub mod batches;
 pub mod beta;
 pub mod chat;
+pub mod common;
 pub mod completions;
 pub mod containers;
 pub mod conversations;

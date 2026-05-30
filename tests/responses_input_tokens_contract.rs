@@ -2,11 +2,14 @@ use std::collections::BTreeMap;
 
 use openai_rust::{
     OpenAI,
-    resources::responses::{
-        FunctionTool, ResponseFileSearchFilter, ResponseFileSearchFilterArrayValue,
-        ResponseFileSearchFilterValue, ResponseFileSearchTool, ResponseFormatTextConfig,
-        ResponseInput, ResponseInputContentPart, ResponseInputImage, ResponseInputItem,
-        ResponseInputText, ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
+    resources::{
+        common::{Truncation, Verbosity},
+        responses::{
+            FunctionTool, ResponseFileSearchFilter, ResponseFileSearchFilterArrayValue,
+            ResponseFileSearchFilterValue, ResponseFileSearchTool, ResponseFormatTextConfig,
+            ResponseInput, ResponseInputContentPart, ResponseInputImage, ResponseInputItem,
+            ResponseInputText, ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
+        },
     },
 };
 use serde_json::{Value, json};
@@ -53,7 +56,7 @@ fn input_tokens_count_forwards_modalities_and_tools() {
             parallel_tool_calls: Some(true),
             text: Some(ResponseTextConfig {
                 format: Some(ResponseFormatTextConfig::Text),
-                verbosity: Some("low".into()),
+                verbosity: Some(Verbosity::Low),
             }),
             tools: vec![
                 ResponseTool::Function(FunctionTool {
@@ -89,7 +92,7 @@ fn input_tokens_count_forwards_modalities_and_tools() {
                     extra: BTreeMap::new(),
                 }),
             ],
-            truncation: Some("auto".into()),
+            truncation: Some(Truncation::Auto),
             ..Default::default()
         })
         .unwrap();

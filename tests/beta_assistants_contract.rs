@@ -6,18 +6,22 @@ use std::{collections::BTreeMap, time::Duration};
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
-    resources::beta::{
-        BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantResponseFormat,
-        BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
-        BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
-        BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
-        BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool, BetaThreadMessageContent,
-        BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
-        BetaThreadRunAdditionalMessage, BetaThreadRunCreateParams, BetaThreadRunListParams,
-        BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
-        BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput, BetaThreadRunUpdateParams,
-        BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides,
-        BetaToolResources, BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
+    resources::{
+        beta::{
+            BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantResponseFormat,
+            BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
+            BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
+            BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
+            BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
+            BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
+            BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
+            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
+            BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
+            BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
+            BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
+            BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
+        },
+        common::ReasoningEffort,
     },
 };
 use serde_json::json;
@@ -61,7 +65,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             model: String::from("gpt-4.1"),
             name: Some(String::from("Support analyst")),
             instructions: Some(String::from("Answer succinctly.")),
-            reasoning_effort: Some(String::from("low")),
+            reasoning_effort: Some(ReasoningEffort::Low),
             tools: Some(vec![BetaAssistantTool::code_interpreter()]),
             ..Default::default()
         })
@@ -82,7 +86,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                         String::from("gold"),
                     )])),
                     response_format: Some(BetaAssistantResponseFormat::JsonObject),
-                    reasoning_effort: Some(String::from("minimal")),
+                    reasoning_effort: Some(ReasoningEffort::Minimal),
                     ..Default::default()
                 },
             )
@@ -277,7 +281,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 }]),
                 max_completion_tokens: Some(256),
                 parallel_tool_calls: Some(true),
-                reasoning_effort: Some(String::from("low")),
+                reasoning_effort: Some(ReasoningEffort::Low),
                 response_format: Some(BetaAssistantResponseFormat::JsonSchema(
                     BetaAssistantResponseFormatJsonSchema {
                         name: String::from("status_update"),

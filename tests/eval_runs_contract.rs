@@ -4,6 +4,7 @@ mod mock_http;
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
+        common::ReasoningEffort,
         evals::{
             EvalRunDataSource, EvalRunDeleteResponse, EvalRunInputMessages, EvalRunListParams,
             EvalRunOutputTextFormat, EvalRunSamplingParams, EvalRunStatus, EvalRunTextConfig,
@@ -69,7 +70,7 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
                             "schema": {"type": "object", "properties": {"answer": {"type": "string"}}}
                         }))),
                     }),
-                    reasoning_effort: Some(String::from("low")),
+                    reasoning_effort: Some(ReasoningEffort::Low),
                     tools: Some(vec![ResponseTool::Function(FunctionTool {
                         name: String::from("grade"),
                         parameters: json!({"type": "object"}),
