@@ -1,7 +1,13 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use openai_rust::{ErrorKind, OpenAI, resources::beta::BetaQueryParams};
+use std::time::Duration;
+
+use openai_rust::{
+    ErrorKind, OpenAI,
+    core::metadata::ResponseMetadata,
+    resources::beta::{BetaAssistantStream, BetaQueryParams, BetaRunPollOptions},
+};
 use serde_json::json;
 
 #[test]
@@ -333,6 +339,242 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     ));
 }
 
+#[test]
+fn beta_assistants_stream_parser_preserves_raw_sse_events() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+    let mut stream = BetaAssistantStream::from_sse_chunks(
+        metadata.clone(),
+        [concat!(
+            "event: thread.run.created\n",
+            "data: {\"id\":\"run_stream\",\"status\":\"queued\"}\n\n",
+            "data: [DONE]\n\n"
+        )],
+    )
+    .expect("stream transcript");
+
+    assert_eq!(stream.metadata().status_code(), 200);
+    let event = stream
+        .next_event()
+        .expect("event read")
+        .expect("first event");
+    assert_eq!(event.event.as_deref(), Some("thread.run.created"));
+    assert_eq!(event.data["id"], json!("run_stream"));
+    assert_eq!(
+        event.raw_data,
+        "{\"id\":\"run_stream\",\"status\":\"queued\"}"
+    );
+    assert!(stream.next_event().expect("eof").is_none());
+
+    let error = BetaAssistantStream::from_sse_chunks(
+        metadata,
+        ["data: {\"id\":\"missing_done\",\"status\":\"queued\"}\n\n"],
+    )
+    .expect_err("missing [DONE] marker should fail");
+    assert_eq!(error.kind, ErrorKind::Transport);
+}
+
+#[test]
+fn beta_assistants_stream_helpers_preserve_routes_headers_and_stream_bodies() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        sse_response(
+            "req_run_stream",
+            "thread.run.created",
+            json!({"id": "run_stream", "status": "queued"}),
+        ),
+        sse_response(
+            "req_thread_run_stream",
+            "thread.run.created",
+            json!({"id": "run_thread_stream", "status": "in_progress"}),
+        ),
+        sse_response(
+            "req_tool_stream",
+            "thread.run.requires_action",
+            json!({"id": "run_tool_stream", "status": "requires_action"}),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let threads = client.beta().threads();
+    let runs = threads.runs();
+
+    let mut run_stream = runs
+        .create_stream("thread_123", json!({"assistant_id": "asst_123"}))
+        .expect("run stream");
+    assert_eq!(run_stream.metadata().request_id(), Some("req_run_stream"));
+    assert_eq!(
+        run_stream
+            .next_event()
+            .expect("run event")
+            .expect("run event")
+            .data["id"],
+        json!("run_stream")
+    );
+    assert!(run_stream.next_event().expect("run eof").is_none());
+
+    let mut thread_stream = threads
+        .create_and_run_stream(json!({
+            "assistant_id": "asst_123",
+            "thread": {"messages": []}
+        }))
+        .expect("thread run stream");
+    assert_eq!(
+        thread_stream.metadata().request_id(),
+        Some("req_thread_run_stream")
+    );
+    assert_eq!(
+        thread_stream
+            .next_event()
+            .expect("thread event")
+            .expect("thread event")
+            .data["id"],
+        json!("run_thread_stream")
+    );
+    assert!(thread_stream.next_event().expect("thread eof").is_none());
+
+    let mut tool_stream = runs
+        .submit_tool_outputs_stream(
+            "thread_123",
+            "run_123",
+            json!({"tool_outputs": [{"tool_call_id": "call_123", "output": "done"}]}),
+        )
+        .expect("tool stream");
+    assert_eq!(tool_stream.metadata().request_id(), Some("req_tool_stream"));
+    assert_eq!(
+        tool_stream
+            .next_event()
+            .expect("tool event")
+            .expect("tool event")
+            .data["status"],
+        json!("requires_action")
+    );
+    assert!(tool_stream.next_event().expect("tool eof").is_none());
+
+    let requests = server.captured_requests(3).unwrap();
+    assert_methods(&requests, &["POST", "POST", "POST"]);
+    assert_eq!(requests[0].path, "/v1/threads/thread_123/runs");
+    assert_eq!(requests[1].path, "/v1/threads/runs");
+    assert_eq!(
+        requests[2].path,
+        "/v1/threads/thread_123/runs/run_123/submit_tool_outputs"
+    );
+    assert_stream_headers(&requests[0], "threads.runs.create_and_stream");
+    assert_stream_headers(&requests[1], "threads.create_and_run_stream");
+    assert_stream_headers(&requests[2], "threads.runs.submit_tool_outputs_stream");
+
+    let run_body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(run_body["assistant_id"], json!("asst_123"));
+    assert_eq!(run_body["stream"], json!(true));
+    let thread_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(thread_body["thread"]["messages"], json!([]));
+    assert_eq!(thread_body["stream"], json!(true));
+    let tool_body: serde_json::Value = serde_json::from_slice(&requests[2].body).unwrap();
+    assert_eq!(
+        tool_body["tool_outputs"][0]["tool_call_id"],
+        json!("call_123")
+    );
+    assert_eq!(tool_body["stream"], json!(true));
+}
+
+#[test]
+fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
+    let poll_options = BetaRunPollOptions {
+        poll_interval: Some(Duration::from_millis(1)),
+        max_wait: Duration::from_secs(1),
+    };
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response_with_header(
+            run_payload("run_poll", "queued"),
+            "openai-poll-after-ms",
+            "1",
+        ),
+        json_response(run_payload("run_poll", "completed")),
+        json_response(run_payload("run_created_poll", "queued")),
+        json_response(run_payload("run_created_poll", "completed")),
+        json_response(run_payload("run_tool_poll", "queued")),
+        json_response(run_payload("run_tool_poll", "completed")),
+        json_response(run_payload("run_thread_poll", "queued")),
+        json_response(run_payload("run_thread_poll", "requires_action")),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let threads = client.beta().threads();
+    let runs = threads.runs();
+
+    let direct = runs
+        .poll(
+            "thread_123",
+            "run_poll",
+            BetaRunPollOptions {
+                poll_interval: None,
+                max_wait: Duration::from_secs(1),
+            },
+        )
+        .expect("direct poll");
+    assert_eq!(direct.output["status"], json!("completed"));
+
+    let created = runs
+        .create_and_poll(
+            "thread_123",
+            json!({"assistant_id": "asst_123"}),
+            poll_options.clone(),
+        )
+        .expect("create and poll");
+    assert_eq!(created.output["status"], json!("completed"));
+
+    let submitted = runs
+        .submit_tool_outputs_and_poll(
+            "thread_123",
+            "run_needs_tools",
+            json!({"tool_outputs": [{"tool_call_id": "call_123", "output": "done"}]}),
+            poll_options.clone(),
+        )
+        .expect("submit tool outputs and poll");
+    assert_eq!(submitted.output["status"], json!("completed"));
+
+    let thread_created = threads
+        .create_and_run_poll(
+            json!({"assistant_id": "asst_123", "thread": {"messages": []}}),
+            poll_options,
+        )
+        .expect("create thread and poll");
+    assert_eq!(thread_created.output["status"], json!("requires_action"));
+
+    let requests = server.captured_requests(8).unwrap();
+    assert_methods(
+        &requests,
+        &["GET", "GET", "POST", "GET", "POST", "GET", "POST", "GET"],
+    );
+    assert_eq!(requests[0].path, "/v1/threads/thread_123/runs/run_poll");
+    assert_eq!(requests[1].path, "/v1/threads/thread_123/runs/run_poll");
+    assert_eq!(requests[2].path, "/v1/threads/thread_123/runs");
+    assert_eq!(
+        requests[3].path,
+        "/v1/threads/thread_123/runs/run_created_poll"
+    );
+    assert_eq!(
+        requests[4].path,
+        "/v1/threads/thread_123/runs/run_needs_tools/submit_tool_outputs"
+    );
+    assert_eq!(
+        requests[5].path,
+        "/v1/threads/thread_123/runs/run_tool_poll"
+    );
+    assert_eq!(requests[6].path, "/v1/threads/runs");
+    assert_eq!(
+        requests[7].path,
+        "/v1/threads/thread_123/runs/run_thread_poll"
+    );
+    for request in &requests {
+        assert_eq!(
+            request.headers.get("openai-beta").map(String::as_str),
+            Some("assistants=v2")
+        );
+    }
+}
+
 fn client(base_url: &str) -> OpenAI {
     OpenAI::builder()
         .api_key("sk-test")
@@ -346,6 +588,31 @@ fn assert_methods(requests: &[mock_http::CapturedRequest], expected: &[&str]) {
         .map(|request| request.method.as_str())
         .collect();
     assert_eq!(methods, expected);
+}
+
+fn assert_stream_headers(request: &mock_http::CapturedRequest, helper: &str) {
+    assert_eq!(
+        request.headers.get("openai-beta").map(String::as_str),
+        Some("assistants=v2")
+    );
+    assert_eq!(
+        request.headers.get("accept").map(String::as_str),
+        Some("text/event-stream")
+    );
+    assert_eq!(
+        request
+            .headers
+            .get("x-stainless-stream-helper")
+            .map(String::as_str),
+        Some(helper)
+    );
+    assert_eq!(
+        request
+            .headers
+            .get("x-stainless-custom-event-handler")
+            .map(String::as_str),
+        Some("false")
+    );
 }
 
 fn assistant_payload(id: &str) -> String {
@@ -431,19 +698,57 @@ fn delete_payload(object: &str, id: &str) -> String {
 }
 
 fn json_response(body: String) -> mock_http::ScriptedResponse {
+    json_response_with_headers(body, Vec::new())
+}
+
+fn json_response_with_header(
+    body: String,
+    name: impl Into<String>,
+    value: impl Into<String>,
+) -> mock_http::ScriptedResponse {
+    json_response_with_headers(body, vec![(name.into(), value.into())])
+}
+
+fn json_response_with_headers(
+    body: String,
+    extra_headers: Vec<(String, String)>,
+) -> mock_http::ScriptedResponse {
+    let mut headers = vec![
+        (String::from("content-length"), body.len().to_string()),
+        (
+            String::from("content-type"),
+            String::from("application/json"),
+        ),
+        (
+            String::from("x-request-id"),
+            String::from("req_beta_assistants"),
+        ),
+    ];
+    headers.extend(extra_headers);
+
+    mock_http::ScriptedResponse {
+        headers,
+        body: body.into_bytes(),
+        ..Default::default()
+    }
+}
+
+fn sse_response(
+    request_id: &str,
+    event: &str,
+    data: serde_json::Value,
+) -> mock_http::ScriptedResponse {
+    let body = format!("event: {event}\ndata: {data}\n\ndata: [DONE]\n\n");
     mock_http::ScriptedResponse {
         headers: vec![
-            (String::from("content-length"), body.len().to_string()),
             (
                 String::from("content-type"),
-                String::from("application/json"),
+                String::from("text/event-stream"),
             ),
-            (
-                String::from("x-request-id"),
-                String::from("req_beta_assistants"),
-            ),
+            (String::from("x-request-id"), request_id.to_string()),
         ],
         body: body.into_bytes(),
+        chunked: true,
         ..Default::default()
     }
 }

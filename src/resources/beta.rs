@@ -1,14 +1,25 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::{Arc, mpsc},
+    thread,
+    time::{Duration, Instant},
+};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
+use tokio::{runtime::Builder, sync::watch};
 
 use crate::{
     OpenAIError,
     core::{
-        request::RequestOptions, response::ApiResponse, runtime::ClientRuntime,
-        transport::execute_json,
+        metadata::ResponseMetadata,
+        request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
+        response::ApiResponse,
+        runtime::ClientRuntime,
+        transport::{execute_json, execute_text_stream},
     },
+    error::ErrorKind,
+    helpers::sse::{SseFrame, SseParser},
     resources::files::{encode_path_id, validate_path_id},
 };
 
@@ -161,6 +172,32 @@ impl BetaThreads {
     ) -> Result<ApiResponse<Value>, OpenAIError> {
         assistants_beta_post_body(&self.runtime, "/threads/runs", &params)
     }
+
+    /// Creates a thread and starts a streamed run.
+    pub fn create_and_run_stream<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        let body = body_with_stream_flag(params)?;
+        assistants_beta_post_stream_value(
+            &self.runtime,
+            "/threads/runs",
+            &body,
+            Some("threads.create_and_run_stream"),
+        )
+    }
+
+    /// Creates a thread, starts a run, and polls that run until it reaches a terminal state.
+    pub fn create_and_run_poll<B: Serialize>(
+        &self,
+        params: B,
+        options: BetaRunPollOptions,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let created = self.create_and_run(params)?;
+        let run_id = value_string_field(&created.output, "id")?;
+        let thread_id = value_string_field(&created.output, "thread_id")?;
+        self.runs().poll(&thread_id, &run_id, options)
+    }
 }
 
 /// Deprecated beta thread message endpoints.
@@ -287,6 +324,64 @@ impl BetaThreadRuns {
         )
     }
 
+    /// Creates a streamed run within a thread.
+    pub fn create_stream<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        self.create_stream_with_query(thread_id, params, BetaQueryParams::default())
+    }
+
+    /// Creates a streamed run within a thread with additional query parameters.
+    pub fn create_stream_with_query<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+        query: BetaQueryParams,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let body = body_with_stream_flag(params)?;
+        assistants_beta_post_stream_value(
+            &self.runtime,
+            path_with_query(format!("/threads/{thread_id}/runs"), query.into_pairs()),
+            &body,
+            Some("threads.runs.create_and_stream"),
+        )
+    }
+
+    /// Alias for the upstream run stream helper.
+    pub fn stream<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        self.create_stream_with_query(thread_id, params, BetaQueryParams::default())
+    }
+
+    /// Creates a run and polls it until it reaches a terminal state.
+    pub fn create_and_poll<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+        options: BetaRunPollOptions,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        self.create_and_poll_with_query(thread_id, params, BetaQueryParams::default(), options)
+    }
+
+    /// Creates a run with query parameters and polls it until it reaches a terminal state.
+    pub fn create_and_poll_with_query<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+        query: BetaQueryParams,
+        options: BetaRunPollOptions,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let created = self.create_with_query(thread_id, params, query)?;
+        let run_id = value_string_field(&created.output, "id")?;
+        self.poll(thread_id, &run_id, options)
+    }
+
     /// Retrieves one run within a thread.
     pub fn retrieve(
         &self,
@@ -352,6 +447,63 @@ impl BetaThreadRuns {
             format!("/threads/{thread_id}/runs/{run_id}/submit_tool_outputs"),
             &params,
         )
+    }
+
+    /// Submits tool outputs for a run and streams subsequent run events.
+    pub fn submit_tool_outputs_stream<B: Serialize>(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        params: B,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        let body = body_with_stream_flag(params)?;
+        assistants_beta_post_stream_value(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}/submit_tool_outputs"),
+            &body,
+            Some("threads.runs.submit_tool_outputs_stream"),
+        )
+    }
+
+    /// Submits tool outputs and polls the run until it reaches a terminal state.
+    pub fn submit_tool_outputs_and_poll<B: Serialize>(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        params: B,
+        options: BetaRunPollOptions,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let submitted = self.submit_tool_outputs(thread_id, run_id, params)?;
+        let run_id = value_string_field(&submitted.output, "id").unwrap_or_else(|_| run_id.into());
+        self.poll(thread_id, &run_id, options)
+    }
+
+    /// Polls a run until it reaches a terminal Assistants status.
+    pub fn poll(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        options: BetaRunPollOptions,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let started_at = Instant::now();
+        loop {
+            let response = self.retrieve(thread_id, run_id)?;
+            if is_terminal_run_status(&response.output) {
+                return Ok(response);
+            }
+
+            let sleep_interval = poll_interval(&response, &options)?;
+            let elapsed = started_at.elapsed();
+            if elapsed > options.max_wait || elapsed + sleep_interval > options.max_wait {
+                return Err(OpenAIError::new(
+                    ErrorKind::Timeout,
+                    "beta Assistants run polling exceeded max_wait",
+                ));
+            }
+            thread::sleep(sleep_interval);
+        }
     }
 }
 
@@ -474,6 +626,242 @@ where
             params = params.push(key, value);
         }
         params
+    }
+}
+
+/// Polling options for deprecated beta Assistants run helpers.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BetaRunPollOptions {
+    pub poll_interval: Option<Duration>,
+    pub max_wait: Duration,
+}
+
+impl Default for BetaRunPollOptions {
+    fn default() -> Self {
+        Self {
+            poll_interval: None,
+            max_wait: Duration::from_secs(600),
+        }
+    }
+}
+
+/// One raw Assistants stream event.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BetaAssistantStreamEvent {
+    pub event: Option<String>,
+    pub data: Value,
+    pub raw_data: String,
+}
+
+/// Stream of raw Assistants SSE events.
+#[derive(Debug)]
+pub struct BetaAssistantStream {
+    metadata: ResponseMetadata,
+    events: VecDeque<BetaAssistantStreamEvent>,
+    live: Option<LiveBetaAssistantStreamHandle>,
+    aborted: bool,
+}
+
+impl BetaAssistantStream {
+    pub fn from_sse_chunks<I, B>(metadata: ResponseMetadata, chunks: I) -> Result<Self, OpenAIError>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<str>,
+    {
+        let mut parser = SseParser::default();
+        let mut events = VecDeque::new();
+        let mut seen_done = false;
+
+        for chunk in chunks {
+            for frame in parser.push(chunk.as_ref().as_bytes())? {
+                if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
+                    events.push_back(event);
+                }
+            }
+        }
+        for frame in parser.finish()? {
+            if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
+                events.push_back(event);
+            }
+        }
+        if !seen_done {
+            return Err(OpenAIError::new(
+                ErrorKind::Transport,
+                "beta Assistants stream ended before [DONE]",
+            ));
+        }
+
+        Ok(Self {
+            metadata,
+            events,
+            live: None,
+            aborted: false,
+        })
+    }
+
+    fn start_live(
+        request: PreparedRequest,
+        options: ResolvedRequestOptions,
+    ) -> Result<Self, OpenAIError> {
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        let (abort_tx, abort_rx) = watch::channel(false);
+
+        let worker = thread::spawn(move || {
+            let runtime = match Builder::new_current_thread().enable_all().build() {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    let error = OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to build beta Assistants stream runtime: {error}"),
+                    )
+                    .with_source(error);
+                    let _ = startup_tx.send(Err(error.clone()));
+                    let _ = event_tx.send(LiveBetaAssistantStreamMessage::Error(error));
+                    return;
+                }
+            };
+
+            runtime.block_on(async move {
+                match execute_text_stream(&request, &options).await {
+                    Ok(response) => {
+                        let _ = startup_tx.send(Ok(response.metadata.clone()));
+                        if let Err(error) =
+                            consume_beta_assistant_live_stream(response, abort_rx, event_tx.clone())
+                                .await
+                        {
+                            let _ = event_tx.send(LiveBetaAssistantStreamMessage::Error(error));
+                        }
+                    }
+                    Err(error) => {
+                        let _ = startup_tx.send(Err(error.clone()));
+                        let _ = event_tx.send(LiveBetaAssistantStreamMessage::Error(error));
+                    }
+                }
+            });
+        });
+
+        let metadata = startup_rx.recv().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("beta Assistants stream worker exited before startup completed: {error}"),
+            )
+        })??;
+
+        Ok(Self {
+            metadata,
+            events: VecDeque::new(),
+            live: Some(LiveBetaAssistantStreamHandle {
+                receiver: event_rx,
+                abort: abort_tx,
+                worker: Some(worker),
+            }),
+            aborted: false,
+        })
+    }
+
+    pub fn next_event(&mut self) -> Result<Option<BetaAssistantStreamEvent>, OpenAIError> {
+        if self.aborted {
+            return Ok(None);
+        }
+        if self.events.is_empty() {
+            self.fill_from_live()?;
+        }
+        Ok(self.events.pop_front())
+    }
+
+    pub async fn next_event_async(
+        &mut self,
+    ) -> Result<Option<BetaAssistantStreamEvent>, OpenAIError> {
+        self.next_event()
+    }
+
+    pub fn abort(&mut self) {
+        self.aborted = true;
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            live.join_worker();
+        }
+        self.live = None;
+        self.events.clear();
+    }
+
+    pub fn metadata(&self) -> &ResponseMetadata {
+        &self.metadata
+    }
+
+    fn fill_from_live(&mut self) -> Result<(), OpenAIError> {
+        let Some(live) = self.live.as_ref() else {
+            return Ok(());
+        };
+
+        let Some(message) = live.receiver.recv().ok() else {
+            if let Some(mut live) = self.live.take() {
+                live.join_worker();
+            }
+            return Ok(());
+        };
+        self.process_live_message(message)?;
+
+        while let Some(live) = self.live.as_ref() {
+            match live.receiver.try_recv() {
+                Ok(message) => self.process_live_message(message)?,
+                Err(_) => break,
+            }
+        }
+        Ok(())
+    }
+
+    fn process_live_message(
+        &mut self,
+        message: LiveBetaAssistantStreamMessage,
+    ) -> Result<(), OpenAIError> {
+        match message {
+            LiveBetaAssistantStreamMessage::Event(event) => self.events.push_back(event),
+            LiveBetaAssistantStreamMessage::Finished => {
+                if let Some(mut live) = self.live.take() {
+                    live.join_worker();
+                }
+            }
+            LiveBetaAssistantStreamMessage::Error(error) => {
+                if let Some(mut live) = self.live.take() {
+                    live.join_worker();
+                }
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for BetaAssistantStream {
+    fn drop(&mut self) {
+        if let Some(live) = &mut self.live {
+            let _ = live.abort.send(true);
+            live.join_worker();
+        }
+    }
+}
+
+#[derive(Debug)]
+enum LiveBetaAssistantStreamMessage {
+    Event(BetaAssistantStreamEvent),
+    Finished,
+    Error(OpenAIError),
+}
+
+#[derive(Debug)]
+struct LiveBetaAssistantStreamHandle {
+    receiver: mpsc::Receiver<LiveBetaAssistantStreamMessage>,
+    abort: watch::Sender<bool>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl LiveBetaAssistantStreamHandle {
+    fn join_worker(&mut self) {
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 
@@ -986,6 +1374,34 @@ where
     execute_json(&request, &options)
 }
 
+fn assistants_beta_post_stream_value(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+    body: &Value,
+    stream_helper: Option<&str>,
+) -> Result<BetaAssistantStream, OpenAIError> {
+    let mut request = runtime.prepare_json_request("POST", path, body)?;
+    request
+        .headers
+        .insert(String::from("accept"), String::from("text/event-stream"));
+    request.headers.insert(
+        String::from("openai-beta"),
+        String::from(ASSISTANTS_BETA_HEADER),
+    );
+    if let Some(stream_helper) = stream_helper {
+        request.headers.insert(
+            String::from("x-stainless-stream-helper"),
+            String::from(stream_helper),
+        );
+        request.headers.insert(
+            String::from("x-stainless-custom-event-handler"),
+            String::from("false"),
+        );
+    }
+    let options = runtime.resolve_request_options(&RequestOptions::default())?;
+    BetaAssistantStream::start_live(request, options)
+}
+
 fn assistants_beta_get(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
@@ -1023,6 +1439,149 @@ where
     );
     let options = runtime.resolve_request_options(&RequestOptions::default())?;
     execute_json(&request, &options)
+}
+
+fn body_with_stream_flag<B: Serialize>(params: B) -> Result<Value, OpenAIError> {
+    let mut value = serde_json::to_value(params).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to serialize beta Assistants stream body: {error}"),
+        )
+        .with_source(error)
+    })?;
+    let Value::Object(map) = &mut value else {
+        return Err(OpenAIError::new(
+            ErrorKind::Validation,
+            "beta Assistants stream body must serialize to a JSON object",
+        ));
+    };
+    map.insert(String::from("stream"), Value::Bool(true));
+    Ok(value)
+}
+
+fn value_string_field(value: &Value, field: &str) -> Result<String, OpenAIError> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(String::from)
+        .ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Parse,
+                format!("beta Assistants response did not include a non-empty `{field}`"),
+            )
+        })
+}
+
+fn is_terminal_run_status(value: &Value) -> bool {
+    matches!(
+        value.get("status").and_then(Value::as_str),
+        Some("requires_action" | "cancelled" | "completed" | "failed" | "expired" | "incomplete")
+    )
+}
+
+fn poll_interval(
+    response: &ApiResponse<Value>,
+    options: &BetaRunPollOptions,
+) -> Result<Duration, OpenAIError> {
+    if let Some(interval) = options.poll_interval {
+        return Ok(interval);
+    }
+    let Some(header) = response.header("openai-poll-after-ms") else {
+        return Ok(Duration::from_secs(1));
+    };
+    let millis = header.parse::<u64>().map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("invalid openai-poll-after-ms header `{header}`: {error}"),
+        )
+        .with_source(error)
+    })?;
+    Ok(Duration::from_millis(millis))
+}
+
+fn parse_beta_assistant_frame(
+    frame: SseFrame,
+    seen_done: &mut bool,
+) -> Result<Option<BetaAssistantStreamEvent>, OpenAIError> {
+    if frame.data.trim() == "[DONE]" {
+        *seen_done = true;
+        return Ok(None);
+    }
+    let data = serde_json::from_str::<Value>(&frame.data).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse beta Assistants stream event: {error}"),
+        )
+        .with_source(error)
+    })?;
+    Ok(Some(BetaAssistantStreamEvent {
+        event: frame.event,
+        raw_data: frame.data,
+        data,
+    }))
+}
+
+async fn consume_beta_assistant_live_stream(
+    response: crate::core::transport::StreamingTextResponse,
+    mut abort_rx: watch::Receiver<bool>,
+    event_tx: mpsc::Sender<LiveBetaAssistantStreamMessage>,
+) -> Result<(), OpenAIError> {
+    let mut response = response.response;
+    let mut parser = SseParser::default();
+    let mut seen_done = false;
+
+    loop {
+        tokio::select! {
+            changed = abort_rx.changed() => {
+                if changed.is_ok() && *abort_rx.borrow() {
+                    let _ = event_tx.send(LiveBetaAssistantStreamMessage::Finished);
+                    return Ok(());
+                }
+            }
+            chunk = response.chunk() => {
+                let chunk = chunk.map_err(map_beta_live_transport_error)?;
+                let Some(chunk) = chunk else {
+                    break;
+                };
+                for frame in parser.push(chunk.as_ref())? {
+                    if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
+                        if event_tx.send(LiveBetaAssistantStreamMessage::Event(event)).is_err() {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for frame in parser.finish()? {
+        if let Some(event) = parse_beta_assistant_frame(frame, &mut seen_done)? {
+            if event_tx
+                .send(LiveBetaAssistantStreamMessage::Event(event))
+                .is_err()
+            {
+                return Ok(());
+            }
+        }
+    }
+    if !seen_done {
+        return Err(OpenAIError::new(
+            ErrorKind::Transport,
+            "beta Assistants stream ended before [DONE]",
+        ));
+    }
+    let _ = event_tx.send(LiveBetaAssistantStreamMessage::Finished);
+    Ok(())
+}
+
+fn map_beta_live_transport_error(error: reqwest::Error) -> OpenAIError {
+    let kind = if error.is_timeout() {
+        ErrorKind::Timeout
+    } else {
+        ErrorKind::Transport
+    };
+    OpenAIError::new(kind, error.to_string()).with_source(error)
 }
 
 fn assistants_beta_delete(

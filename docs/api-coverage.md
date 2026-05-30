@@ -30,7 +30,7 @@ This note tracks the public surface that is already shipped in the crate.
 - `src/resources/images.rs`
 - `src/resources/audio.rs`
 - `src/resources/admin.rs` — admin organization operations for audit logs, admin API keys, usage/costs, invites, users, groups, roles, data retention, spend alerts, certificates, projects, and nested project permissions — `tests/admin_contract.rs`
-- `src/resources/beta.rs` — beta ChatKit sessions and threads, deprecated beta Assistants/Threads/Runs/Run Steps compatibility, and beta realtime session/transcription-session token issuance, including required `OpenAI-Beta` headers — `tests/chatkit_contract.rs`, `tests/beta_assistants_contract.rs`, `tests/beta_realtime_contract.rs`
+- `src/resources/beta.rs` — beta ChatKit sessions and threads, deprecated beta Assistants/Threads/Runs/Run Steps compatibility with stream and poll helpers, and beta realtime session/transcription-session token issuance, including required `OpenAI-Beta` headers — `tests/chatkit_contract.rs`, `tests/beta_assistants_contract.rs`, `tests/beta_realtime_contract.rs`
 - `src/resources/fine_tuning.rs`
 - `src/resources/evals.rs`
 - `src/resources/containers.rs`
