@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::{Map, Number, Value};
 
 use crate::{OpenAIError, error::ErrorKind};
 
@@ -180,6 +180,101 @@ impl<'de> Deserialize<'de> for RealtimeMaxOutputTokens {
     }
 }
 
+/// Realtime conversation truncation strategy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeTruncation {
+    Auto,
+    Disabled,
+    RetentionRatio(Box<RealtimeTruncationRetentionRatio>),
+    UnknownString(String),
+    UnknownObject(Box<Value>),
+}
+
+impl From<RealtimeTruncationRetentionRatio> for RealtimeTruncation {
+    fn from(value: RealtimeTruncationRetentionRatio) -> Self {
+        Self::RetentionRatio(Box::new(value))
+    }
+}
+
+impl Serialize for RealtimeTruncation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Disabled => serializer.serialize_str("disabled"),
+            Self::RetentionRatio(value) => value.serialize(serializer),
+            Self::UnknownString(value) => serializer.serialize_str(value),
+            Self::UnknownObject(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeTruncation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) if value == "auto" => Ok(Self::Auto),
+            Value::String(value) if value == "disabled" => Ok(Self::Disabled),
+            Value::String(value) => Ok(Self::UnknownString(value)),
+            Value::Object(_) => match serde_json::from_value(value.clone()) {
+                Ok(value) => Ok(Self::RetentionRatio(Box::new(value))),
+                Err(_) => Ok(Self::UnknownObject(Box::new(value))),
+            },
+            _ => Err(serde::de::Error::custom(
+                "truncation must be a string or object",
+            )),
+        }
+    }
+}
+
+/// Retain a fraction of Realtime conversation tokens during truncation.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeTruncationRetentionRatio {
+    pub retention_ratio: Number,
+    #[serde(rename = "type")]
+    pub truncation_type: RealtimeTruncationRetentionRatioType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_limits: Option<RealtimeTruncationTokenLimits>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl RealtimeTruncationRetentionRatio {
+    pub fn new(retention_ratio: Number) -> Self {
+        Self {
+            retention_ratio,
+            truncation_type: RealtimeTruncationRetentionRatioType::RetentionRatio,
+            token_limits: None,
+            extra: BTreeMap::new(),
+        }
+    }
+
+    pub fn from_f64(retention_ratio: f64) -> Option<Self> {
+        Number::from_f64(retention_ratio).map(Self::new)
+    }
+}
+
+/// Realtime retention-ratio truncation object marker.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RealtimeTruncationRetentionRatioType {
+    RetentionRatio,
+}
+
+/// Optional token limits for Realtime retention-ratio truncation.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeTruncationTokenLimits {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_instructions: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 realtime_string_literal_enum! {
     /// Additional Realtime fields that can be requested in server outputs.
     pub enum RealtimeInclude {
@@ -265,7 +360,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracing: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub truncation: Option<Value>,
+    pub truncation: Option<RealtimeTruncation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_detection: Option<Value>,
     #[serde(flatten)]

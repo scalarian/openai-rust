@@ -4,7 +4,8 @@ use openai_rust::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
         RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
-        RealtimeSessionTTLAnchor, RealtimeSessionType,
+        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeTruncation,
+        RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits,
     },
 };
 use serde_json::json;
@@ -28,6 +29,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "model": "gpt-realtime-mini",
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
+                    "truncation": "auto",
                     "instructions": "Answer tersely."
                 }
             })
@@ -63,6 +65,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
+                truncation: Some(RealtimeTruncation::Disabled),
                 ..Default::default()
             }),
         })
@@ -80,6 +83,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.max_output_tokens,
         Some(RealtimeMaxOutputTokens::Inf)
+    );
+    assert_eq!(
+        secret.output().session.truncation,
+        Some(RealtimeTruncation::Auto)
     );
 
     let sdp_only = client
@@ -104,6 +111,13 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
+                truncation: Some(RealtimeTruncation::from(RealtimeTruncationRetentionRatio {
+                    token_limits: Some(RealtimeTruncationTokenLimits {
+                        post_instructions: Some(5_000),
+                        ..Default::default()
+                    }),
+                    ..RealtimeTruncationRetentionRatio::from_f64(0.8).unwrap()
+                })),
                 ..Default::default()
             }),
         })
@@ -127,6 +141,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
+                truncation: Some(RealtimeTruncation::Auto),
                 ..Default::default()
             },
         )
@@ -174,6 +189,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
+    assert_eq!(client_secret_body["session"]["truncation"], "disabled");
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
     assert_eq!(
@@ -213,6 +229,12 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(multipart_session["max_output_tokens"], "inf");
     assert_eq!(multipart_session["parallel_tool_calls"], true);
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
+    assert_eq!(multipart_session["truncation"]["type"], "retention_ratio");
+    assert_eq!(multipart_session["truncation"]["retention_ratio"], 0.8);
+    assert_eq!(
+        multipart_session["truncation"]["token_limits"]["post_instructions"],
+        5_000
+    );
 
     let accept_body: serde_json::Value =
         serde_json::from_slice(&requests[3].body).expect("accept json body");
@@ -228,6 +250,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(accept_body["max_output_tokens"], 128);
+    assert_eq!(accept_body["truncation"], "auto");
     assert_eq!(accept_body["parallel_tool_calls"], true);
     assert_eq!(accept_body["reasoning"]["effort"], "low");
 
