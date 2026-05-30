@@ -22,6 +22,7 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
         json_response(job_payload("ftjob_123", "cancelled")),
         json_response(checkpoint_list_payload()),
         json_response(permission_create_payload()),
+        json_response(permission_retrieve_payload()),
         json_response(permission_list_payload()),
         json_response(permission_delete_payload()),
     ])
@@ -138,6 +139,21 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
     assert_eq!(created_permissions.output.data.len(), 2);
     assert_eq!(created_permissions.output.data[0].project_id, "proj_123");
 
+    let retrieved_permissions = sdk
+        .fine_tuning()
+        .checkpoints()
+        .permissions()
+        .retrieve(
+            "ft:gpt-4o-mini:org:weather:checkpoint",
+            FineTuningCheckpointPermissionListParams {
+                project_id: Some(String::from("proj_123")),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(retrieved_permissions.output.data.len(), 1);
+    assert_eq!(retrieved_permissions.output.data[0].id, "perm_123");
+
     let listed_permissions = sdk
         .fine_tuning()
         .checkpoints()
@@ -163,7 +179,7 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
         .unwrap();
     assert!(deleted_permission.output.deleted);
 
-    let requests = success_server.captured_requests(8).unwrap();
+    let requests = success_server.captured_requests(9).unwrap();
     assert_eq!(requests[0].path, "/v1/fine_tuning/jobs");
     assert_eq!(requests[1].path, "/v1/fine_tuning/jobs/ftjob_123");
     assert_eq!(
@@ -181,10 +197,14 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
     );
     assert_eq!(
         requests[6].path,
-        "/v1/fine_tuning/checkpoints/ft:gpt-4o-mini:org:weather:checkpoint/permissions?after=perm_000&limit=2&order=descending&project_id=proj_123"
+        "/v1/fine_tuning/checkpoints/ft:gpt-4o-mini:org:weather:checkpoint/permissions?project_id=proj_123"
     );
     assert_eq!(
         requests[7].path,
+        "/v1/fine_tuning/checkpoints/ft:gpt-4o-mini:org:weather:checkpoint/permissions?after=perm_000&limit=2&order=descending&project_id=proj_123"
+    );
+    assert_eq!(
+        requests[8].path,
         "/v1/fine_tuning/checkpoints/ft:gpt-4o-mini:org:weather:checkpoint/permissions/perm_123"
     );
 
@@ -331,6 +351,24 @@ fn permission_create_payload() -> String {
             {"id": "perm_456", "object": "checkpoint.permission", "created_at": 1_717_171_931, "project_id": "proj_456"}
         ],
         "has_more": false
+    })
+    .to_string()
+}
+
+fn permission_retrieve_payload() -> String {
+    json!({
+        "object": "list",
+        "data": [
+            {
+                "id": "perm_123",
+                "object": "checkpoint.permission",
+                "created_at": 1_717_171_800,
+                "project_id": "proj_123"
+            }
+        ],
+        "has_more": false,
+        "first_id": "perm_123",
+        "last_id": "perm_123"
     })
     .to_string()
 }

@@ -414,6 +414,15 @@ impl FineTuningCheckpointPermissions {
             .execute_json("GET", path, RequestOptions::default())
     }
 
+    /// Deprecated upstream alias for retrieving checkpoint permissions with query filters.
+    pub fn retrieve(
+        &self,
+        checkpoint_id: &str,
+        params: FineTuningCheckpointPermissionListParams,
+    ) -> Result<ApiResponse<FineTuningCheckpointPermissionPage>, OpenAIError> {
+        self.list(checkpoint_id, params)
+    }
+
     /// Deletes a single checkpoint permission.
     pub fn delete(
         &self,
