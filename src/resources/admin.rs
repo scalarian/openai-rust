@@ -330,6 +330,27 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project service-account object type.
+    pub enum AdminProjectServiceAccountObject {
+        OrganizationProjectServiceAccount => "organization.project.service_account",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project service-account API key object type.
+    pub enum AdminProjectServiceAccountApiKeyObject {
+        OrganizationProjectServiceAccountApiKey => "organization.project.service_account.api_key",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project service-account deletion object type.
+    pub enum AdminProjectServiceAccountDeletedObject {
+        OrganizationProjectServiceAccountDeleted => "organization.project.service_account.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1764,6 +1785,57 @@ pub type AdminProjectUserRoleCreateResponse = AdminUserRoleCreateResponse;
 pub type AdminProjectUserRoleRetrieveResponse = AdminRoleAssignment;
 pub type AdminProjectUserRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
 pub type AdminProjectUserRoleDeleteResponse = AdminRoleAssignmentDeleteResponse;
+
+/// API key returned when creating a project service account.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectServiceAccountApiKey {
+    pub id: String,
+    pub created_at: u64,
+    pub name: String,
+    pub object: AdminProjectServiceAccountApiKeyObject,
+    pub value: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual service account in a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectServiceAccount {
+    pub id: String,
+    pub created_at: u64,
+    pub name: String,
+    pub object: AdminProjectServiceAccountObject,
+    pub role: AdminProjectMembershipRole,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Response returned when creating a project service account.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectServiceAccountCreateResponse {
+    pub id: String,
+    #[serde(default)]
+    pub api_key: Option<AdminProjectServiceAccountApiKey>,
+    pub created_at: u64,
+    pub name: String,
+    pub object: AdminProjectServiceAccountObject,
+    pub role: AdminProjectMembershipRole,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting a project service account.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectServiceAccountDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminProjectServiceAccountDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectServiceAccountListResponse =
+    AdminConversationCursorPage<AdminProjectServiceAccount>;
 
 /// Project service-account creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -3709,12 +3781,13 @@ impl ProjectServiceAccounts {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectServiceAccountCreateResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/service_accounts"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -3722,12 +3795,13 @@ impl ProjectServiceAccounts {
         &self,
         project_id: &str,
         service_account_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectServiceAccount>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let service_account_id = path_id("service_account_id", service_account_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/service_accounts/{service_account_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -3736,13 +3810,14 @@ impl ProjectServiceAccounts {
         project_id: &str,
         service_account_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectServiceAccount>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let service_account_id = path_id("service_account_id", service_account_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/service_accounts/{service_account_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -3750,12 +3825,15 @@ impl ProjectServiceAccounts {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectServiceAccountListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/service_accounts"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/service_accounts"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -3763,12 +3841,13 @@ impl ProjectServiceAccounts {
         &self,
         project_id: &str,
         service_account_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectServiceAccountDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let service_account_id = path_id("service_account_id", service_account_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/service_accounts/{service_account_id}"),
+            RequestOptions::default(),
         )
     }
 }

@@ -264,6 +264,28 @@ fn project_user_json(id: &str, role: &str) -> Value {
     })
 }
 
+fn project_service_account_json(id: &str, name: &str, role: &str) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_172_400u64,
+        "name": name,
+        "object": "organization.project.service_account",
+        "role": role
+    })
+}
+
+fn project_service_account_create_json(id: &str, name: &str) -> Value {
+    let mut service_account = project_service_account_json(id, name, "member");
+    service_account["api_key"] = json!({
+        "id": "key_svc_robot",
+        "created_at": 1_717_172_401u64,
+        "name": "robot key",
+        "object": "organization.project.service_account.api_key",
+        "value": "sk-service-account"
+    });
+    service_account
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -1270,6 +1292,18 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[4] =
+        json_response(project_service_account_create_json("svc_robot", "robot").to_string());
+    responses[5] =
+        json_response(project_service_account_json("svc_robot", "robot-prod", "owner").to_string());
+    responses[6] = json_response(
+        json!({
+            "data": [project_service_account_json("svc_robot", "robot-prod", "owner")],
+            "has_more": true,
+            "last_id": "svc_robot"
+        })
+        .to_string(),
+    );
     responses[7] = json_response(
         json!({
             "data": [project_api_key_json("key_project")],
@@ -1380,7 +1414,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         Some("role_project_viewer")
     );
 
-    projects
+    let created_service_account = projects
         .service_accounts()
         .create(
             "proj_research",
@@ -1389,7 +1423,19 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        created_service_account.output.object,
+        AdminProjectServiceAccountObject::OrganizationProjectServiceAccount
+    );
+    assert_eq!(
+        created_service_account
+            .output
+            .api_key
+            .as_ref()
+            .map(|key| key.value.as_str()),
+        Some("sk-service-account")
+    );
+    let updated_service_account = projects
         .service_accounts()
         .update(
             "proj_research",
@@ -1400,7 +1446,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        updated_service_account.output.role,
+        AdminProjectMembershipRole::Owner
+    );
+    let service_accounts = projects
         .service_accounts()
         .list(
             "proj_research",
@@ -1410,6 +1460,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(service_accounts.output.data[0].id, "svc_robot");
+    assert_eq!(service_accounts.output.next_after(), Some("svc_robot"));
 
     let project_keys = projects
         .api_keys()
@@ -2231,6 +2283,56 @@ fn admin_project_user_role_retrieve_and_delete_return_typed_responses() {
     assert_eq!(
         requests[1].path,
         "/v1/projects/proj_research/users/user_admin/roles/role_project_viewer"
+    );
+}
+
+#[test]
+fn admin_project_service_account_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(project_service_account_json("svc_robot", "robot", "member").to_string()),
+        json_response(
+            json!({
+                "id": "svc_robot",
+                "deleted": true,
+                "object": "organization.project.service_account.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let service_accounts = client.admin().organization().projects().service_accounts();
+
+    let service_account = service_accounts
+        .retrieve("proj_research", "svc_robot")
+        .unwrap();
+    assert_eq!(
+        service_account.output.object,
+        AdminProjectServiceAccountObject::OrganizationProjectServiceAccount
+    );
+    assert_eq!(
+        service_account.output.role,
+        AdminProjectMembershipRole::Member
+    );
+
+    let deleted = service_accounts
+        .delete("proj_research", "svc_robot")
+        .unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminProjectServiceAccountDeletedObject::OrganizationProjectServiceAccountDeleted
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/projects/proj_research/service_accounts/svc_robot"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/projects/proj_research/service_accounts/svc_robot"
     );
 }
 
