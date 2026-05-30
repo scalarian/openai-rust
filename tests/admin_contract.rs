@@ -176,7 +176,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             "proj_research",
             "grp_eng",
             AdminProjectGroupRetrieveParams {
-                group_type: Some(String::from("group")),
+                group_type: Some(AdminGroupType::Group),
             },
         )
         .unwrap();
@@ -314,10 +314,10 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     org.invites()
         .create(AdminInviteCreateParams {
             email: String::from("new@example.com"),
-            role: String::from("reader"),
+            role: AdminInviteRole::Reader,
             projects: Some(vec![AdminInviteProject {
                 id: String::from("proj_1"),
-                role: String::from("member"),
+                role: AdminProjectMembershipRole::Member,
             }]),
         })
         .unwrap();
@@ -434,7 +434,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
 
     org.data_retention()
         .update(AdminDataRetentionUpdateParams {
-            retention_type: String::from("default"),
+            retention_type: AdminOrganizationDataRetentionType::ZeroDataRetention,
         })
         .unwrap();
 
@@ -475,11 +475,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
 
     org.spend_alerts()
         .create(AdminSpendAlertCreateParams {
-            currency: String::from("USD"),
-            interval: String::from("month"),
+            currency: AdminSpendAlertCurrency::Usd,
+            interval: AdminSpendAlertInterval::Month,
             notification_channel: AdminSpendAlertNotificationChannel {
                 recipients: vec![String::from("ops@example.com")],
-                kind: String::from("email"),
+                kind: AdminSpendAlertNotificationType::Email,
                 subject_prefix: None,
             },
             threshold_amount: 10_000,
@@ -497,11 +497,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .update(
             "alert_ops",
             AdminSpendAlertUpdateParams {
-                currency: String::from("USD"),
-                interval: String::from("month"),
+                currency: AdminSpendAlertCurrency::Usd,
+                interval: AdminSpendAlertInterval::Month,
                 notification_channel: AdminSpendAlertNotificationChannel {
                     recipients: vec![String::from("sec@example.com")],
-                    kind: String::from("email"),
+                    kind: AdminSpendAlertNotificationType::Email,
                     subject_prefix: None,
                 },
                 threshold_amount: 20_000,
@@ -546,6 +546,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
 
     let invite_body: AdminValue = serde_json::from_slice(&requests[1].body).unwrap();
     assert_eq!(invite_body["email"], json!("new@example.com"));
+    assert_eq!(invite_body["role"], json!("reader"));
     assert_eq!(invite_body["projects"][0]["role"], json!("member"));
     let user_update_body: AdminValue = serde_json::from_slice(&requests[4].body).unwrap();
     assert_eq!(user_update_body["role_id"], json!("role_owner"));
@@ -631,7 +632,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             "svc_robot",
             AdminProjectServiceAccountUpdateParams {
                 name: Some(String::from("robot-prod")),
-                role: Some(String::from("owner")),
+                role: Some(AdminProjectMembershipRole::Owner),
             },
         )
         .unwrap();
@@ -672,7 +673,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .update(
             "proj_research",
             AdminProjectModelPermissionUpdateParams {
-                mode: Some(String::from("allow")),
+                mode: Some(AdminProjectModelPermissionMode::AllowList),
                 model_ids: Some(vec![String::from("gpt-5")]),
             },
         )
@@ -740,7 +741,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .update(
             "proj_research",
             AdminProjectDataRetentionUpdateParams {
-                retention_type: String::from("default"),
+                retention_type: AdminProjectDataRetentionType::OrganizationDefault,
             },
         )
         .unwrap();
@@ -749,11 +750,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .create(
             "proj_research",
             AdminProjectSpendAlertCreateParams {
-                currency: String::from("USD"),
-                interval: String::from("month"),
+                currency: AdminSpendAlertCurrency::Usd,
+                interval: AdminSpendAlertInterval::Month,
                 notification_channel: AdminSpendAlertNotificationChannel {
                     recipients: vec![String::from("ops@example.com")],
-                    kind: String::from("email"),
+                    kind: AdminSpendAlertNotificationType::Email,
                     subject_prefix: None,
                 },
                 threshold_amount: 30_000,
@@ -778,11 +779,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             "proj_research",
             "alert_project",
             AdminProjectSpendAlertUpdateParams {
-                currency: String::from("USD"),
-                interval: String::from("month"),
+                currency: AdminSpendAlertCurrency::Usd,
+                interval: AdminSpendAlertInterval::Month,
                 notification_channel: AdminSpendAlertNotificationChannel {
                     recipients: vec![String::from("sec@example.com")],
-                    kind: String::from("email"),
+                    kind: AdminSpendAlertNotificationType::Email,
                     subject_prefix: None,
                 },
                 threshold_amount: 40_000,
@@ -848,6 +849,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     let service_account_body: AdminValue = serde_json::from_slice(&requests[4].body).unwrap();
     assert_eq!(service_account_body["name"], json!("robot"));
     let model_permissions_body: AdminValue = serde_json::from_slice(&requests[9].body).unwrap();
+    assert_eq!(model_permissions_body["mode"], json!("allow_list"));
     assert_eq!(model_permissions_body["model_ids"], json!(["gpt-5"]));
     let group_body: AdminValue = serde_json::from_slice(&requests[10].body).unwrap();
     assert_eq!(group_body["group_id"], json!("grp_eng"));

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
@@ -14,6 +14,193 @@ use crate::{
 
 /// JSON value returned by the flexible admin endpoint surface.
 pub type AdminValue = Value;
+
+macro_rules! admin_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
+admin_string_literal_enum! {
+    /// Organization invite role.
+    pub enum AdminInviteRole {
+        Reader => "reader",
+        Owner => "owner",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project membership role used by invite project grants and service accounts.
+    pub enum AdminProjectMembershipRole {
+        Member => "member",
+        Owner => "owner",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization-level data retention mode.
+    pub enum AdminOrganizationDataRetentionType {
+        ZeroDataRetention => "zero_data_retention",
+        ModifiedAbuseMonitoring => "modified_abuse_monitoring",
+        EnhancedZeroDataRetention => "enhanced_zero_data_retention",
+        EnhancedModifiedAbuseMonitoring => "enhanced_modified_abuse_monitoring",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project-level data retention mode.
+    pub enum AdminProjectDataRetentionType {
+        OrganizationDefault => "organization_default",
+        None => "none",
+        ZeroDataRetention => "zero_data_retention",
+        ModifiedAbuseMonitoring => "modified_abuse_monitoring",
+        EnhancedZeroDataRetention => "enhanced_zero_data_retention",
+        EnhancedModifiedAbuseMonitoring => "enhanced_modified_abuse_monitoring",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Currency supported by spend-alert thresholds.
+    pub enum AdminSpendAlertCurrency {
+        Usd => "USD",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Spend-alert evaluation interval.
+    pub enum AdminSpendAlertInterval {
+        Month => "month",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Spend-alert notification channel type.
+    pub enum AdminSpendAlertNotificationType {
+        Email => "email",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project model-permission mode.
+    pub enum AdminProjectModelPermissionMode {
+        AllowList => "allow_list",
+        DenyList => "deny_list",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization group type.
+    pub enum AdminGroupType {
+        Group => "group",
+        TenantGroup => "tenant_group",
+    }
+}
 
 /// Query parameters for admin endpoints.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -167,7 +354,7 @@ impl From<AdminApiKeyListParams> for AdminQueryParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminInviteCreateParams {
     pub email: String,
-    pub role: String,
+    pub role: AdminInviteRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub projects: Option<Vec<AdminInviteProject>>,
 }
@@ -176,7 +363,7 @@ pub struct AdminInviteCreateParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminInviteProject {
     pub id: String,
-    pub role: String,
+    pub role: AdminProjectMembershipRole,
 }
 
 /// Organization invite list query parameters.
@@ -411,14 +598,14 @@ impl From<AdminCertificateListParams> for AdminQueryParams {
 /// Organization data-retention update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminDataRetentionUpdateParams {
-    pub retention_type: String,
+    pub retention_type: AdminOrganizationDataRetentionType,
 }
 
 /// Organization spend-alert creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminSpendAlertCreateParams {
-    pub currency: String,
-    pub interval: String,
+    pub currency: AdminSpendAlertCurrency,
+    pub interval: AdminSpendAlertInterval,
     pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
@@ -426,8 +613,8 @@ pub struct AdminSpendAlertCreateParams {
 /// Organization spend-alert update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminSpendAlertUpdateParams {
-    pub currency: String,
-    pub interval: String,
+    pub currency: AdminSpendAlertCurrency,
+    pub interval: AdminSpendAlertInterval,
     pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
@@ -437,7 +624,7 @@ pub struct AdminSpendAlertUpdateParams {
 pub struct AdminSpendAlertNotificationChannel {
     pub recipients: Vec<String>,
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: AdminSpendAlertNotificationType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subject_prefix: Option<String>,
 }
@@ -566,7 +753,7 @@ pub struct AdminProjectServiceAccountUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
+    pub role: Option<AdminProjectMembershipRole>,
 }
 
 /// Project service-account list query parameters.
@@ -637,7 +824,7 @@ pub struct AdminProjectRateLimitUpdateParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectModelPermissionUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
+    pub mode: Option<AdminProjectModelPermissionMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_ids: Option<Vec<String>>,
 }
@@ -673,7 +860,7 @@ pub struct AdminProjectGroupCreateParams {
 /// Project group retrieve query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminProjectGroupRetrieveParams {
-    pub group_type: Option<String>,
+    pub group_type: Option<AdminGroupType>,
 }
 
 impl From<AdminProjectGroupRetrieveParams> for AdminQueryParams {
@@ -763,14 +950,14 @@ impl From<AdminProjectRoleListParams> for AdminQueryParams {
 /// Project data-retention update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectDataRetentionUpdateParams {
-    pub retention_type: String,
+    pub retention_type: AdminProjectDataRetentionType,
 }
 
 /// Project spend-alert creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectSpendAlertCreateParams {
-    pub currency: String,
-    pub interval: String,
+    pub currency: AdminSpendAlertCurrency,
+    pub interval: AdminSpendAlertInterval,
     pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
@@ -778,8 +965,8 @@ pub struct AdminProjectSpendAlertCreateParams {
 /// Project spend-alert update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectSpendAlertUpdateParams {
-    pub currency: String,
-    pub interval: String,
+    pub currency: AdminSpendAlertCurrency,
+    pub interval: AdminSpendAlertInterval,
     pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
