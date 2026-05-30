@@ -39,6 +39,13 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
         })
         .unwrap();
     assert_eq!(generated.output().created, 1_717_171_717);
+    assert_eq!(
+        generated.output().background.as_deref(),
+        Some("transparent")
+    );
+    assert_eq!(generated.output().output_format.as_deref(), Some("png"));
+    assert_eq!(generated.output().quality.as_deref(), Some("high"));
+    assert_eq!(generated.output().size.as_deref(), Some("1024x1024"));
     assert_eq!(generated.output().data.len(), 2);
     assert_eq!(
         generated.output().data[0].b64_json.as_deref(),
@@ -49,6 +56,18 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
         Some("https://cdn.example.com/final.png")
     );
     assert_eq!(generated.output().usage.as_ref().unwrap().total_tokens, 42);
+    assert_eq!(
+        generated
+            .output()
+            .usage
+            .as_ref()
+            .unwrap()
+            .output_tokens_details
+            .as_ref()
+            .unwrap()
+            .image_tokens,
+        30
+    );
 
     let first = openai_rust::resources::images::ImageInput::new(
         "frame-1.png",
@@ -221,6 +240,10 @@ fn json_response(body: String) -> mock_http::ScriptedResponse {
 fn generate_payload() -> String {
     json!({
         "created": 1717171717_i64,
+        "background": "transparent",
+        "output_format": "png",
+        "quality": "high",
+        "size": "1024x1024",
         "data": [
             {"b64_json": "Zmlyc3Q=", "revised_prompt": "A stained glass lighthouse at sunset"},
             {"url": "https://cdn.example.com/final.png"}
@@ -229,6 +252,7 @@ fn generate_payload() -> String {
             "input_tokens": 10,
             "input_tokens_details": {"text_tokens": 6, "image_tokens": 4},
             "output_tokens": 32,
+            "output_tokens_details": {"text_tokens": 2, "image_tokens": 30},
             "total_tokens": 42
         }
     })

@@ -338,7 +338,15 @@ pub struct ImagesResponse {
     #[serde(default)]
     pub created: i64,
     #[serde(default)]
+    pub background: Option<String>,
+    #[serde(default)]
     pub data: Vec<ImageData>,
+    #[serde(default)]
+    pub output_format: Option<String>,
+    #[serde(default)]
+    pub quality: Option<String>,
+    #[serde(default)]
+    pub size: Option<String>,
     #[serde(default)]
     pub usage: Option<ImageUsage>,
     #[serde(flatten)]
@@ -368,6 +376,8 @@ pub struct ImageUsage {
     #[serde(default)]
     pub output_tokens: u32,
     #[serde(default)]
+    pub output_tokens_details: Option<ImageOutputTokenDetails>,
+    #[serde(default)]
     pub total_tokens: u32,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -376,6 +386,17 @@ pub struct ImageUsage {
 /// Input token split by modality.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ImageInputTokenDetails {
+    #[serde(default)]
+    pub image_tokens: u32,
+    #[serde(default)]
+    pub text_tokens: u32,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Output token split by modality.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ImageOutputTokenDetails {
     #[serde(default)]
     pub image_tokens: u32,
     #[serde(default)]
@@ -614,10 +635,10 @@ impl ImageGenerationStream {
     fn process_live_message(&mut self, message: LiveImageGenerationMessage) {
         match message {
             LiveImageGenerationMessage::Event(event) => {
-                if let ImageGenerationStreamEvent::Completed(completed) = &event {
+                if let ImageGenerationStreamEvent::Completed(completed) = event.as_ref() {
                     self.final_completed = Some(completed.clone());
                 }
-                self.events.push_back(event);
+                self.events.push_back(*event);
             }
             LiveImageGenerationMessage::Finished => {
                 if let Some(live) = self.live.as_mut() {
@@ -778,10 +799,10 @@ impl ImageEditStream {
     fn process_live_message(&mut self, message: LiveImageEditMessage) {
         match message {
             LiveImageEditMessage::Event(event) => {
-                if let ImageEditStreamEvent::Completed(completed) = &event {
+                if let ImageEditStreamEvent::Completed(completed) = event.as_ref() {
                     self.final_completed = Some(completed.clone());
                 }
-                self.events.push_back(event);
+                self.events.push_back(*event);
             }
             LiveImageEditMessage::Finished => {
                 if let Some(live) = self.live.as_mut() {
@@ -914,7 +935,7 @@ impl ImageEditAccumulator {
 
 #[derive(Debug)]
 enum LiveImageGenerationMessage {
-    Event(ImageGenerationStreamEvent),
+    Event(Box<ImageGenerationStreamEvent>),
     Finished,
     Error(OpenAIError),
 }
@@ -935,7 +956,7 @@ impl LiveImageGenerationHandle {
 
 #[derive(Debug)]
 enum LiveImageEditMessage {
-    Event(ImageEditStreamEvent),
+    Event(Box<ImageEditStreamEvent>),
     Finished,
     Error(OpenAIError),
 }
@@ -1030,7 +1051,7 @@ fn drain_generation_events(
 ) {
     while let Some(event) = accumulator.events.pop_front() {
         if event_tx
-            .send(LiveImageGenerationMessage::Event(event))
+            .send(LiveImageGenerationMessage::Event(Box::new(event)))
             .is_err()
         {
             break;
@@ -1068,7 +1089,10 @@ fn drain_edit_events(
     event_tx: &mpsc::Sender<LiveImageEditMessage>,
 ) {
     while let Some(event) = accumulator.events.pop_front() {
-        if event_tx.send(LiveImageEditMessage::Event(event)).is_err() {
+        if event_tx
+            .send(LiveImageEditMessage::Event(Box::new(event)))
+            .is_err()
+        {
             break;
         }
     }
