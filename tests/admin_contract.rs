@@ -33,20 +33,20 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     org.admin_api_keys().delete("key_ops").unwrap();
 
     org.usage()
-        .completions(
-            AdminQueryParams::new()
-                .push("start_time", 1_717_171_700)
-                .push("bucket_width", "1d")
-                .push_repeated("models", ["gpt-5.5", "gpt-5-mini"]),
-        )
+        .completions(AdminUsageCompletionsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            models: Some(vec![String::from("gpt-5.5"), String::from("gpt-5-mini")]),
+            ..Default::default()
+        })
         .unwrap();
     org.usage()
-        .costs(
-            AdminQueryParams::new()
-                .push("start_time", 1_717_171_700)
-                .push("bucket_width", "1d")
-                .push_repeated("group_by", ["project_id", "line_item"]),
-        )
+        .costs(AdminUsageCostsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            group_by: Some(vec![String::from("project_id"), String::from("line_item")]),
+            ..Default::default()
+        })
         .unwrap();
 
     org.users()
@@ -849,22 +849,97 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     .unwrap();
     let client = client(&server.url());
     let usage = client.admin().organization().usage();
-    let params = AdminQueryParams::new()
-        .push("start_time", 1_717_171_700)
-        .push("bucket_width", "1d")
-        .push("page", "cursor_123")
-        .push("limit", 1);
 
-    usage.audio_speeches(params.clone()).unwrap();
-    usage.audio_transcriptions(params.clone()).unwrap();
-    usage.code_interpreter_sessions(params.clone()).unwrap();
-    usage.completions(params.clone()).unwrap();
-    usage.embeddings(params.clone()).unwrap();
-    usage.file_search_calls(params.clone()).unwrap();
-    usage.images(params.clone()).unwrap();
-    usage.moderations(params.clone()).unwrap();
-    usage.vector_stores(params.clone()).unwrap();
-    usage.web_search_calls(params).unwrap();
+    usage
+        .audio_speeches(AdminUsageAudioSpeechesParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .audio_transcriptions(AdminUsageAudioTranscriptionsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .code_interpreter_sessions(AdminUsageCodeInterpreterSessionsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .completions(AdminUsageCompletionsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .embeddings(AdminUsageEmbeddingsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .file_search_calls(AdminUsageFileSearchCallsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .images(AdminUsageImagesParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .moderations(AdminUsageModerationsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .vector_stores(AdminUsageVectorStoresParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
+    usage
+        .web_search_calls(AdminUsageWebSearchCallsParams {
+            start_time: Some(1_717_171_700),
+            bucket_width: Some(String::from("1d")),
+            limit: Some(1),
+            page: Some(String::from("cursor_123")),
+            ..Default::default()
+        })
+        .unwrap();
 
     let requests = server.captured_requests(10).unwrap();
     let paths = requests
@@ -874,16 +949,16 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     assert_eq!(
         paths,
         vec![
-            "/v1/organization/usage/audio_speeches?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/audio_transcriptions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/code_interpreter_sessions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/completions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/embeddings?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/file_search_calls?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/images?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/moderations?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/vector_stores?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
-            "/v1/organization/usage/web_search_calls?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/audio_speeches?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/audio_transcriptions?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/code_interpreter_sessions?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/completions?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/embeddings?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/file_search_calls?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/images?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/moderations?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/vector_stores?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/web_search_calls?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
         ]
     );
     assert!(requests.iter().all(|request| request.method == "GET"));

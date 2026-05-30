@@ -800,6 +800,339 @@ impl From<AdminProjectCertificateListParams> for AdminQueryParams {
     }
 }
 
+/// Organization audio speeches usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageAudioSpeechesParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageAudioSpeechesParams> for AdminQueryParams {
+    fn from(value: AdminUsageAudioSpeechesParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization audio transcriptions usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageAudioTranscriptionsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageAudioTranscriptionsParams> for AdminQueryParams {
+    fn from(value: AdminUsageAudioTranscriptionsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization code interpreter sessions usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageCodeInterpreterSessionsParams {
+    pub start_time: Option<i64>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageCodeInterpreterSessionsParams> for AdminQueryParams {
+    fn from(value: AdminUsageCodeInterpreterSessionsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+    }
+}
+
+/// Organization completions usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageCompletionsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub batch: Option<bool>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageCompletionsParams> for AdminQueryParams {
+    fn from(value: AdminUsageCompletionsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("batch", value.batch)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization costs usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageCostsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageCostsParams> for AdminQueryParams {
+    fn from(value: AdminUsageCostsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+    }
+}
+
+/// Organization embeddings usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageEmbeddingsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageEmbeddingsParams> for AdminQueryParams {
+    fn from(value: AdminUsageEmbeddingsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization file search calls usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageFileSearchCallsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+    pub vector_store_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageFileSearchCallsParams> for AdminQueryParams {
+    fn from(value: AdminUsageFileSearchCallsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+            .push_repeated_opt("vector_store_ids", value.vector_store_ids)
+    }
+}
+
+/// Organization images usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageImagesParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub sizes: Option<Vec<String>>,
+    pub sources: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageImagesParams> for AdminQueryParams {
+    fn from(value: AdminUsageImagesParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("sizes", value.sizes)
+            .push_repeated_opt("sources", value.sources)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization moderations usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageModerationsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageModerationsParams> for AdminQueryParams {
+    fn from(value: AdminUsageModerationsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
+/// Organization vector stores usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageVectorStoresParams {
+    pub start_time: Option<i64>,
+    pub bucket_width: Option<String>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageVectorStoresParams> for AdminQueryParams {
+    fn from(value: AdminUsageVectorStoresParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+    }
+}
+
+/// Organization web search calls usage query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUsageWebSearchCallsParams {
+    pub start_time: Option<i64>,
+    pub api_key_ids: Option<Vec<String>>,
+    pub bucket_width: Option<String>,
+    pub context_levels: Option<Vec<String>>,
+    pub end_time: Option<i64>,
+    pub group_by: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub models: Option<Vec<String>>,
+    pub page: Option<String>,
+    pub project_ids: Option<Vec<String>>,
+    pub user_ids: Option<Vec<String>>,
+}
+
+impl From<AdminUsageWebSearchCallsParams> for AdminQueryParams {
+    fn from(value: AdminUsageWebSearchCallsParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("start_time", value.start_time)
+            .push_repeated_opt("api_key_ids", value.api_key_ids)
+            .push_opt("bucket_width", value.bucket_width)
+            .push_repeated_opt("context_levels", value.context_levels)
+            .push_opt("end_time", value.end_time)
+            .push_repeated_opt("group_by", value.group_by)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("models", value.models)
+            .push_opt("page", value.page)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("user_ids", value.user_ids)
+    }
+}
+
 /// Admin API family.
 #[derive(Clone, Debug)]
 pub struct Admin {
