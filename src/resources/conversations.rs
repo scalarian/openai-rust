@@ -12,7 +12,8 @@ use crate::{
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
             ResponseFileSearchResult, ResponseInputAudioData, ResponseInputItem,
-            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput, ResponseItemTool,
+            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput, ResponseItemRole,
+            ResponseItemStatus, ResponseItemTool, ResponseMessagePhase,
             ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
         },
     },
@@ -319,15 +320,15 @@ impl ConversationItemList {
 pub struct ConversationItem {
     pub id: Option<String>,
     pub item_type: String,
-    pub role: Option<String>,
+    pub role: Option<ResponseItemRole>,
     pub name: Option<String>,
     pub arguments: Option<String>,
     pub arguments_json: Option<Value>,
     pub input: Option<String>,
     pub code: Option<String>,
     pub call_id: Option<String>,
-    pub status: Option<String>,
-    pub phase: Option<String>,
+    pub status: Option<ResponseItemStatus>,
+    pub phase: Option<ResponseMessagePhase>,
     pub namespace: Option<String>,
     pub created_by: Option<String>,
     pub action: Option<ResponseItemAction>,
@@ -388,7 +389,7 @@ struct WireConversationItem {
     #[serde(rename = "type")]
     item_type: String,
     #[serde(default)]
-    role: Option<String>,
+    role: Option<ResponseItemRole>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -400,9 +401,9 @@ struct WireConversationItem {
     #[serde(default)]
     call_id: Option<String>,
     #[serde(default)]
-    status: Option<String>,
+    status: Option<ResponseItemStatus>,
     #[serde(default)]
-    phase: Option<String>,
+    phase: Option<ResponseMessagePhase>,
     #[serde(default)]
     namespace: Option<String>,
     #[serde(default)]

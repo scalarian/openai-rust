@@ -1357,6 +1357,247 @@ impl<'de> Deserialize<'de> for ResponseStatus {
     }
 }
 
+/// Role attached to message-like response and conversation items.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResponseItemRole {
+    UnknownRole,
+    User,
+    Assistant,
+    System,
+    Critic,
+    Discriminator,
+    Developer,
+    Tool,
+    Unknown(String),
+}
+
+impl ResponseItemRole {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::UnknownRole => "unknown",
+            Self::User => "user",
+            Self::Assistant => "assistant",
+            Self::System => "system",
+            Self::Critic => "critic",
+            Self::Discriminator => "discriminator",
+            Self::Developer => "developer",
+            Self::Tool => "tool",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ResponseItemRole {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ResponseItemRole {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ResponseItemRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ResponseItemRole {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseItemRole {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "unknown" => Self::UnknownRole,
+            "user" => Self::User,
+            "assistant" => Self::Assistant,
+            "system" => Self::System,
+            "critic" => Self::Critic,
+            "discriminator" => Self::Discriminator,
+            "developer" => Self::Developer,
+            "tool" => Self::Tool,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
+/// Status attached to response and conversation output/input items.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResponseItemStatus {
+    InProgress,
+    Completed,
+    Incomplete,
+    Generating,
+    Failed,
+    Calling,
+    Searching,
+    Interpreting,
+    Unknown(String),
+}
+
+impl ResponseItemStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::InProgress => "in_progress",
+            Self::Completed => "completed",
+            Self::Incomplete => "incomplete",
+            Self::Generating => "generating",
+            Self::Failed => "failed",
+            Self::Calling => "calling",
+            Self::Searching => "searching",
+            Self::Interpreting => "interpreting",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for ResponseItemStatus {
+    fn from(value: &str) -> Self {
+        match value {
+            "in_progress" => Self::InProgress,
+            "completed" => Self::Completed,
+            "incomplete" => Self::Incomplete,
+            "generating" => Self::Generating,
+            "failed" => Self::Failed,
+            "calling" => Self::Calling,
+            "searching" => Self::Searching,
+            "interpreting" => Self::Interpreting,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for ResponseItemStatus {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "in_progress" => Self::InProgress,
+            "completed" => Self::Completed,
+            "incomplete" => Self::Incomplete,
+            "generating" => Self::Generating,
+            "failed" => Self::Failed,
+            "calling" => Self::Calling,
+            "searching" => Self::Searching,
+            "interpreting" => Self::Interpreting,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+impl AsRef<str> for ResponseItemStatus {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ResponseItemStatus {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ResponseItemStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ResponseItemStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseItemStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
+/// Assistant message phase attached to intermediate and final-answer items.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResponseMessagePhase {
+    Commentary,
+    FinalAnswer,
+    Unknown(String),
+}
+
+impl ResponseMessagePhase {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Commentary => "commentary",
+            Self::FinalAnswer => "final_answer",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ResponseMessagePhase {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ResponseMessagePhase {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ResponseMessagePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ResponseMessagePhase {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseMessagePhase {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "commentary" => Self::Commentary,
+            "final_answer" => Self::FinalAnswer,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
 /// Public parsed response object with aggregated `output_text`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Response {
@@ -1486,7 +1727,7 @@ pub struct CompactedResponse {
 pub struct ResponseOutputItem {
     pub id: Option<String>,
     pub item_type: String,
-    pub role: Option<String>,
+    pub role: Option<ResponseItemRole>,
     pub name: Option<String>,
     pub arguments: Option<String>,
     /// Raw `arguments` payload. Most tool calls use JSON strings, while
@@ -1495,8 +1736,8 @@ pub struct ResponseOutputItem {
     pub input: Option<String>,
     pub code: Option<String>,
     pub call_id: Option<String>,
-    pub status: Option<String>,
-    pub phase: Option<String>,
+    pub status: Option<ResponseItemStatus>,
+    pub phase: Option<ResponseMessagePhase>,
     pub namespace: Option<String>,
     pub created_by: Option<String>,
     pub action: Option<ResponseItemAction>,
@@ -2253,7 +2494,7 @@ struct WireResponseOutputItem {
     #[serde(rename = "type")]
     item_type: String,
     #[serde(default)]
-    role: Option<String>,
+    role: Option<ResponseItemRole>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -2265,9 +2506,9 @@ struct WireResponseOutputItem {
     #[serde(default)]
     call_id: Option<String>,
     #[serde(default)]
-    status: Option<String>,
+    status: Option<ResponseItemStatus>,
     #[serde(default)]
-    phase: Option<String>,
+    phase: Option<ResponseMessagePhase>,
     #[serde(default)]
     namespace: Option<String>,
     #[serde(default)]
@@ -5739,7 +5980,7 @@ impl StreamAccumulator {
 
     fn set_output_status(&mut self, output_index: usize, status: &str) -> Result<(), OpenAIError> {
         let output = self.get_output_mut(output_index, &[])?;
-        output.status = Some(status.to_string());
+        output.status = Some(ResponseItemStatus::from(status));
         Ok(())
     }
 
