@@ -9,8 +9,8 @@ use openai_rust::{
         common::ListOrder,
         vector_stores::{
             VectorStoreAttributeValue, VectorStoreFileContentPage, VectorStoreFileCreateParams,
-            VectorStoreFileDeleteResponse, VectorStoreFileListParams, VectorStoreFilePollOptions,
-            VectorStoreFileStatus, VectorStoreFileUpdateParams,
+            VectorStoreFileDeleteResponse, VectorStoreFileListFilter, VectorStoreFileListParams,
+            VectorStoreFilePollOptions, VectorStoreFileStatus, VectorStoreFileUpdateParams,
         },
     },
 };
@@ -96,7 +96,7 @@ fn crud_and_content_flows() {
             VectorStoreFileListParams {
                 after: Some(String::from("vsf_000")),
                 before: Some(String::from("vsf_999")),
-                filter: Some(String::from("completed")),
+                filter: Some(VectorStoreFileListFilter::Completed),
                 limit: Some(2),
                 order: Some(ListOrder::Asc),
             },

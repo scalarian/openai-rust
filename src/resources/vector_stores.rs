@@ -229,7 +229,7 @@ impl VectorStoreFiles {
             serializer.append_pair("before", &before);
         }
         if let Some(filter) = params.filter {
-            serializer.append_pair("filter", &filter);
+            serializer.append_pair("filter", filter.as_str());
         }
         if let Some(limit) = params.limit {
             serializer.append_pair("limit", &limit.to_string());
@@ -478,7 +478,7 @@ impl VectorStoreFileBatches {
             serializer.append_pair("before", &before);
         }
         if let Some(filter) = params.filter {
-            serializer.append_pair("filter", &filter);
+            serializer.append_pair("filter", filter.as_str());
         }
         if let Some(limit) = params.limit {
             serializer.append_pair("limit", &limit.to_string());
@@ -812,7 +812,7 @@ pub struct VectorStoreFileUpdateParams {
 pub struct VectorStoreFileListParams {
     pub after: Option<String>,
     pub before: Option<String>,
-    pub filter: Option<String>,
+    pub filter: Option<VectorStoreFileListFilter>,
     pub limit: Option<u32>,
     pub order: Option<ListOrder>,
 }
@@ -845,9 +845,36 @@ pub struct VectorStoreFileBatchFile {
 pub struct VectorStoreFileBatchListFilesParams {
     pub after: Option<String>,
     pub before: Option<String>,
-    pub filter: Option<String>,
+    pub filter: Option<VectorStoreFileListFilter>,
     pub limit: Option<u32>,
     pub order: Option<ListOrder>,
+}
+
+/// Vector-store file status filter accepted by file-list endpoints.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VectorStoreFileListFilter {
+    InProgress,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl VectorStoreFileListFilter {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::InProgress => "in_progress",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+impl AsRef<str> for VectorStoreFileListFilter {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 /// Polling options for vector-store file helpers.

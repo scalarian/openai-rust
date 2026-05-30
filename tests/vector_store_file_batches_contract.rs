@@ -21,7 +21,7 @@ use openai_rust::{
             VectorStoreAttributeValue, VectorStoreFileBatchCreateParams, VectorStoreFileBatchFile,
             VectorStoreFileBatchListFilesParams, VectorStoreFileBatchPollOptions,
             VectorStoreFileBatchStatus, VectorStoreFileBatchUploadAndPollParams,
-            VectorStoreFileStatus,
+            VectorStoreFileListFilter, VectorStoreFileStatus,
         },
     },
 };
@@ -128,7 +128,7 @@ fn create_retrieve_cancel_and_list_files_cover_batch_contract() {
             VectorStoreFileBatchListFilesParams {
                 after: Some(String::from("vsf_000")),
                 before: Some(String::from("vsf_999")),
-                filter: Some(String::from("failed")),
+                filter: Some(VectorStoreFileListFilter::Failed),
                 limit: Some(2),
                 order: Some(ListOrder::Desc),
             },
