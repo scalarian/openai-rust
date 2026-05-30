@@ -3,8 +3,8 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::responses::{
         ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-        ResponseInput, ResponseRetrieveParams, ResponseStream, ResponseStreamEvent,
-        ResponseStreamTerminal, ResponseTextAnnotation, ResponseTextConfig,
+        ResponseIncompleteReason, ResponseInput, ResponseRetrieveParams, ResponseStream,
+        ResponseStreamEvent, ResponseStreamTerminal, ResponseTextAnnotation, ResponseTextConfig,
     },
 };
 use serde_json::json;
@@ -481,8 +481,8 @@ fn terminal_incomplete_state_remains_explicit() {
                 && response
                     .incomplete_details
                     .as_ref()
-                    .and_then(|details| details.reason.as_deref())
-                    == Some("max_output_tokens")
+                    .and_then(|details| details.reason.as_ref())
+                    == Some(&ResponseIncompleteReason::MaxOutputTokens)
     ));
 
     let response_error = incomplete

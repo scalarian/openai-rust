@@ -1633,6 +1633,14 @@ response_string_literal_enum! {
     }
 }
 
+response_string_literal_enum! {
+    /// Reasons returned when a response is incomplete.
+    pub enum ResponseIncompleteReason {
+        MaxOutputTokens => "max_output_tokens",
+        ContentFilter => "content_filter",
+    }
+}
+
 /// Role attached to message-like response and conversation items.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponseItemRole {
@@ -2001,7 +2009,7 @@ pub struct ResponseError {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ResponseIncompleteDetails {
     #[serde(default)]
-    pub reason: Option<String>,
+    pub reason: Option<ResponseIncompleteReason>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
