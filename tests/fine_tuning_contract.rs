@@ -4,9 +4,10 @@ mod mock_http;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::fine_tuning::{
-        FineTuningCheckpointListParams, FineTuningCheckpointPermissionCreateParams,
+        AutoOrNumber, FineTuningCheckpointListParams, FineTuningCheckpointPermissionCreateParams,
         FineTuningCheckpointPermissionListParams, FineTuningJobCreateParams,
-        FineTuningJobListParams, FineTuningJobStatus,
+        FineTuningJobIntegration, FineTuningJobListParams, FineTuningJobStatus, FineTuningMethod,
+        FineTuningWandbIntegration,
     },
 };
 use serde_json::json;
@@ -35,21 +36,43 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
             validation_file: Some(String::from("file-valid")),
             suffix: Some(String::from("weather-mini")),
             seed: Some(7),
-            integrations: Some(json!([{
-                "type": "wandb",
-                "wandb": {
-                    "project": "weather"
-                }
-            }])),
+            integrations: Some(vec![FineTuningJobIntegration {
+                integration_type: String::from("wandb"),
+                wandb: FineTuningWandbIntegration {
+                    project: String::from("weather"),
+                    tags: vec![String::from("nightly")],
+                    ..Default::default()
+                },
+            }]),
             metadata: Some(json!({"suite": "fine-tuning"})),
             ..Default::default()
         })
         .unwrap();
     assert_eq!(created.output.status, FineTuningJobStatus::Queued);
+    assert_eq!(
+        created.output.integrations.as_ref().unwrap()[0]
+            .wandb
+            .project,
+        "weather"
+    );
 
     let retrieved = sdk.fine_tuning().jobs().retrieve("ftjob_123").unwrap();
     assert_eq!(retrieved.output.status, FineTuningJobStatus::Running);
     assert_eq!(retrieved.output.training_file, "file-train");
+    match retrieved.output.method.as_ref().unwrap() {
+        FineTuningMethod::Supervised(config) => assert_eq!(
+            config
+                .supervised
+                .as_ref()
+                .unwrap()
+                .hyperparameters
+                .as_ref()
+                .unwrap()
+                .learning_rate_multiplier,
+            Some(AutoOrNumber::Float(0.25))
+        ),
+        other => panic!("expected supervised method, got {other:?}"),
+    }
 
     let listed = sdk
         .fine_tuning()
@@ -243,7 +266,22 @@ fn job_payload(id: &str, status: &str) -> String {
         "training_file": "file-train",
         "validation_file": "file-valid",
         "estimated_finish": 1_717_181_717,
-        "metadata": {"suite": "fine-tuning"}
+        "integrations": [{
+            "type": "wandb",
+            "wandb": {
+                "project": "weather",
+                "tags": ["nightly"]
+            }
+        }],
+        "metadata": {"suite": "fine-tuning"},
+        "method": {
+            "type": "supervised",
+            "supervised": {
+                "hyperparameters": {
+                    "learning_rate_multiplier": 0.25
+                }
+            }
+        }
     })
     .to_string()
 }

@@ -345,7 +345,7 @@ pub struct FineTuningJobCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hyperparameters: Option<FineTuningSupervisedHyperparameters>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrations: Option<Value>,
+    pub integrations: Option<Vec<FineTuningJobIntegration>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -359,11 +359,12 @@ pub struct FineTuningJobCreateParams {
 }
 
 /// Supports `auto` or a numeric override.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum AutoOrNumber {
     #[default]
     Auto,
     Number(u64),
+    Float(f64),
 }
 
 impl Serialize for AutoOrNumber {
@@ -374,6 +375,7 @@ impl Serialize for AutoOrNumber {
         match self {
             Self::Auto => serializer.serialize_str("auto"),
             Self::Number(value) => serializer.serialize_u64(*value),
+            Self::Float(value) => serializer.serialize_f64(*value),
         }
     }
 }
@@ -386,10 +388,15 @@ impl<'de> Deserialize<'de> for AutoOrNumber {
         let value = Value::deserialize(deserializer)?;
         match value {
             Value::String(value) if value == "auto" => Ok(Self::Auto),
-            Value::Number(value) => value
-                .as_u64()
-                .map(Self::Number)
-                .ok_or_else(|| D::Error::custom("expected unsigned integer for hyperparameter")),
+            Value::Number(value) => {
+                if let Some(value) = value.as_u64() {
+                    Ok(Self::Number(value))
+                } else if let Some(value) = value.as_f64() {
+                    Ok(Self::Float(value))
+                } else {
+                    Err(D::Error::custom("expected number for hyperparameter"))
+                }
+            }
             other => Err(D::Error::custom(format!(
                 "expected `auto` or number for hyperparameter, got {other}"
             ))),
@@ -435,6 +442,40 @@ impl Serialize for FineTuningMethod {
             }
         }
         Value::Object(object).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for FineTuningMethod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct WireFineTuningMethod {
+            #[serde(rename = "type")]
+            method_type: String,
+            #[serde(default)]
+            supervised: Option<FineTuningSupervisedMethod>,
+            #[serde(default)]
+            dpo: Option<FineTuningDpoMethod>,
+            #[serde(default)]
+            reinforcement: Option<FineTuningReinforcementMethod>,
+        }
+
+        let value = WireFineTuningMethod::deserialize(deserializer)?;
+        let config = FineTuningMethodConfig {
+            supervised: value.supervised,
+            dpo: value.dpo,
+            reinforcement: value.reinforcement,
+        };
+        match value.method_type.as_str() {
+            "supervised" => Ok(Self::Supervised(config)),
+            "dpo" => Ok(Self::Dpo(config)),
+            "reinforcement" => Ok(Self::Reinforcement(config)),
+            other => Err(D::Error::custom(format!(
+                "unknown fine-tuning method type `{other}`"
+            ))),
+        }
     }
 }
 
@@ -516,6 +557,27 @@ pub struct FineTuningReinforcementHyperparameters {
     pub reasoning_effort: Option<String>,
 }
 
+/// Weights and Biases integration settings for fine-tuning jobs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FineTuningJobIntegration {
+    #[serde(rename = "type")]
+    pub integration_type: String,
+    pub wandb: FineTuningWandbIntegration,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct FineTuningWandbIntegration {
+    pub project: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Job-list query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FineTuningJobListParams {
@@ -588,9 +650,11 @@ pub struct FineTuningJob {
     #[serde(default)]
     pub estimated_finish: Option<u64>,
     #[serde(default)]
+    pub integrations: Option<Vec<FineTuningJobIntegration>>,
+    #[serde(default)]
     pub metadata: Option<Value>,
     #[serde(default)]
-    pub method: Option<Value>,
+    pub method: Option<FineTuningMethod>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

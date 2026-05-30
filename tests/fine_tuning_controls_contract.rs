@@ -57,9 +57,9 @@ fn method_variants_and_job_controls_remain_distinct() {
                 dpo: Some(openai_rust::resources::fine_tuning::FineTuningDpoMethod {
                     hyperparameters: Some(
                         openai_rust::resources::fine_tuning::FineTuningDpoHyperparameters {
-                            beta: Some(AutoOrNumber::Number(3)),
+                            beta: Some(AutoOrNumber::Float(0.3)),
                             n_epochs: Some(AutoOrNumber::Auto),
-                            learning_rate_multiplier: Some(AutoOrNumber::Number(2)),
+                            learning_rate_multiplier: Some(AutoOrNumber::Float(2.5)),
                             ..Default::default()
                         },
                     ),
@@ -161,7 +161,7 @@ fn method_variants_and_job_controls_remain_distinct() {
     assert_eq!(dpo_body["method"]["type"], json!("dpo"));
     assert_eq!(
         dpo_body["method"]["dpo"]["hyperparameters"]["beta"],
-        json!(3)
+        json!(0.3)
     );
     assert_eq!(
         dpo_body["method"]["dpo"]["hyperparameters"]["n_epochs"],
@@ -169,7 +169,7 @@ fn method_variants_and_job_controls_remain_distinct() {
     );
     assert_eq!(
         dpo_body["method"]["dpo"]["hyperparameters"]["learning_rate_multiplier"],
-        json!(2)
+        json!(2.5)
     );
 
     let reinforcement_body: serde_json::Value = serde_json::from_slice(&requests[2].body).unwrap();
