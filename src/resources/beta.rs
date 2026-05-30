@@ -936,6 +936,62 @@ impl BetaRealtimeTranscriptionSessions {
     }
 }
 
+/// Beta realtime session-token creation parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeSessionCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_noise_reduction: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_transcription: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_response_output_tokens: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modalities: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_audio_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracing: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_detection: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+}
+
+/// Beta realtime transcription-session token creation parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeTranscriptionSessionCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_noise_reduction: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_audio_transcription: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modalities: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_detection: Option<Value>,
+}
+
 impl ChatKit {
     fn new(runtime: Arc<ClientRuntime>) -> Self {
         Self { runtime }

@@ -1,7 +1,12 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use openai_rust::OpenAI;
+use openai_rust::{
+    OpenAI,
+    resources::beta::{
+        BetaRealtimeSessionCreateParams, BetaRealtimeTranscriptionSessionCreateParams,
+    },
+};
 use serde_json::json;
 
 #[test]
@@ -16,21 +21,22 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
 
     let session = realtime
         .sessions()
-        .create(json!({
-            "model": "gpt-realtime",
-            "modalities": ["text", "audio"],
-            "voice": "verse",
-            "client_secret": {
+        .create(BetaRealtimeSessionCreateParams {
+            model: Some(String::from("gpt-realtime")),
+            modalities: Some(vec![String::from("text"), String::from("audio")]),
+            voice: Some(String::from("verse")),
+            client_secret: Some(json!({
                 "expires_after": {
                     "anchor": "created_at",
                     "seconds": 120
                 }
-            },
-            "turn_detection": {
+            })),
+            turn_detection: Some(json!({
                 "type": "server_vad",
                 "threshold": 0.5
-            }
-        }))
+            })),
+            ..Default::default()
+        })
         .unwrap();
     assert_eq!(
         session.output["client_secret"]["value"],
@@ -39,21 +45,24 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
 
     let transcription = realtime
         .transcription_sessions()
-        .create(json!({
-            "modalities": ["text"],
-            "input_audio_format": "pcm16",
-            "include": ["item.input_audio_transcription.logprobs"],
-            "input_audio_transcription": {
+        .create(BetaRealtimeTranscriptionSessionCreateParams {
+            modalities: Some(vec![String::from("text")]),
+            input_audio_format: Some(String::from("pcm16")),
+            include: Some(vec![String::from(
+                "item.input_audio_transcription.logprobs",
+            )]),
+            input_audio_transcription: Some(json!({
                 "model": "gpt-4o-transcribe",
                 "language": "en"
-            },
-            "client_secret": {
+            })),
+            client_secret: Some(json!({
                 "expires_at": {
                     "anchor": "created_at",
                     "seconds": 300
                 }
-            }
-        }))
+            })),
+            ..Default::default()
+        })
         .unwrap();
     assert_eq!(
         transcription.output["client_secret"]["value"],
