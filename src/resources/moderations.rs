@@ -1,12 +1,117 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
 };
+
+/// Moderation input modality and input-item discriminator literals.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ModerationInputType {
+    Text,
+    Image,
+    ImageUrl,
+    Unknown(String),
+}
+
+impl ModerationInputType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text => "text",
+            Self::Image => "image",
+            Self::ImageUrl => "image_url",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for ModerationInputType {
+    fn from(value: &str) -> Self {
+        match value {
+            "text" => Self::Text,
+            "image" => Self::Image,
+            "image_url" => Self::ImageUrl,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for ModerationInputType {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "text" => Self::Text,
+            "image" => Self::Image,
+            "image_url" => Self::ImageUrl,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+impl AsRef<str> for ModerationInputType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ModerationInputType {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ModerationInputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for ModerationInputType {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<ModerationInputType> for &str {
+    fn eq(&self, other: &ModerationInputType) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<String> for ModerationInputType {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<ModerationInputType> for String {
+    fn eq(&self, other: &ModerationInputType) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Serialize for ModerationInputType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ModerationInputType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
 
 /// Moderations API family.
 #[derive(Clone, Debug)]
@@ -124,7 +229,7 @@ impl ModerationInputItem {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ModerationTextInput {
     #[serde(rename = "type")]
-    pub input_type: String,
+    pub input_type: ModerationInputType,
     pub text: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -133,7 +238,7 @@ pub struct ModerationTextInput {
 impl ModerationTextInput {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
-            input_type: String::from("text"),
+            input_type: ModerationInputType::Text,
             text: text.into(),
             extra: BTreeMap::new(),
         }
@@ -144,7 +249,7 @@ impl ModerationTextInput {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ModerationImageUrlInput {
     #[serde(rename = "type")]
-    pub input_type: String,
+    pub input_type: ModerationInputType,
     pub image_url: ModerationImageUrl,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -153,7 +258,7 @@ pub struct ModerationImageUrlInput {
 impl ModerationImageUrlInput {
     pub fn url(url: impl Into<String>) -> Self {
         Self {
-            input_type: String::from("image_url"),
+            input_type: ModerationInputType::ImageUrl,
             image_url: ModerationImageUrl {
                 url: url.into(),
                 extra: BTreeMap::new(),
@@ -269,31 +374,31 @@ pub struct ModerationCategoryScores {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ModerationCategoryAppliedInputTypes {
     #[serde(default)]
-    pub harassment: Vec<String>,
+    pub harassment: Vec<ModerationInputType>,
     #[serde(default, rename = "harassment/threatening")]
-    pub harassment_threatening: Vec<String>,
+    pub harassment_threatening: Vec<ModerationInputType>,
     #[serde(default)]
-    pub hate: Vec<String>,
+    pub hate: Vec<ModerationInputType>,
     #[serde(default, rename = "hate/threatening")]
-    pub hate_threatening: Vec<String>,
+    pub hate_threatening: Vec<ModerationInputType>,
     #[serde(default)]
-    pub illicit: Vec<String>,
+    pub illicit: Vec<ModerationInputType>,
     #[serde(default, rename = "illicit/violent")]
-    pub illicit_violent: Vec<String>,
+    pub illicit_violent: Vec<ModerationInputType>,
     #[serde(default, rename = "self-harm")]
-    pub self_harm: Vec<String>,
+    pub self_harm: Vec<ModerationInputType>,
     #[serde(default, rename = "self-harm/instructions")]
-    pub self_harm_instructions: Vec<String>,
+    pub self_harm_instructions: Vec<ModerationInputType>,
     #[serde(default, rename = "self-harm/intent")]
-    pub self_harm_intent: Vec<String>,
+    pub self_harm_intent: Vec<ModerationInputType>,
     #[serde(default)]
-    pub sexual: Vec<String>,
+    pub sexual: Vec<ModerationInputType>,
     #[serde(default, rename = "sexual/minors")]
-    pub sexual_minors: Vec<String>,
+    pub sexual_minors: Vec<ModerationInputType>,
     #[serde(default)]
-    pub violence: Vec<String>,
+    pub violence: Vec<ModerationInputType>,
     #[serde(default, rename = "violence/graphic")]
-    pub violence_graphic: Vec<String>,
+    pub violence_graphic: Vec<ModerationInputType>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
