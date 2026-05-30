@@ -9,7 +9,8 @@ use crate::{
     error::ErrorKind,
     resources::responses::{
         ResponseCodeInterpreterOutput, ResponseComputerAction, ResponseFileSearchResult,
-        ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+        ResponseInputAudioData, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+        ResponseTextAnnotation, ResponseTextLogprob,
     },
 };
 
@@ -524,9 +525,9 @@ pub struct ConversationItemContent {
     #[serde(default)]
     pub refusal: Option<String>,
     #[serde(default)]
-    pub annotations: Vec<Value>,
+    pub annotations: Vec<ResponseTextAnnotation>,
     #[serde(default)]
-    pub logprobs: Option<Vec<Value>>,
+    pub logprobs: Option<Vec<ResponseTextLogprob>>,
     #[serde(default)]
     pub detail: Option<String>,
     #[serde(default)]
@@ -540,7 +541,7 @@ pub struct ConversationItemContent {
     #[serde(default)]
     pub image_url: Option<String>,
     #[serde(default)]
-    pub input_audio: Option<Value>,
+    pub input_audio: Option<ResponseInputAudioData>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

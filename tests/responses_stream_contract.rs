@@ -4,7 +4,7 @@ use openai_rust::{
     resources::responses::{
         ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
         ResponseRetrieveParams, ResponseStream, ResponseStreamEvent, ResponseStreamTerminal,
-        ResponseTextConfig,
+        ResponseTextAnnotation, ResponseTextConfig,
     },
 };
 use serde_json::json;
@@ -362,10 +362,11 @@ fn newer_response_stream_events_are_typed_and_update_snapshots() {
         snapshot.output[0].summary,
         vec![json!({"type": "summary_text", "text": "Plan done"})]
     );
-    assert_eq!(
-        snapshot.output[1].content[0].annotations,
-        vec![json!({"type": "url_citation", "url": "https://example.com"})]
-    );
+    assert!(matches!(
+        snapshot.output[1].content[0].annotations.as_slice(),
+        [ResponseTextAnnotation::UrlCitation(annotation)]
+            if annotation.url.as_deref() == Some("https://example.com")
+    ));
     assert_eq!(snapshot.output[2].status.as_deref(), Some("completed"));
 
     assert!(matches!(

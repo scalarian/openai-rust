@@ -6,8 +6,8 @@ use openai_rust::{
         ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
         ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
         ResponseFormatTextConfig, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-        ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome, ResponseTool,
-        ResponseToolChoice, ResponseWebSearchPreviewTool,
+        ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome, ResponseTextAnnotation,
+        ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -454,25 +454,19 @@ fn tool_and_refusal_fields_round_trip() {
             .expect("text message");
         assert_eq!(text_message.status.as_deref(), Some("completed"));
         assert_eq!(text_message.phase.as_deref(), Some("final_answer"));
-        assert_eq!(
-            text_message.content[0].annotations,
-            vec![json!({
-                "type": "url_citation",
-                "start_index": 0,
-                "end_index": 5,
-                "title": "Weather",
-                "url": "https://example.com/weather"
-            })]
-        );
-        assert_eq!(
-            text_message.content[0].logprobs,
-            Some(vec![json!({
-                "token": "Hello",
-                "bytes": [72, 101, 108, 108, 111],
-                "logprob": -0.01,
-                "top_logprobs": []
-            })])
-        );
+        assert!(matches!(
+            text_message.content[0].annotations.as_slice(),
+            [ResponseTextAnnotation::UrlCitation(annotation)]
+                if annotation.start_index == Some(0)
+                    && annotation.end_index == Some(5)
+                    && annotation.title.as_deref() == Some("Weather")
+                    && annotation.url.as_deref() == Some("https://example.com/weather")
+        ));
+        let logprobs = text_message.content[0].logprobs.as_ref().unwrap();
+        assert_eq!(logprobs[0].token, "Hello");
+        assert_eq!(logprobs[0].bytes, vec![72, 101, 108, 108, 111]);
+        assert_eq!(logprobs[0].logprob, -0.01);
+        assert!(logprobs[0].top_logprobs.is_empty());
 
         let reasoning = response
             .output

@@ -1879,9 +1879,9 @@ pub struct ResponseContentPart {
     #[serde(default)]
     pub refusal: Option<String>,
     #[serde(default)]
-    pub annotations: Vec<Value>,
+    pub annotations: Vec<ResponseTextAnnotation>,
     #[serde(default)]
-    pub logprobs: Option<Vec<Value>>,
+    pub logprobs: Option<Vec<ResponseTextLogprob>>,
     #[serde(default)]
     pub detail: Option<String>,
     #[serde(default)]
@@ -1895,7 +1895,7 @@ pub struct ResponseContentPart {
     #[serde(default)]
     pub image_url: Option<String>,
     #[serde(default)]
-    pub input_audio: Option<Value>,
+    pub input_audio: Option<ResponseInputAudioData>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1904,6 +1904,146 @@ impl ResponseContentPart {
     fn refusal_text(&self) -> Option<&str> {
         self.refusal.as_deref().or(self.text.as_deref())
     }
+}
+
+/// Annotation attached to an output-text content part.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseTextAnnotation {
+    FileCitation(ResponseFileCitationAnnotation),
+    UrlCitation(ResponseUrlCitationAnnotation),
+    ContainerFileCitation(ResponseContainerFileCitationAnnotation),
+    FilePath(ResponseFilePathAnnotation),
+    Other {
+        annotation_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseTextAnnotation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(annotation_type) = object
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match annotation_type.as_str() {
+            "file_citation" => serde_json::from_value(Value::Object(object))
+                .map(Self::FileCitation)
+                .map_err(serde::de::Error::custom),
+            "url_citation" => serde_json::from_value(Value::Object(object))
+                .map(Self::UrlCitation)
+                .map_err(serde::de::Error::custom),
+            "container_file_citation" => serde_json::from_value(Value::Object(object))
+                .map(Self::ContainerFileCitation)
+                .map_err(serde::de::Error::custom),
+            "file_path" => serde_json::from_value(Value::Object(object))
+                .map(Self::FilePath)
+                .map_err(serde::de::Error::custom),
+            _ => {
+                let mut extra = object;
+                extra.remove("type");
+                Ok(Self::Other {
+                    annotation_type,
+                    extra: extra.into_iter().collect(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseFileCitationAnnotation {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub index: Option<i64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseUrlCitationAnnotation {
+    #[serde(default)]
+    pub end_index: Option<i64>,
+    #[serde(default)]
+    pub start_index: Option<i64>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseContainerFileCitationAnnotation {
+    #[serde(default)]
+    pub container_id: Option<String>,
+    #[serde(default)]
+    pub end_index: Option<i64>,
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub start_index: Option<i64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseFilePathAnnotation {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub index: Option<i64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseTextLogprob {
+    pub token: String,
+    pub bytes: Vec<i64>,
+    pub logprob: f64,
+    #[serde(default)]
+    pub top_logprobs: Vec<ResponseTextTopLogprob>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseTextTopLogprob {
+    pub token: String,
+    pub bytes: Vec<i64>,
+    pub logprob: f64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseInputAudioData {
+    pub data: String,
+    pub format: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn response_text_annotation_from_value(value: Value) -> ResponseTextAnnotation {
+    serde_json::from_value(value.clone()).unwrap_or(ResponseTextAnnotation::Json(value))
 }
 
 /// Parsed non-stream response with structured output helper access.
@@ -4471,7 +4611,10 @@ impl StreamAccumulator {
                 format!("stream referenced missing annotation_index {annotation_index}"),
             ));
         }
-        content.annotations.insert(annotation_index, annotation);
+        content.annotations.insert(
+            annotation_index,
+            response_text_annotation_from_value(annotation),
+        );
         Ok(())
     }
 
