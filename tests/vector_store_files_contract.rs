@@ -1,14 +1,14 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::vector_stores::{
-        VectorStoreFileContentPage, VectorStoreFileCreateParams, VectorStoreFileDeleteResponse,
-        VectorStoreFileListParams, VectorStoreFilePollOptions, VectorStoreFileStatus,
-        VectorStoreFileUpdateParams,
+        VectorStoreAttributeValue, VectorStoreFileContentPage, VectorStoreFileCreateParams,
+        VectorStoreFileDeleteResponse, VectorStoreFileListParams, VectorStoreFilePollOptions,
+        VectorStoreFileStatus, VectorStoreFileUpdateParams,
     },
 };
 use serde_json::json;
@@ -44,7 +44,7 @@ fn crud_and_content_flows() {
             "vs_123",
             VectorStoreFileCreateParams {
                 file_id: String::from("file_123"),
-                attributes: Some(json!({"department": "support"})),
+                attributes: Some(attrs("department", "support")),
                 chunking_strategy: None,
             },
         )
@@ -72,13 +72,17 @@ fn crud_and_content_flows() {
             "vs_123",
             "vsf_123",
             VectorStoreFileUpdateParams {
-                attributes: Some(json!({"department": "support"})),
+                attributes: Some(attrs("department", "support")),
             },
         )
         .unwrap();
     assert_eq!(
-        updated.output.attributes,
-        Some(json!({"department": "support"}))
+        updated
+            .output
+            .attributes
+            .as_ref()
+            .and_then(|attributes| attributes.get("department")),
+        Some(&VectorStoreAttributeValue::String(String::from("support")))
     );
 
     let listed = client
@@ -417,4 +421,11 @@ fn json_response_with_headers(
         body: body.into_bytes(),
         ..Default::default()
     }
+}
+
+fn attrs(key: &str, value: &str) -> BTreeMap<String, VectorStoreAttributeValue> {
+    BTreeMap::from([(
+        String::from(key),
+        VectorStoreAttributeValue::String(String::from(value)),
+    )])
 }

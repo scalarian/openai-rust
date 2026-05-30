@@ -693,7 +693,7 @@ pub struct VectorStoreListParams {
 pub struct VectorStoreSearchParams {
     pub query: VectorStoreSearchQuery,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Value>,
+    pub filters: Option<VectorStoreSearchFilter>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_num_results: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -710,6 +710,73 @@ pub enum VectorStoreSearchQuery {
     Multiple(Vec<String>),
 }
 
+/// Vector-store file attribute map.
+pub type VectorStoreAttributes = BTreeMap<String, VectorStoreAttributeValue>;
+
+/// Primitive vector-store file attribute value.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum VectorStoreAttributeValue {
+    String(String),
+    Bool(bool),
+    Number(f64),
+}
+
+/// Vector-store search filters over file attributes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum VectorStoreSearchFilter {
+    Eq {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Ne {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Gt {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Gte {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Lt {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Lte {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    In {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    Nin {
+        key: String,
+        value: VectorStoreSearchFilterValue,
+    },
+    And {
+        filters: Vec<VectorStoreSearchFilter>,
+    },
+    Or {
+        filters: Vec<VectorStoreSearchFilter>,
+    },
+}
+
+/// Value used by vector-store search comparison filters.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum VectorStoreSearchFilterValue {
+    String(String),
+    Bool(bool),
+    Number(f64),
+    StringArray(Vec<String>),
+    NumberArray(Vec<f64>),
+}
+
 /// Search ranking configuration.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct VectorStoreSearchRankingOptions {
@@ -724,7 +791,7 @@ pub struct VectorStoreSearchRankingOptions {
 pub struct VectorStoreFileCreateParams {
     pub file_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunking_strategy: Option<FileChunkingStrategy>,
 }
@@ -733,7 +800,7 @@ pub struct VectorStoreFileCreateParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct VectorStoreFileUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
 }
 
 /// File-list query parameters.
@@ -750,7 +817,7 @@ pub struct VectorStoreFileListParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct VectorStoreFileBatchCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunking_strategy: Option<FileChunkingStrategy>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -764,7 +831,7 @@ pub struct VectorStoreFileBatchCreateParams {
 pub struct VectorStoreFileBatchFile {
     pub file_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunking_strategy: Option<FileChunkingStrategy>,
 }
@@ -815,7 +882,7 @@ impl Default for VectorStoreFileBatchPollOptions {
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorStoreFileUploadParams {
     pub file: FileUpload,
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     pub chunking_strategy: Option<FileChunkingStrategy>,
 }
 
@@ -997,7 +1064,7 @@ pub struct VectorStoreDeleteResponse {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct VectorStoreSearchResult {
     #[serde(default)]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     #[serde(default)]
     pub content: Vec<VectorStoreSearchContentPart>,
     #[serde(default)]
@@ -1051,7 +1118,7 @@ pub struct VectorStoreFile {
     #[serde(default)]
     pub vector_store_id: String,
     #[serde(default)]
-    pub attributes: Option<Value>,
+    pub attributes: Option<VectorStoreAttributes>,
     #[serde(default)]
     pub chunking_strategy: Option<FileChunkingStrategy>,
     #[serde(flatten)]

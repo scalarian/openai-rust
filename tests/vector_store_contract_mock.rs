@@ -4,8 +4,9 @@ mod mock_http;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::vector_stores::{
-        StaticChunkingStrategy, VectorStoreCreateParams, VectorStoreDeleteResponse,
-        VectorStoreExpiresAfter, VectorStoreListParams, VectorStoreSearchParams,
+        StaticChunkingStrategy, VectorStoreAttributeValue, VectorStoreCreateParams,
+        VectorStoreDeleteResponse, VectorStoreExpiresAfter, VectorStoreListParams,
+        VectorStoreSearchFilter, VectorStoreSearchFilterValue, VectorStoreSearchParams,
         VectorStoreSearchQuery, VectorStoreSearchRankingOptions, VectorStoreStatus,
         VectorStoreUpdateParams,
     },
@@ -151,7 +152,10 @@ fn list_and_search_preserve_distinct_page_contracts() {
                     String::from("refund policy"),
                     String::from("chargeback"),
                 ]),
-                filters: Some(json!({"type": "eq", "key": "department", "value": "support"})),
+                filters: Some(VectorStoreSearchFilter::Eq {
+                    key: String::from("department"),
+                    value: VectorStoreSearchFilterValue::String(String::from("support")),
+                }),
                 max_num_results: Some(8),
                 ranking_options: Some(VectorStoreSearchRankingOptions {
                     ranker: Some(String::from("default-2024-11-15")),
@@ -163,6 +167,14 @@ fn list_and_search_preserve_distinct_page_contracts() {
         .unwrap();
     assert_eq!(searched.output.data.len(), 1);
     assert_eq!(searched.output.data[0].filename, "policy.txt");
+    assert_eq!(
+        searched.output.data[0]
+            .attributes
+            .as_ref()
+            .unwrap()
+            .get("department"),
+        Some(&VectorStoreAttributeValue::String(String::from("support")))
+    );
     assert_eq!(
         searched.output.data[0].content[0].text,
         "Refunds are handled within 5 business days."

@@ -17,7 +17,7 @@ use openai_rust::{
     resources::{
         files::FileUpload,
         vector_stores::{
-            VectorStoreFileBatchCreateParams, VectorStoreFileBatchFile,
+            VectorStoreAttributeValue, VectorStoreFileBatchCreateParams, VectorStoreFileBatchFile,
             VectorStoreFileBatchListFilesParams, VectorStoreFileBatchPollOptions,
             VectorStoreFileBatchStatus, VectorStoreFileBatchUploadAndPollParams,
             VectorStoreFileStatus,
@@ -60,7 +60,7 @@ fn create_retrieve_cancel_and_list_files_cover_batch_contract() {
         .create(
             "vs_123",
             VectorStoreFileBatchCreateParams {
-                attributes: Some(json!({"department": "support"})),
+                attributes: Some(attrs("department", "support")),
                 chunking_strategy: None,
                 file_ids: vec![String::from("file_1"), String::from("file_2")],
                 files: Vec::new(),
@@ -82,12 +82,12 @@ fn create_retrieve_cancel_and_list_files_cover_batch_contract() {
                 files: vec![
                     VectorStoreFileBatchFile {
                         file_id: String::from("file_a"),
-                        attributes: Some(json!({"topic": "faq"})),
+                        attributes: Some(attrs("topic", "faq")),
                         chunking_strategy: None,
                     },
                     VectorStoreFileBatchFile {
                         file_id: String::from("file_b"),
-                        attributes: Some(json!({"topic": "policy"})),
+                        attributes: Some(attrs("topic", "policy")),
                         chunking_strategy: None,
                     },
                 ],
@@ -836,4 +836,11 @@ fn write_http_response_with_status(
     stream.flush()?;
     stream.shutdown(Shutdown::Write)?;
     Ok(())
+}
+
+fn attrs(key: &str, value: &str) -> BTreeMap<String, VectorStoreAttributeValue> {
+    BTreeMap::from([(
+        String::from(key),
+        VectorStoreAttributeValue::String(String::from(value)),
+    )])
 }

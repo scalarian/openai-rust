@@ -3,7 +3,7 @@ mod mock_http;
 #[path = "support/multipart.rs"]
 mod multipart_support;
 
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 use openai_rust::{
     OpenAI,
@@ -11,7 +11,8 @@ use openai_rust::{
     resources::{
         files::FileUpload,
         vector_stores::{
-            VectorStoreFilePollOptions, VectorStoreFileStatus, VectorStoreFileUploadParams,
+            VectorStoreAttributeValue, VectorStoreFilePollOptions, VectorStoreFileStatus,
+            VectorStoreFileUploadParams,
         },
     },
 };
@@ -59,7 +60,7 @@ fn upload_composes_files_create_and_attach() {
             "vs_123",
             VectorStoreFileUploadParams {
                 file: FileUpload::new("knowledge.txt", "text/plain", b"support policy".to_vec()),
-                attributes: Some(json!({"department": "support"})),
+                attributes: Some(attrs("department", "support")),
                 chunking_strategy: None,
             },
         )
@@ -89,6 +90,13 @@ fn upload_composes_files_create_and_attach() {
     let attach_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
     assert_eq!(attach_body["file_id"], json!("file_uploaded"));
     assert_eq!(attach_body["attributes"]["department"], json!("support"));
+}
+
+fn attrs(key: &str, value: &str) -> BTreeMap<String, VectorStoreAttributeValue> {
+    BTreeMap::from([(
+        String::from(key),
+        VectorStoreAttributeValue::String(String::from(value)),
+    )])
 }
 
 #[test]

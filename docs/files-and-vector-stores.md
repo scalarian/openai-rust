@@ -25,15 +25,19 @@ let _ = params;
 ## Vector-store attach/upload helpers
 
 ```rust
+use std::collections::BTreeMap;
+
 use openai_rust::resources::{
     files::FileUpload,
-    vector_stores::VectorStoreFileUploadParams,
+    vector_stores::{VectorStoreAttributeValue, VectorStoreFileUploadParams},
 };
-use serde_json::json;
 
 let params = VectorStoreFileUploadParams {
     file: FileUpload::new("notes.txt", "text/plain", b"retrieval ready".to_vec()),
-    attributes: Some(json!({"topic":"sdk"})),
+    attributes: Some(BTreeMap::from([(
+        String::from("topic"),
+        VectorStoreAttributeValue::String(String::from("sdk")),
+    )])),
     chunking_strategy: None,
 };
 
