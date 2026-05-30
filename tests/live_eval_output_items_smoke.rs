@@ -2,9 +2,12 @@ use std::{collections::BTreeMap, thread, time::Duration};
 
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
-    resources::evals::{
-        EvalCreateDataSourceConfig, EvalCreateParams, EvalGrader, EvalOutputItemListParams,
-        EvalRunCreateParams, EvalRunDataSource, EvalRunSource, EvalRunSourceRow,
+    resources::{
+        evals::{
+            EvalCreateDataSourceConfig, EvalCreateParams, EvalGrader, EvalOutputItemListParams,
+            EvalRunCreateParams, EvalRunDataSource, EvalRunSource, EvalRunSourceRow,
+        },
+        graders::GraderStringCheckOperation,
     },
 };
 use serde_json::json;
@@ -36,7 +39,7 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
             testing_criteria: vec![EvalGrader::StringCheck {
                 name: String::from("exact_match"),
                 input: String::from("{{sample.output_text}}"),
-                operation: String::from("eq"),
+                operation: GraderStringCheckOperation::Eq,
                 reference: String::from("{{item.expected}}"),
             }],
             metadata: Some(BTreeMap::from([(

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use openai_rust::{DEFAULT_BASE_URL, OpenAI};
+use openai_rust::{DEFAULT_BASE_URL, OpenAI, resources::graders::GraderStringCheckOperation};
 
 #[test]
 #[ignore = "requires live OpenAI credentials"]
@@ -28,7 +28,7 @@ fn live_evals_crud_smoke_captures_request_ids() {
             testing_criteria: vec![openai_rust::resources::evals::EvalGrader::StringCheck {
                 name: String::from("exact_match"),
                 input: String::from("{{sample.output_text}}"),
-                operation: String::from("eq"),
+                operation: GraderStringCheckOperation::Eq,
                 reference: String::from("{{item.expected}}"),
             }],
             metadata: Some(BTreeMap::from([(

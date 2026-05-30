@@ -9,7 +9,10 @@ use crate::{
     resources::{
         common::ReasoningEffort,
         files::{encode_path_id, validate_path_id},
-        graders::{GraderMessageContent, GraderMessageRole, GraderMessageType},
+        graders::{
+            GraderMessageContent, GraderMessageRole, GraderMessageType, GraderStringCheckOperation,
+            GraderTextSimilarityMetric,
+        },
         responses::ResponseTool,
     },
 };
@@ -339,11 +342,11 @@ pub enum EvalGrader {
     StringCheck {
         input: String,
         name: String,
-        operation: String,
+        operation: GraderStringCheckOperation,
         reference: String,
     },
     TextSimilarity {
-        evaluation_metric: String,
+        evaluation_metric: GraderTextSimilarityMetric,
         input: String,
         name: String,
         reference: String,

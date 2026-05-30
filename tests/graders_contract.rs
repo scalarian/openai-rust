@@ -10,7 +10,9 @@ use openai_rust::{
             FineTuningGrader, FineTuningGraderMessage, FineTuningGraderRunParams,
             FineTuningGraderValidateParams,
         },
-        graders::{GraderMessageContent, GraderMessageRole, GraderMessageType},
+        graders::{
+            GraderMessageContent, GraderMessageRole, GraderMessageType, GraderStringCheckOperation,
+        },
     },
 };
 use serde_json::json;
@@ -68,7 +70,7 @@ fn graders_validate_configs_and_run_tiny_samples() {
             grader: FineTuningGrader::StringCheck {
                 input: String::from("{{sample.output_text}}"),
                 name: String::from("exact_match"),
-                operation: String::from("eq"),
+                operation: GraderStringCheckOperation::Eq,
                 reference: String::from("sunny"),
             },
             model_sample: String::from("sunny"),

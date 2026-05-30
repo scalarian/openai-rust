@@ -2,8 +2,11 @@ use std::collections::BTreeMap;
 
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
-    resources::fine_tuning::{
-        FineTuningGrader, FineTuningGraderRunParams, FineTuningGraderValidateParams,
+    resources::{
+        fine_tuning::{
+            FineTuningGrader, FineTuningGraderRunParams, FineTuningGraderValidateParams,
+        },
+        graders::GraderStringCheckOperation,
     },
 };
 
@@ -19,7 +22,7 @@ fn live_fine_tuning_graders_smoke_captures_request_ids_and_scores() {
     let grader = FineTuningGrader::StringCheck {
         input: String::from("{{sample.output_text}}"),
         name: String::from("exact_match"),
-        operation: String::from("eq"),
+        operation: GraderStringCheckOperation::Eq,
         reference: String::from("sunny"),
     };
 

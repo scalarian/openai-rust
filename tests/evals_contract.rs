@@ -8,7 +8,10 @@ use openai_rust::{
             EvalDataSourceConfig, EvalDeleteResponse, EvalGrader, EvalListParams, EvalOrderBy,
             EvalOrderDirection, EvalUpdateParams,
         },
-        graders::{GraderMessageContent, GraderMessageRole},
+        graders::{
+            GraderMessageContent, GraderMessageRole, GraderStringCheckOperation,
+            GraderTextSimilarityMetric,
+        },
     },
 };
 use serde_json::json;
@@ -90,8 +93,15 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
                 EvalGrader::StringCheck {
                     name: String::from("exact_match"),
                     input: String::from("{{sample.output_text}}"),
-                    operation: String::from("eq"),
+                    operation: GraderStringCheckOperation::Eq,
                     reference: String::from("{{item.expected}}"),
+                },
+                EvalGrader::TextSimilarity {
+                    name: String::from("semantic_similarity"),
+                    input: String::from("{{sample.output_text}}"),
+                    evaluation_metric: GraderTextSimilarityMetric::RougeL,
+                    reference: String::from("{{item.expected}}"),
+                    pass_threshold: 0.7,
                 },
                 EvalGrader::ScoreModel {
                     name: String::from("judge"),
@@ -125,6 +135,13 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
     assert!(matches!(
         created.output.testing_criteria[0],
         EvalGrader::StringCheck { .. }
+    ));
+    assert!(matches!(
+        created.output.testing_criteria[1],
+        EvalGrader::TextSimilarity {
+            evaluation_metric: GraderTextSimilarityMetric::RougeL,
+            ..
+        }
     ));
 
     let retrieved = client.evals().retrieve("eval_logs").unwrap();
@@ -203,11 +220,15 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
         json!(true)
     );
     assert_eq!(
-        create_body["testing_criteria"][1]["pass_threshold"],
+        create_body["testing_criteria"][1]["evaluation_metric"],
+        json!("rouge_l")
+    );
+    assert_eq!(
+        create_body["testing_criteria"][2]["pass_threshold"],
         json!(0.8)
     );
     assert_eq!(
-        create_body["testing_criteria"][1]["sampling_params"]["temperature"],
+        create_body["testing_criteria"][2]["sampling_params"]["temperature"],
         json!(0.1)
     );
 
@@ -252,6 +273,14 @@ fn criteria_payload() -> serde_json::Value {
             "input": "{{sample.output_text}}",
             "operation": "eq",
             "reference": "{{item.expected}}"
+        },
+        {
+            "type": "text_similarity",
+            "name": "semantic_similarity",
+            "input": "{{sample.output_text}}",
+            "evaluation_metric": "rouge_l",
+            "reference": "{{item.expected}}",
+            "pass_threshold": 0.7
         },
         {
             "type": "score_model",

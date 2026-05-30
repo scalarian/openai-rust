@@ -3,11 +3,14 @@ mod mock_http;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::fine_tuning::{
-        AutoOrNumber, FineTuningGrader, FineTuningJobCreateParams, FineTuningJobEventLevel,
-        FineTuningJobEventListParams, FineTuningJobEventType, FineTuningMethod,
-        FineTuningMethodConfig, FineTuningReinforcementHyperparameters,
-        FineTuningReinforcementReasoningEffort, FineTuningSupervisedHyperparameters,
+    resources::{
+        fine_tuning::{
+            AutoOrNumber, FineTuningGrader, FineTuningJobCreateParams, FineTuningJobEventLevel,
+            FineTuningJobEventListParams, FineTuningJobEventType, FineTuningMethod,
+            FineTuningMethodConfig, FineTuningReinforcementHyperparameters,
+            FineTuningReinforcementReasoningEffort, FineTuningSupervisedHyperparameters,
+        },
+        graders::GraderStringCheckOperation,
     },
 };
 use serde_json::json;
@@ -84,7 +87,7 @@ fn method_variants_and_job_controls_remain_distinct() {
                         grader: FineTuningGrader::StringCheck {
                             input: String::from("{{sample.output_text}}"),
                             name: String::from("exact_match"),
-                            operation: String::from("eq"),
+                            operation: GraderStringCheckOperation::Eq,
                             reference: String::from("sunny"),
                         },
                         hyperparameters: Some(FineTuningReinforcementHyperparameters {

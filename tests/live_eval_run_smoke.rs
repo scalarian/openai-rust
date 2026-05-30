@@ -2,9 +2,12 @@ use std::collections::BTreeMap;
 
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
-    resources::evals::{
-        EvalCreateDataSourceConfig, EvalCreateParams, EvalGrader, EvalRunCreateParams,
-        EvalRunDataSource, EvalRunSource, EvalRunSourceRow, EvalRunStatus,
+    resources::{
+        evals::{
+            EvalCreateDataSourceConfig, EvalCreateParams, EvalGrader, EvalRunCreateParams,
+            EvalRunDataSource, EvalRunSource, EvalRunSourceRow, EvalRunStatus,
+        },
+        graders::GraderStringCheckOperation,
     },
 };
 use serde_json::json;
@@ -36,7 +39,7 @@ fn live_eval_run_smoke_proves_create_cancel_and_status_request_ids() {
             testing_criteria: vec![EvalGrader::StringCheck {
                 name: String::from("exact_match"),
                 input: String::from("{{sample.output_text}}"),
-                operation: String::from("eq"),
+                operation: GraderStringCheckOperation::Eq,
                 reference: String::from("{{item.expected}}"),
             }],
             metadata: Some(BTreeMap::from([(

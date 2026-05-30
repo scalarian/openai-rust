@@ -129,6 +129,33 @@ grader_string_literal_enum! {
     }
 }
 
+grader_string_literal_enum! {
+    /// String comparison operations accepted by string-check graders.
+    pub enum GraderStringCheckOperation {
+        Eq => "eq",
+        Ne => "ne",
+        Like => "like",
+        Ilike => "ilike",
+    }
+}
+
+grader_string_literal_enum! {
+    /// Text-similarity metrics accepted by text-similarity graders.
+    pub enum GraderTextSimilarityMetric {
+        Cosine => "cosine",
+        FuzzyMatch => "fuzzy_match",
+        Bleu => "bleu",
+        Gleu => "gleu",
+        Meteor => "meteor",
+        Rouge1 => "rouge_1",
+        Rouge2 => "rouge_2",
+        Rouge3 => "rouge_3",
+        Rouge4 => "rouge_4",
+        Rouge5 => "rouge_5",
+        RougeL => "rouge_l",
+    }
+}
+
 /// Message content accepted by eval and fine-tuning model graders.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
