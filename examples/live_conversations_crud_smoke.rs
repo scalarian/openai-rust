@@ -1,26 +1,32 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::BTreeMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use openai_rust::{
     OpenAI,
-    resources::conversations::{ConversationCreateParams, ConversationUpdateParams},
+    resources::{
+        conversations::{ConversationCreateParams, ConversationUpdateParams},
+        responses::{ResponseInputContentPart, ResponseInputItem, ResponseInputText},
+    },
 };
-use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
     let marker = unique_marker("crud");
 
     let created = client.conversations().create(ConversationCreateParams {
-        metadata: Some(json!({
-            "smoke": "conversations_crud",
-            "marker": marker,
-            "phase": "created"
-        })),
-        items: vec![json!({
-            "type": "message",
-            "role": "user",
-            "content": [{"type": "input_text", "text": "Conversation CRUD smoke"}]
-        })],
+        metadata: Some(BTreeMap::from([
+            (String::from("smoke"), String::from("conversations_crud")),
+            (String::from("marker"), marker.clone()),
+            (String::from("phase"), String::from("created")),
+        ])),
+        items: vec![ResponseInputItem::message(
+            "user",
+            vec![ResponseInputContentPart::Text(ResponseInputText::new(
+                "Conversation CRUD smoke",
+            ))],
+        )],
         ..Default::default()
     })?;
     let conversation_id = created.output().id.clone();
@@ -37,11 +43,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let updated = client.conversations().update(
         &conversation_id,
         ConversationUpdateParams {
-            metadata: json!({
-                "smoke": "conversations_crud",
-                "marker": marker,
-                "phase": "updated"
-            }),
+            metadata: Some(BTreeMap::from([
+                (String::from("smoke"), String::from("conversations_crud")),
+                (String::from("marker"), marker.clone()),
+                (String::from("phase"), String::from("updated")),
+            ])),
             ..Default::default()
         },
     )?;

@@ -1,23 +1,28 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::BTreeMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use openai_rust::{
     OpenAI,
-    resources::conversations::{
-        ConversationCreateParams, ConversationItemCreateParams, ConversationItemListParams,
-        ConversationItemRetrieveParams,
+    resources::{
+        conversations::{
+            ConversationCreateParams, ConversationItemCreateParams, ConversationItemListParams,
+            ConversationItemRetrieveParams,
+        },
+        responses::{ResponseInputContentPart, ResponseInputItem, ResponseInputText},
     },
 };
-use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
     let marker = unique_marker("items");
 
     let created_conversation = client.conversations().create(ConversationCreateParams {
-        metadata: Some(json!({
-            "smoke": "conversations_items",
-            "marker": marker
-        })),
+        metadata: Some(BTreeMap::from([
+            (String::from("smoke"), String::from("conversations_items")),
+            (String::from("marker"), marker.clone()),
+        ])),
         ..Default::default()
     })?;
     let conversation_id = created_conversation.output().id.clone();
@@ -25,11 +30,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let created_items = client.conversations().items().create(
         &conversation_id,
         ConversationItemCreateParams {
-            items: vec![json!({
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_text", "text": format!("Conversation items smoke {marker}")}]
-            })],
+            items: vec![ResponseInputItem::message(
+                "user",
+                vec![ResponseInputContentPart::Text(ResponseInputText::new(
+                    format!("Conversation items smoke {marker}"),
+                ))],
+            )],
             ..Default::default()
         },
     )?;

@@ -9,7 +9,7 @@ use crate::{
     error::ErrorKind,
     resources::responses::{
         ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
-        ResponseFileSearchResult, ResponseInputAudioData, ResponseItemAction,
+        ResponseFileSearchResult, ResponseInputAudioData, ResponseInputItem, ResponseItemAction,
         ResponseItemEnvironment, ResponseItemOutput, ResponseItemTool,
         ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
     },
@@ -168,9 +168,9 @@ impl Items {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ConversationCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub items: Vec<Value>,
+    pub items: Vec<ResponseInputItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -178,7 +178,7 @@ pub struct ConversationCreateParams {
 /// Update-conversation body.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ConversationUpdateParams {
-    pub metadata: Value,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -187,7 +187,7 @@ pub struct ConversationUpdateParams {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ConversationItemCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub items: Vec<Value>,
+    pub items: Vec<ResponseInputItem>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub include: Vec<String>,
     #[serde(flatten)]
@@ -197,7 +197,10 @@ pub struct ConversationItemCreateParams {
 impl ConversationItemCreateParams {
     fn into_request_body(self) -> Value {
         let mut body = serde_json::Map::new();
-        body.insert(String::from("items"), Value::Array(self.items));
+        body.insert(
+            String::from("items"),
+            serde_json::to_value(self.items).unwrap_or_else(|_| Value::Array(Vec::new())),
+        );
         for (key, value) in self.extra {
             body.insert(key, value);
         }
@@ -262,7 +265,7 @@ pub struct Conversation {
     pub object: String,
     pub created_at: i64,
     #[serde(default)]
-    pub metadata: Value,
+    pub metadata: BTreeMap<String, String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

@@ -1,5 +1,9 @@
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::responses::{ResponseInputContentPart, ResponseInputItem, ResponseInputText},
+};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -41,12 +45,16 @@ fn crud_and_path_guards() {
         .conversations()
         .create(
             openai_rust::resources::conversations::ConversationCreateParams {
-                metadata: Some(json!({"topic": "onboarding", "phase": "draft"})),
-                items: vec![json!({
-                    "type": "message",
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": "Hello"}]
-                })],
+                metadata: Some(BTreeMap::from([
+                    (String::from("topic"), String::from("onboarding")),
+                    (String::from("phase"), String::from("draft")),
+                ])),
+                items: vec![ResponseInputItem::message(
+                    "user",
+                    vec![ResponseInputContentPart::Text(ResponseInputText::new(
+                        "Hello",
+                    ))],
+                )],
                 ..Default::default()
             },
         )
@@ -54,25 +62,34 @@ fn crud_and_path_guards() {
     assert_eq!(created.output().id, "conv_create");
     assert_eq!(created.output().object, "conversation");
     assert_eq!(
-        created.output().metadata,
-        json!({"topic": "onboarding", "phase": "draft"})
+        created.output().metadata.get("phase").map(String::as_str),
+        Some("draft")
     );
 
     let retrieved = client.conversations().retrieve(conversation_id).unwrap();
     assert_eq!(retrieved.output().id, "conv_create");
-    assert_eq!(retrieved.output().metadata["phase"], "draft");
+    assert_eq!(
+        retrieved.output().metadata.get("phase").map(String::as_str),
+        Some("draft")
+    );
 
     let updated = client
         .conversations()
         .update(
             conversation_id,
             openai_rust::resources::conversations::ConversationUpdateParams {
-                metadata: json!({"topic": "onboarding", "phase": "published"}),
+                metadata: Some(BTreeMap::from([
+                    (String::from("topic"), String::from("onboarding")),
+                    (String::from("phase"), String::from("published")),
+                ])),
                 ..Default::default()
             },
         )
         .unwrap();
-    assert_eq!(updated.output().metadata["phase"], "published");
+    assert_eq!(
+        updated.output().metadata.get("phase").map(String::as_str),
+        Some("published")
+    );
 
     let deleted = client.conversations().delete(conversation_id).unwrap();
     assert_eq!(deleted.output().id, "conv_create");
@@ -121,7 +138,10 @@ fn crud_and_path_guards() {
             .update(
                 invalid,
                 openai_rust::resources::conversations::ConversationUpdateParams {
-                    metadata: json!({"phase": "ignored"}),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("phase"),
+                        String::from("ignored"),
+                    )])),
                     ..Default::default()
                 },
             )

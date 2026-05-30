@@ -1,11 +1,13 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
-        ResponseApplyPatchOperation, ResponseComputerAction, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
+        ResponseApplyPatchOperation, ResponseComputerAction, ResponseInputContentPart,
+        ResponseInputItem, ResponseInputText, ResponseItemAction, ResponseItemEnvironment,
+        ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
     },
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -44,12 +46,17 @@ fn routes_and_pagination() {
             conversation_id,
             openai_rust::resources::conversations::ConversationItemCreateParams {
                 items: vec![
-                    json!({
-                        "type": "message",
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": "hello"}]
-                    }),
-                    json!({"type": "reasoning", "summary": []}),
+                    ResponseInputItem::message(
+                        "user",
+                        vec![ResponseInputContentPart::Text(ResponseInputText::new(
+                            "hello",
+                        ))],
+                    ),
+                    ResponseInputItem {
+                        item_type: Some(String::from("reasoning")),
+                        extra: BTreeMap::from([(String::from("summary"), json!([]))]),
+                        ..Default::default()
+                    },
                 ],
                 include: vec![
                     String::from("message.output_text.logprobs"),
