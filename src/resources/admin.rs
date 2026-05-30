@@ -164,6 +164,20 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization data retention object type.
+    pub enum AdminOrganizationDataRetentionObject {
+        OrganizationDataRetention => "organization.data_retention",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project data retention object type.
+    pub enum AdminProjectDataRetentionObject {
+        ProjectDataRetention => "project.data_retention",
+    }
+}
+
+admin_string_literal_enum! {
     /// Organization invite role.
     pub enum AdminInviteRole {
         Reader => "reader",
@@ -227,6 +241,20 @@ admin_string_literal_enum! {
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
         DenyList => "deny_list",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project model permissions object type.
+    pub enum AdminProjectModelPermissionsObject {
+        ProjectModelPermissions => "project.model_permissions",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project model permissions deletion object type.
+    pub enum AdminProjectModelPermissionsDeletedObject {
+        ProjectModelPermissionsDeleted => "project.model_permissions.deleted",
     }
 }
 
@@ -935,6 +963,16 @@ pub struct AdminDataRetentionUpdateParams {
     pub retention_type: AdminOrganizationDataRetentionType,
 }
 
+/// Organization data retention control setting.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminOrganizationDataRetention {
+    pub object: AdminOrganizationDataRetentionObject,
+    #[serde(rename = "type")]
+    pub retention_type: AdminOrganizationDataRetentionType,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Organization spend-alert creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminSpendAlertCreateParams {
@@ -1226,6 +1264,25 @@ pub struct AdminProjectModelPermissionUpdateParams {
     pub model_ids: Option<Vec<String>>,
 }
 
+/// Project model allowlist or denylist policy.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectModelPermissions {
+    pub mode: AdminProjectModelPermissionMode,
+    pub model_ids: Vec<String>,
+    pub object: AdminProjectModelPermissionsObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting project model permissions.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectModelPermissionsDeleted {
+    pub deleted: bool,
+    pub object: AdminProjectModelPermissionsDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Project hosted-tool permission update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectHostedToolPermissionUpdateParams {
@@ -1245,6 +1302,26 @@ pub struct AdminProjectHostedToolPermissionUpdateParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminHostedToolPermission {
     pub enabled: bool,
+}
+
+/// Permission state for a single project hosted tool.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminHostedToolPermissionState {
+    pub enabled: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Hosted tool permissions configured for a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectHostedToolPermissions {
+    pub code_interpreter: AdminHostedToolPermissionState,
+    pub file_search: AdminHostedToolPermissionState,
+    pub image_generation: AdminHostedToolPermissionState,
+    pub mcp: AdminHostedToolPermissionState,
+    pub web_search: AdminHostedToolPermissionState,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Project group creation body.
@@ -1348,6 +1425,16 @@ impl From<AdminProjectRoleListParams> for AdminQueryParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectDataRetentionUpdateParams {
     pub retention_type: AdminProjectDataRetentionType,
+}
+
+/// Project data retention control setting.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectDataRetention {
+    pub object: AdminProjectDataRetentionObject,
+    #[serde(rename = "type")]
+    pub retention_type: AdminProjectDataRetentionType,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Project spend-alert creation body.
@@ -2378,12 +2465,24 @@ impl OrganizationDataRetention {
         Self { runtime }
     }
 
-    pub fn retrieve(&self) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get(&self.runtime, "/organization/data_retention")
+    pub fn retrieve(&self) -> Result<ApiResponse<AdminOrganizationDataRetention>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            "/organization/data_retention",
+            RequestOptions::default(),
+        )
     }
 
-    pub fn update<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/data_retention", params)
+    pub fn update<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<AdminOrganizationDataRetention>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/data_retention",
+            &params,
+            RequestOptions::default(),
+        )
     }
 }
 
@@ -2943,11 +3042,15 @@ impl ProjectModelPermissions {
         Self { runtime }
     }
 
-    pub fn retrieve(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(
+        &self,
+        project_id: &str,
+    ) -> Result<ApiResponse<AdminProjectModelPermissions>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/model_permissions"),
+            RequestOptions::default(),
         )
     }
 
@@ -2955,20 +3058,25 @@ impl ProjectModelPermissions {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectModelPermissions>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/model_permissions"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
-    pub fn delete(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        project_id: &str,
+    ) -> Result<ApiResponse<AdminProjectModelPermissionsDeleted>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/model_permissions"),
+            RequestOptions::default(),
         )
     }
 }
@@ -2984,11 +3092,15 @@ impl ProjectHostedToolPermissions {
         Self { runtime }
     }
 
-    pub fn retrieve(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(
+        &self,
+        project_id: &str,
+    ) -> Result<ApiResponse<AdminProjectHostedToolPermissions>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/hosted_tool_permissions"),
+            RequestOptions::default(),
         )
     }
 
@@ -2996,12 +3108,13 @@ impl ProjectHostedToolPermissions {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectHostedToolPermissions>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/hosted_tool_permissions"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 }
@@ -3238,11 +3351,15 @@ impl ProjectDataRetention {
         Self { runtime }
     }
 
-    pub fn retrieve(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(
+        &self,
+        project_id: &str,
+    ) -> Result<ApiResponse<AdminProjectDataRetention>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/data_retention"),
+            RequestOptions::default(),
         )
     }
 
@@ -3250,12 +3367,13 @@ impl ProjectDataRetention {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectDataRetention>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/data_retention"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 }

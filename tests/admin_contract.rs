@@ -28,6 +28,38 @@ fn project_api_key_json(id: &str) -> Value {
     })
 }
 
+fn organization_data_retention_json(retention_type: &str) -> Value {
+    json!({
+        "object": "organization.data_retention",
+        "type": retention_type
+    })
+}
+
+fn project_data_retention_json(retention_type: &str) -> Value {
+    json!({
+        "object": "project.data_retention",
+        "type": retention_type
+    })
+}
+
+fn project_model_permissions_json() -> Value {
+    json!({
+        "mode": "allow_list",
+        "model_ids": ["gpt-5"],
+        "object": "project.model_permissions"
+    })
+}
+
+fn project_hosted_tool_permissions_json() -> Value {
+    json!({
+        "code_interpreter": {"enabled": false},
+        "file_search": {"enabled": false},
+        "image_generation": {"enabled": false},
+        "mcp": {"enabled": false},
+        "web_search": {"enabled": true}
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -89,6 +121,14 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         (4..23).map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string())),
     );
     responses[17] = json_response(project_api_key_json("key_project").to_string());
+    responses[19] = json_response(
+        json!({
+            "deleted": true,
+            "object": "project.model_permissions.deleted"
+        })
+        .to_string(),
+    );
+    responses[20] = json_response(project_hosted_tool_permissions_json().to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -258,11 +298,16 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    let deleted_model_permissions = projects
         .model_permissions()
         .delete("proj_research")
         .unwrap();
-    projects
+    assert!(deleted_model_permissions.output.deleted);
+    assert_eq!(
+        deleted_model_permissions.output.object,
+        AdminProjectModelPermissionsDeletedObject::ProjectModelPermissionsDeleted
+    );
+    let hosted_tool_permissions = projects
         .hosted_tool_permissions()
         .update(
             "proj_research",
@@ -272,6 +317,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert!(hosted_tool_permissions.output.web_search.enabled);
     projects
         .groups()
         .retrieve(
@@ -383,12 +429,12 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
 
 #[test]
 fn admin_organization_typed_params_preserve_queries_and_bodies() {
-    let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..24)
-            .map(|index| json_response(json!({"id": format!("typed_admin_{index}")}).to_string()))
-            .collect(),
-    )
-    .unwrap();
+    let mut responses = (0..24)
+        .map(|index| json_response(json!({"id": format!("typed_admin_{index}")}).to_string()))
+        .collect::<Vec<_>>();
+    responses[15] =
+        json_response(organization_data_retention_json("zero_data_retention").to_string());
+    let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
 
@@ -534,11 +580,20 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .unwrap();
 
-    org.data_retention()
+    let organization_retention = org
+        .data_retention()
         .update(AdminDataRetentionUpdateParams {
             retention_type: AdminOrganizationDataRetentionType::ZeroDataRetention,
         })
         .unwrap();
+    assert_eq!(
+        organization_retention.output.object,
+        AdminOrganizationDataRetentionObject::OrganizationDataRetention
+    );
+    assert_eq!(
+        organization_retention.output.retention_type,
+        AdminOrganizationDataRetentionType::ZeroDataRetention
+    );
 
     org.certificates()
         .create(AdminCertificateCreateParams {
@@ -675,6 +730,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[9] = json_response(project_model_permissions_json().to_string());
+    responses[15] = json_response(project_data_retention_json("organization_default").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let projects = client.admin().organization().projects();
@@ -778,7 +835,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    let model_permissions = projects
         .model_permissions()
         .update(
             "proj_research",
@@ -788,6 +845,18 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(
+        model_permissions.output.object,
+        AdminProjectModelPermissionsObject::ProjectModelPermissions
+    );
+    assert_eq!(
+        model_permissions.output.mode,
+        AdminProjectModelPermissionMode::AllowList
+    );
+    assert_eq!(
+        model_permissions.output.model_ids,
+        vec![String::from("gpt-5")]
+    );
 
     projects
         .groups()
@@ -846,7 +915,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         )
         .unwrap();
 
-    projects
+    let project_retention = projects
         .data_retention()
         .update(
             "proj_research",
@@ -855,6 +924,14 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(
+        project_retention.output.object,
+        AdminProjectDataRetentionObject::ProjectDataRetention
+    );
+    assert_eq!(
+        project_retention.output.retention_type,
+        AdminProjectDataRetentionType::OrganizationDefault
+    );
     projects
         .spend_alerts()
         .create(
