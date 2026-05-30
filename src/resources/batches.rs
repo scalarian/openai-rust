@@ -73,7 +73,7 @@ pub struct BatchCreateParams {
     pub endpoint: BatchEndpoint,
     pub input_file_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_expires_after: Option<BatchOutputExpiresAfter>,
 }
@@ -156,7 +156,7 @@ pub struct Batch {
     #[serde(default)]
     pub in_progress_at: Option<u64>,
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]

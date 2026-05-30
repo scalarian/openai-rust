@@ -3,7 +3,7 @@ mod mock_http;
 #[path = "support/multipart.rs"]
 mod multipart_support;
 
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 use openai_rust::{
     OpenAI,
@@ -132,7 +132,10 @@ fn uploads_complete_file_ids_feed_downstream_batches_without_manual_glue() {
             completion_window: BatchCompletionWindow::Hours24,
             endpoint: BatchEndpoint::Responses,
             input_file_id: uploaded_file_id.clone(),
-            metadata: Some(json!({"source": "upload"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("source"),
+                String::from("upload"),
+            )])),
             output_expires_after: None,
         })
         .unwrap();

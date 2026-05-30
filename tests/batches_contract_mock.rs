@@ -9,6 +9,7 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[test]
 fn create_and_cancel_lifecycle() {
@@ -25,7 +26,10 @@ fn create_and_cancel_lifecycle() {
             completion_window: BatchCompletionWindow::Hours24,
             endpoint: BatchEndpoint::Responses,
             input_file_id: String::from("file_input"),
-            metadata: Some(json!({"job": "nightly"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("job"),
+                String::from("nightly"),
+            )])),
             output_expires_after: Some(BatchOutputExpiresAfter {
                 anchor: String::from("created_at"),
                 seconds: 3600,
