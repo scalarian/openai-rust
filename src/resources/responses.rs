@@ -1960,7 +1960,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     tools: Vec<ResponseItemTool>,
     #[serde(default)]
-    summary: Option<Value>,
+    summary: Vec<ResponseReasoningSummaryPart>,
     #[serde(default)]
     encrypted_content: Option<String>,
     #[serde(default)]
@@ -1982,18 +1982,7 @@ struct WireResponseOutputItem {
 impl From<WireResponseOutputItem> for ResponseOutputItem {
     fn from(value: WireResponseOutputItem) -> Self {
         let arguments = value.arguments.as_ref().map(argument_value_to_string);
-        let mut extra = value.extra;
-        let summary = match value.summary {
-            Some(Value::Array(summary)) => summary
-                .into_iter()
-                .map(response_reasoning_summary_part_from_value)
-                .collect(),
-            Some(summary) => {
-                extra.insert(String::from("summary"), summary);
-                Vec::new()
-            }
-            None => Vec::new(),
-        };
+        let extra = value.extra;
         Self {
             id: value.id,
             item_type: value.item_type,
@@ -2023,7 +2012,7 @@ impl From<WireResponseOutputItem> for ResponseOutputItem {
             reason: value.reason,
             error: value.error,
             tools: value.tools,
-            summary,
+            summary: value.summary,
             encrypted_content: value.encrypted_content,
             container_id: value.container_id,
             outputs: value.outputs,
@@ -2256,10 +2245,6 @@ pub struct ResponseInputAudioData {
     pub extra: BTreeMap<String, Value>,
 }
 
-fn response_text_annotation_from_value(value: Value) -> ResponseTextAnnotation {
-    serde_json::from_value(value.clone()).unwrap_or(ResponseTextAnnotation::Json(value))
-}
-
 /// Parsed non-stream response with structured output helper access.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParsedResponse<T> {
@@ -2450,19 +2435,19 @@ pub enum ResponseStreamEvent {
         output_index: usize,
         content_index: usize,
         annotation_index: usize,
-        annotation: Value,
+        annotation: ResponseTextAnnotation,
     },
     ReasoningSummaryPartAdded {
         item_id: Option<String>,
         output_index: usize,
         summary_index: usize,
-        part: Value,
+        part: ResponseReasoningSummaryPart,
     },
     ReasoningSummaryPartDone {
         item_id: Option<String>,
         output_index: usize,
         summary_index: usize,
-        part: Value,
+        part: ResponseReasoningSummaryPart,
     },
     ReasoningSummaryTextDelta {
         item_id: Option<String>,
@@ -4547,7 +4532,7 @@ struct StreamOutputTextAnnotationAddedPayload {
     annotation_index: usize,
     #[serde(default)]
     item_id: Option<String>,
-    annotation: Value,
+    annotation: ResponseTextAnnotation,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -4556,7 +4541,7 @@ struct StreamReasoningSummaryPartPayload {
     summary_index: usize,
     #[serde(default)]
     item_id: Option<String>,
-    part: Value,
+    part: ResponseReasoningSummaryPart,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -5396,7 +5381,7 @@ impl StreamAccumulator {
         output_index: usize,
         content_index: usize,
         annotation_index: usize,
-        annotation: Value,
+        annotation: ResponseTextAnnotation,
     ) -> Result<(), OpenAIError> {
         let snapshot = self.snapshot.as_mut().ok_or_else(|| {
             OpenAIError::new(
@@ -5411,10 +5396,7 @@ impl StreamAccumulator {
                 format!("stream referenced missing annotation_index {annotation_index}"),
             ));
         }
-        content.annotations.insert(
-            annotation_index,
-            response_text_annotation_from_value(annotation),
-        );
+        content.annotations.insert(annotation_index, annotation);
         Ok(())
     }
 
@@ -5422,7 +5404,7 @@ impl StreamAccumulator {
         &mut self,
         output_index: usize,
         summary_index: usize,
-        part: Value,
+        part: ResponseReasoningSummaryPart,
     ) -> Result<(), OpenAIError> {
         let summary = self.reasoning_summary_mut(output_index)?;
         if summary_index > summary.len() {
@@ -5431,10 +5413,7 @@ impl StreamAccumulator {
                 format!("stream referenced missing summary_index {summary_index}"),
             ));
         }
-        summary.insert(
-            summary_index,
-            response_reasoning_summary_part_from_value(part),
-        );
+        summary.insert(summary_index, part);
         Ok(())
     }
 
@@ -5442,7 +5421,7 @@ impl StreamAccumulator {
         &mut self,
         output_index: usize,
         summary_index: usize,
-        part: Value,
+        part: ResponseReasoningSummaryPart,
     ) -> Result<(), OpenAIError> {
         let summary = self.reasoning_summary_mut(output_index)?;
         let slot = summary.get_mut(summary_index).ok_or_else(|| {
@@ -5451,7 +5430,7 @@ impl StreamAccumulator {
                 format!("stream referenced missing summary_index {summary_index}"),
             )
         })?;
-        *slot = response_reasoning_summary_part_from_value(part);
+        *slot = part;
         Ok(())
     }
 

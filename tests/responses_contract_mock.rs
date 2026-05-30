@@ -913,7 +913,7 @@ fn compact_returns_compaction_object() {
             {
                 "id": "cmp_item",
                 "type": "compaction",
-                "summary": "Summarized context"
+                "encrypted_content": "enc_compacted_context"
             }
         ],
         "usage": {
@@ -957,6 +957,10 @@ fn compact_returns_compaction_object() {
     assert_eq!(response.output().output.len(), 2);
     assert_eq!(response.output().output[0].item_type, "message");
     assert_eq!(response.output().output[1].item_type, "compaction");
+    assert_eq!(
+        response.output().output[1].encrypted_content.as_deref(),
+        Some("enc_compacted_context")
+    );
     assert_eq!(
         response.output().usage.as_ref().unwrap().total_tokens,
         Some(15)

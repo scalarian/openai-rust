@@ -280,8 +280,9 @@ fn newer_response_stream_events_are_typed_and_update_snapshots() {
         Some(ResponseStreamEvent::ReasoningSummaryPartAdded {
             output_index: 0,
             summary_index: 0,
+            ref part,
             ..
-        })
+        }) if part.summary_type == "summary_text"
     ));
     assert!(matches!(
         stream.next_event(),
@@ -298,15 +299,20 @@ fn newer_response_stream_events_are_typed_and_update_snapshots() {
         Some(ResponseStreamEvent::ReasoningSummaryPartDone {
             output_index: 0,
             summary_index: 0,
+            ref part,
             ..
-        })
+        }) if part.text.as_deref() == Some("Plan done")
     ));
     match stream.next_event() {
         Some(ResponseStreamEvent::OutputTextAnnotationAdded {
             annotation,
             annotation_index: 0,
             ..
-        }) => assert_eq!(annotation["url"], "https://example.com"),
+        }) => assert!(matches!(
+            annotation,
+            ResponseTextAnnotation::UrlCitation(ref citation)
+                if citation.url.as_deref() == Some("https://example.com")
+        )),
         other => panic!("unexpected annotation event: {other:?}"),
     }
     assert!(matches!(
