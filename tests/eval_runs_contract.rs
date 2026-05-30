@@ -3,9 +3,13 @@ mod mock_http;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::evals::{
-        EvalRunDataSource, EvalRunDeleteResponse, EvalRunInputMessages, EvalRunListParams,
-        EvalRunOutputTextFormat, EvalRunSamplingParams, EvalRunStatus, EvalRunTextConfig,
+    resources::{
+        evals::{
+            EvalRunDataSource, EvalRunDeleteResponse, EvalRunInputMessages, EvalRunListParams,
+            EvalRunOutputTextFormat, EvalRunSamplingParams, EvalRunStatus, EvalRunTextConfig,
+        },
+        graders::GraderMessageContent,
+        responses::{FunctionTool, ResponseTool},
     },
 };
 use serde_json::json;
@@ -36,14 +40,20 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
             data_source: EvalRunDataSource::Responses {
                 source: openai_rust::resources::evals::EvalRunSource::FileContent {
                     content: vec![openai_rust::resources::evals::EvalRunSourceRow {
-                        item: json!({"question": "2+2?", "expected": "4"}),
-                        sample: Some(json!({"output_text": "4"})),
+                        item: BTreeMap::from([
+                            (String::from("question"), json!("2+2?")),
+                            (String::from("expected"), json!("4")),
+                        ]),
+                        sample: Some(BTreeMap::from([(
+                            String::from("output_text"),
+                            json!("4"),
+                        )])),
                     }],
                 },
                 input_messages: Some(EvalRunInputMessages::Template {
                     template: vec![openai_rust::resources::evals::EvalMessageTemplate {
                         role: String::from("user"),
-                        content: json!("{{item.question}}"),
+                        content: GraderMessageContent::from("{{item.question}}"),
                         message_type: None,
                     }],
                 }),
@@ -60,7 +70,13 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
                         }))),
                     }),
                     reasoning_effort: Some(String::from("low")),
-                    tools: Some(json!([{"type": "function", "name": "grade"}])),
+                    tools: Some(vec![ResponseTool::Function(FunctionTool {
+                        name: String::from("grade"),
+                        parameters: json!({"type": "object"}),
+                        strict: None,
+                        description: None,
+                        defer_loading: None,
+                    })]),
                 }),
             },
             metadata: Some(BTreeMap::from([(

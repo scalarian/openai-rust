@@ -16,6 +16,7 @@ pub mod embeddings;
 pub mod evals;
 pub mod files;
 pub mod fine_tuning;
+pub mod graders;
 pub mod images;
 pub mod models;
 pub mod moderations;

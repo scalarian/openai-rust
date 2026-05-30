@@ -53,7 +53,7 @@ fn eval_output_items_preserve_grader_results_sample_provenance_and_usage_detail(
             .content
             .as_ref()
             .unwrap(),
-        &json!("4")
+        "4"
     );
 
     let retrieved = client
@@ -66,7 +66,7 @@ fn eval_output_items_preserve_grader_results_sample_provenance_and_usage_detail(
     assert_eq!(retrieved.output.datasource_item["question"], json!("2+2?"));
     assert_eq!(
         retrieved.output.sample.input[0].content.as_ref().unwrap(),
-        &json!("2+2?")
+        "2+2?"
     );
     assert_eq!(
         retrieved

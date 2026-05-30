@@ -6,7 +6,10 @@ use serde_json::{Map, Value};
 use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
-    resources::files::{encode_path_id, validate_path_id},
+    resources::{
+        files::{encode_path_id, validate_path_id},
+        graders::GraderMessageContent,
+    },
 };
 
 /// Top-level fine-tuning API family.
@@ -988,7 +991,7 @@ pub enum FineTuningGrader {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FineTuningGraderMessage {
     pub role: String,
-    pub content: Value,
+    pub content: GraderMessageContent,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub message_type: Option<String>,
 }

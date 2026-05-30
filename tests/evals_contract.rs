@@ -3,9 +3,12 @@ mod mock_http;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::evals::{
-        EvalDataSourceConfig, EvalDeleteResponse, EvalGrader, EvalListParams, EvalOrderBy,
-        EvalOrderDirection, EvalUpdateParams,
+    resources::{
+        evals::{
+            EvalDataSourceConfig, EvalDeleteResponse, EvalGrader, EvalListParams, EvalOrderBy,
+            EvalOrderDirection, EvalUpdateParams,
+        },
+        graders::GraderMessageContent,
     },
 };
 use serde_json::json;
@@ -95,7 +98,9 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
                     model: String::from("gpt-4o-mini"),
                     input: vec![openai_rust::resources::evals::EvalMessageTemplate {
                         role: String::from("user"),
-                        content: json!("Grade {{sample.output_text}} against {{item.expected}}"),
+                        content: GraderMessageContent::from(
+                            "Grade {{sample.output_text}} against {{item.expected}}",
+                        ),
                         message_type: None,
                     }],
                     pass_threshold: Some(0.8),

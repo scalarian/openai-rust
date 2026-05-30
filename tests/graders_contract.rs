@@ -3,9 +3,12 @@ mod mock_http;
 
 use openai_rust::{
     OpenAI,
-    resources::fine_tuning::{
-        FineTuningGrader, FineTuningGraderMessage, FineTuningGraderRunParams,
-        FineTuningGraderValidateParams,
+    resources::{
+        fine_tuning::{
+            FineTuningGrader, FineTuningGraderMessage, FineTuningGraderRunParams,
+            FineTuningGraderValidateParams,
+        },
+        graders::GraderMessageContent,
     },
 };
 use serde_json::json;
@@ -25,7 +28,9 @@ fn graders_validate_configs_and_run_tiny_samples() {
         input: vec![
             openai_rust::resources::fine_tuning::FineTuningGraderMessage {
                 role: String::from("system"),
-                content: json!("Judge whether the answer matches the reference exactly."),
+                content: GraderMessageContent::from(
+                    "Judge whether the answer matches the reference exactly.",
+                ),
                 message_type: Some(String::from("message")),
             },
         ],
@@ -84,7 +89,9 @@ fn graders_validate_configs_and_run_tiny_samples() {
     let label_model = FineTuningGrader::LabelModel {
         input: vec![FineTuningGraderMessage {
             role: String::from("system"),
-            content: json!("Assign one of the provided labels to the sample output."),
+            content: GraderMessageContent::from(
+                "Assign one of the provided labels to the sample output.",
+            ),
             message_type: Some(String::from("message")),
         }],
         labels: vec![String::from("pass"), String::from("fail")],

@@ -6,7 +6,11 @@ use serde_json::Value;
 use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
-    resources::files::{encode_path_id, validate_path_id},
+    resources::{
+        files::{encode_path_id, validate_path_id},
+        graders::GraderMessageContent,
+        responses::ResponseTool,
+    },
 };
 
 /// Top-level evals API family.
@@ -315,7 +319,7 @@ pub enum EvalDataSourceConfig {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EvalMessageTemplate {
     pub role: String,
-    pub content: Value,
+    pub content: GraderMessageContent,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub message_type: Option<String>,
 }
@@ -512,9 +516,9 @@ pub enum EvalRunDataSource {
 /// Row item for inline datasource content.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EvalRunSourceRow {
-    pub item: Value,
+    pub item: BTreeMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sample: Option<Value>,
+    pub sample: Option<BTreeMap<String, Value>>,
 }
 
 /// Source selectors used by eval-run datasources.
@@ -555,7 +559,7 @@ pub enum EvalRunSource {
         #[serde(skip_serializing_if = "Option::is_none")]
         temperature: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        tools: Option<Value>,
+        tools: Option<Vec<String>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         top_p: Option<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -585,7 +589,7 @@ pub struct EvalRunSamplingParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<EvalRunTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Value>,
+    pub tools: Option<Vec<ResponseTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
 }
@@ -913,7 +917,7 @@ pub struct EvalOutputItemResult {
     #[serde(default)]
     pub score: f64,
     #[serde(default)]
-    pub sample: Option<Value>,
+    pub sample: Option<BTreeMap<String, Value>>,
     #[serde(rename = "type", default)]
     pub type_field: Option<String>,
     #[serde(flatten)]
@@ -934,7 +938,7 @@ pub struct EvalOutputItemMessage {
     #[serde(default)]
     pub role: Option<String>,
     #[serde(default)]
-    pub content: Option<Value>,
+    pub content: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -990,7 +994,7 @@ pub struct EvalOutputItem {
     #[serde(default)]
     pub created_at: u64,
     #[serde(default)]
-    pub datasource_item: Value,
+    pub datasource_item: BTreeMap<String, Value>,
     #[serde(default)]
     pub datasource_item_id: u64,
     #[serde(default)]

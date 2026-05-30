@@ -57,8 +57,15 @@ fn live_eval_run_smoke_proves_create_cancel_and_status_request_ids() {
                 data_source: EvalRunDataSource::Jsonl {
                     source: EvalRunSource::FileContent {
                         content: vec![EvalRunSourceRow {
-                            item: json!({"question": "2+2?", "expected": "4", "model": "gpt-4.1-nano"}),
-                            sample: Some(json!({"model": "gpt-4.1-nano", "output_text": "4"})),
+                            item: BTreeMap::from([
+                                (String::from("question"), json!("2+2?")),
+                                (String::from("expected"), json!("4")),
+                                (String::from("model"), json!("gpt-4.1-nano")),
+                            ]),
+                            sample: Some(BTreeMap::from([
+                                (String::from("model"), json!("gpt-4.1-nano")),
+                                (String::from("output_text"), json!("4")),
+                            ])),
                         }],
                     },
                 },
