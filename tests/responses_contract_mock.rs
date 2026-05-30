@@ -4,9 +4,9 @@ use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
         ResponseCodeInterpreterTool, ResponseComputerAction, ResponseConversation,
-        ResponseConversationObject, ResponseFormatTextConfig, ResponseItemOutput, ResponsePrompt,
-        ResponseReasoning, ResponseShellOutputOutcome, ResponseTool, ResponseToolChoice,
-        ResponseWebSearchPreviewTool,
+        ResponseConversationObject, ResponseFormatTextConfig, ResponseItemAction,
+        ResponseItemEnvironment, ResponseItemOutput, ResponsePrompt, ResponseReasoning,
+        ResponseShellOutputOutcome, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -231,7 +231,7 @@ fn create_populates_output_text_helper() {
     );
     assert!(matches!(
         computer_call.action.as_ref(),
-        Some(ResponseComputerAction::Click(action))
+        Some(ResponseItemAction::Computer(ResponseComputerAction::Click(action)))
             if action.button == "left" && action.x == 10 && action.y == 20
     ));
     assert!(matches!(
@@ -555,6 +555,37 @@ fn tool_and_refusal_fields_round_trip() {
                     && parts[0].text.as_deref() == Some("custom payload")
                     && parts[1].content_type == "input_file"
                     && parts[1].filename.as_deref() == Some("result.txt")
+        ));
+
+        let local_shell_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "local_shell_call")
+            .expect("local_shell_call item");
+        assert!(matches!(
+            local_shell_call.action.as_ref(),
+            Some(ResponseItemAction::LocalShell(action))
+                if action.command == ["ls", "-la"]
+                    && action.env.get("LC_ALL").map(String::as_str) == Some("C")
+                    && action.working_directory.as_deref() == Some("/workspace")
+        ));
+
+        let shell_call = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "shell_call")
+            .expect("shell_call item");
+        assert!(matches!(
+            shell_call.action.as_ref(),
+            Some(ResponseItemAction::Shell(action))
+                if action.commands == ["echo ok"]
+                    && action.max_output_length == Some(2048)
+                    && action.timeout_ms == Some(1000)
+        ));
+        assert!(matches!(
+            shell_call.environment.as_ref(),
+            Some(ResponseItemEnvironment::ContainerReference(environment))
+                if environment.container_id == "cntr_123"
         ));
 
         let shell_output = response
@@ -1017,6 +1048,36 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                         "file_data": "Zm9v"
                     }
                 ]
+            },
+            {
+                "id": "local_shell_123",
+                "type": "local_shell_call",
+                "call_id": "call_local_shell",
+                "status": "completed",
+                "action": {
+                    "type": "exec",
+                    "command": ["ls", "-la"],
+                    "env": {"LC_ALL": "C"},
+                    "timeout_ms": 1000,
+                    "user": "sandbox",
+                    "working_directory": "/workspace"
+                }
+            },
+            {
+                "id": "shell_123",
+                "type": "shell_call",
+                "call_id": "call_shell",
+                "status": "completed",
+                "created_by": "assistant",
+                "action": {
+                    "commands": ["echo ok"],
+                    "max_output_length": 2048,
+                    "timeout_ms": 1000
+                },
+                "environment": {
+                    "type": "container_reference",
+                    "container_id": "cntr_123"
+                }
             },
             {
                 "id": "shell_output_123",

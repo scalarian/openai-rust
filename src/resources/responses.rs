@@ -1127,10 +1127,10 @@ pub struct ResponseOutputItem {
     pub phase: Option<String>,
     pub namespace: Option<String>,
     pub created_by: Option<String>,
-    pub action: Option<ResponseComputerAction>,
+    pub action: Option<ResponseItemAction>,
     pub actions: Option<Vec<ResponseComputerAction>>,
     pub operation: Option<Value>,
-    pub environment: Option<Value>,
+    pub environment: Option<ResponseItemEnvironment>,
     pub execution: Option<String>,
     pub output: Option<ResponseItemOutput>,
     pub result: Option<String>,
@@ -1176,6 +1176,170 @@ pub struct ResponseComputerSafetyCheck {
     pub code: Option<String>,
     #[serde(default)]
     pub message: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Action payload used by output items with a generic `action` field.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseItemAction {
+    Computer(ResponseComputerAction),
+    LocalShell(ResponseLocalShellAction),
+    Shell(ResponseShellAction),
+    Other {
+        action_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseItemAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(object) = value else {
+            return Ok(Self::Json(value));
+        };
+
+        if object.get("commands").is_some() {
+            return serde_json::from_value(Value::Object(object))
+                .map(Self::Shell)
+                .map_err(serde::de::Error::custom);
+        }
+
+        let Some(action_type) = object
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match action_type.as_str() {
+            "exec" => serde_json::from_value(Value::Object(object))
+                .map(Self::LocalShell)
+                .map_err(serde::de::Error::custom),
+            action_type if is_response_computer_action_type(action_type) => {
+                serde_json::from_value(Value::Object(object))
+                    .map(Self::Computer)
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => {
+                let mut extra = object;
+                extra.remove("type");
+                Ok(Self::Other {
+                    action_type,
+                    extra: extra.into_iter().collect(),
+                })
+            }
+        }
+    }
+}
+
+fn is_response_computer_action_type(action_type: &str) -> bool {
+    matches!(
+        action_type,
+        "click"
+            | "double_click"
+            | "drag"
+            | "keypress"
+            | "move"
+            | "screenshot"
+            | "scroll"
+            | "type"
+            | "wait"
+    )
+}
+
+/// Execute a shell command on the local shell.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseLocalShellAction {
+    #[serde(default)]
+    pub command: Vec<String>,
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+    #[serde(default)]
+    pub user: Option<String>,
+    #[serde(default)]
+    pub working_directory: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Shell commands and limits for a managed shell tool call.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseShellAction {
+    #[serde(default)]
+    pub commands: Vec<String>,
+    #[serde(default)]
+    pub max_output_length: Option<u64>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Environment payload used by shell-call items.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseItemEnvironment {
+    Local(ResponseLocalEnvironment),
+    ContainerReference(ResponseContainerReference),
+    Other {
+        environment_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseItemEnvironment {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(environment_type) = object
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match environment_type.as_str() {
+            "local" => serde_json::from_value(Value::Object(object))
+                .map(Self::Local)
+                .map_err(serde::de::Error::custom),
+            "container_reference" => serde_json::from_value(Value::Object(object))
+                .map(Self::ContainerReference)
+                .map_err(serde::de::Error::custom),
+            _ => {
+                let mut extra = object;
+                extra.remove("type");
+                Ok(Self::Other {
+                    environment_type,
+                    extra: extra.into_iter().collect(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseLocalEnvironment {
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseContainerReference {
+    pub container_id: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1506,13 +1670,13 @@ struct WireResponseOutputItem {
     #[serde(default)]
     created_by: Option<String>,
     #[serde(default)]
-    action: Option<ResponseComputerAction>,
+    action: Option<ResponseItemAction>,
     #[serde(default)]
     actions: Option<Vec<ResponseComputerAction>>,
     #[serde(default)]
     operation: Option<Value>,
     #[serde(default)]
-    environment: Option<Value>,
+    environment: Option<ResponseItemEnvironment>,
     #[serde(default)]
     execution: Option<String>,
     #[serde(default)]

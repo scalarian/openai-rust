@@ -1,7 +1,8 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
-        ResponseComputerAction, ResponseItemOutput, ResponseShellOutputOutcome,
+        ResponseComputerAction, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+        ResponseShellOutputOutcome,
     },
 };
 use serde_json::{Value, json};
@@ -216,6 +217,8 @@ fn typed_known_fields_are_not_lost() {
             computer_call_output_item("computer_output_1"),
             custom_tool_call_output_item("custom_output_1"),
             shell_call_output_item("shell_output_1"),
+            local_shell_call_item("local_shell_1"),
+            shell_call_item("shell_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -317,7 +320,7 @@ fn typed_known_fields_are_not_lost() {
     );
     assert!(matches!(
         computer_call.action.as_ref(),
-        Some(ResponseComputerAction::Click(action))
+        Some(ResponseItemAction::Computer(ResponseComputerAction::Click(action)))
             if action.button == "left" && action.x == 10 && action.y == 20
     ));
     assert!(matches!(
@@ -369,6 +372,27 @@ fn typed_known_fields_are_not_lost() {
                     &outputs[0].outcome,
                     ResponseShellOutputOutcome::Exit(outcome) if outcome.exit_code == 0
                 )
+    ));
+
+    let local_shell_call = &listed.output().data[7];
+    assert_eq!(local_shell_call.item_type, "local_shell_call");
+    assert!(matches!(
+        local_shell_call.action.as_ref(),
+        Some(ResponseItemAction::LocalShell(action))
+            if action.command == ["ls", "-la"]
+                && action.env.get("LC_ALL").map(String::as_str) == Some("C")
+    ));
+
+    let shell_call = &listed.output().data[8];
+    assert_eq!(shell_call.item_type, "shell_call");
+    assert!(matches!(
+        shell_call.action.as_ref(),
+        Some(ResponseItemAction::Shell(action))
+            if action.commands == ["echo ok"] && action.max_output_length == Some(2048)
+    ));
+    assert!(matches!(
+        shell_call.environment.as_ref(),
+        Some(ResponseItemEnvironment::Local(_))
     ));
 
     let retrieved_function_call = retrieved.output();
@@ -546,6 +570,31 @@ fn shell_call_output_item(id: &str) -> Value {
             "stderr": "",
             "outcome": {"type": "exit", "exit_code": 0}
         }]
+    })
+}
+
+fn local_shell_call_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "local_shell_call",
+        "call_id": "call_local_shell",
+        "status": "completed",
+        "action": {
+            "type": "exec",
+            "command": ["ls", "-la"],
+            "env": {"LC_ALL": "C"}
+        }
+    })
+}
+
+fn shell_call_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "shell_call",
+        "call_id": "call_shell",
+        "status": "completed",
+        "action": {"commands": ["echo ok"], "max_output_length": 2048},
+        "environment": {"type": "local"}
     })
 }
 
