@@ -30,7 +30,7 @@ use crate::{
     },
     error::{ApiErrorKind, ErrorKind},
     helpers::sse::{SseFrame, SseParser},
-    resources::containers::{ContainerMemoryLimit, ContainerNetworkPolicy},
+    resources::containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
 };
 
 /// Primary Responses API family.
@@ -3822,7 +3822,219 @@ pub struct ResponseImageGenerationInputImageMask {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseShellTool {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub environment: Option<Value>,
+    pub environment: Option<ResponseShellEnvironment>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseShellEnvironment {
+    ContainerAuto {
+        file_ids: Vec<String>,
+        memory_limit: Option<ContainerMemoryLimit>,
+        network_policy: Option<ContainerNetworkPolicy>,
+        skills: Vec<ContainerSkill>,
+        extra: BTreeMap<String, Value>,
+    },
+    Local {
+        skills: Vec<ResponseLocalSkill>,
+        extra: BTreeMap<String, Value>,
+    },
+    ContainerReference(ResponseContainerReference),
+    Other {
+        environment_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl Serialize for ResponseShellEnvironment {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::ContainerAuto {
+                file_ids,
+                memory_limit,
+                network_policy,
+                skills,
+                extra,
+            } => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("container_auto")),
+                );
+                if !file_ids.is_empty() {
+                    object.insert(
+                        String::from("file_ids"),
+                        serde_json::to_value(file_ids).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                if let Some(memory_limit) = memory_limit {
+                    object.insert(
+                        String::from("memory_limit"),
+                        serde_json::to_value(memory_limit).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                if let Some(network_policy) = network_policy {
+                    object.insert(
+                        String::from("network_policy"),
+                        serde_json::to_value(network_policy).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                if !skills.is_empty() {
+                    object.insert(
+                        String::from("skills"),
+                        serde_json::to_value(skills).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Local { skills, extra } => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(String::from("type"), Value::String(String::from("local")));
+                if !skills.is_empty() {
+                    object.insert(
+                        String::from("skills"),
+                        serde_json::to_value(skills).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                Value::Object(object).serialize(serializer)
+            }
+            Self::ContainerReference(environment) => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in &environment.extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("container_reference")),
+                );
+                object.insert(
+                    String::from("container_id"),
+                    Value::String(environment.container_id.clone()),
+                );
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Other {
+                environment_type,
+                extra,
+            } => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(
+                    String::from("type"),
+                    Value::String(environment_type.clone()),
+                );
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Json(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseShellEnvironment {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(environment_type) = object.remove("type").and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        }) else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match environment_type.as_str() {
+            "container_auto" => {
+                let file_ids = match object.remove("file_ids") {
+                    Some(Value::Null) | None => Vec::new(),
+                    Some(value) => {
+                        serde_json::from_value(value).map_err(serde::de::Error::custom)?
+                    }
+                };
+                let memory_limit = match object.remove("memory_limit") {
+                    Some(Value::Null) | None => None,
+                    Some(value) => {
+                        Some(serde_json::from_value(value).map_err(serde::de::Error::custom)?)
+                    }
+                };
+                let network_policy = match object.remove("network_policy") {
+                    Some(Value::Null) | None => None,
+                    Some(value) => {
+                        Some(serde_json::from_value(value).map_err(serde::de::Error::custom)?)
+                    }
+                };
+                let skills = match object.remove("skills") {
+                    Some(Value::Null) | None => Vec::new(),
+                    Some(value) => {
+                        serde_json::from_value(value).map_err(serde::de::Error::custom)?
+                    }
+                };
+                Ok(Self::ContainerAuto {
+                    file_ids,
+                    memory_limit,
+                    network_policy,
+                    skills,
+                    extra: object.into_iter().collect(),
+                })
+            }
+            "local" => {
+                let skills = match object.remove("skills") {
+                    Some(Value::Null) | None => Vec::new(),
+                    Some(value) => {
+                        serde_json::from_value(value).map_err(serde::de::Error::custom)?
+                    }
+                };
+                Ok(Self::Local {
+                    skills,
+                    extra: object.into_iter().collect(),
+                })
+            }
+            "container_reference" => {
+                let container_id = object
+                    .remove("container_id")
+                    .and_then(|value| match value {
+                        Value::String(value) => Some(value),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "container_reference shell environment missing `container_id`",
+                        )
+                    })?;
+                Ok(Self::ContainerReference(ResponseContainerReference {
+                    container_id,
+                    extra: object.into_iter().collect(),
+                }))
+            }
+            _ => Ok(Self::Other {
+                environment_type,
+                extra: object.into_iter().collect(),
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseLocalSkill {
+    pub description: String,
+    pub name: String,
+    pub path: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

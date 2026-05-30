@@ -12,8 +12,8 @@ use openai_rust::{
             ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
             ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
             ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
-            ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
-            ResponseWebSearchPreviewTool,
+            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
+            ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -126,6 +126,18 @@ fn create_populates_output_text_helper() {
                     server_url: Some(String::from("https://mcp.example.test")),
                     extra: BTreeMap::new(),
                 }),
+                ResponseTool::Shell(ResponseShellTool {
+                    environment: Some(ResponseShellEnvironment::ContainerAuto {
+                        file_ids: vec![String::from("file_shell")],
+                        memory_limit: Some(ContainerMemoryLimit::G1),
+                        network_policy: Some(ContainerNetworkPolicy::Allowlist {
+                            allowed_domains: vec![String::from("api.example.com")],
+                            domain_secrets: None,
+                        }),
+                        skills: Vec::new(),
+                        extra: BTreeMap::new(),
+                    }),
+                }),
             ],
             ..Default::default()
         })
@@ -196,6 +208,21 @@ fn create_populates_output_text_helper() {
         body["tools"][2]["require_approval"]["never"]["read_only"],
         true
     );
+    assert_eq!(body["tools"][3]["type"], "shell");
+    assert_eq!(body["tools"][3]["environment"]["type"], "container_auto");
+    assert_eq!(
+        body["tools"][3]["environment"]["file_ids"],
+        json!(["file_shell"])
+    );
+    assert_eq!(body["tools"][3]["environment"]["memory_limit"], "1g");
+    assert_eq!(
+        body["tools"][3]["environment"]["network_policy"]["type"],
+        "allowlist"
+    );
+    assert_eq!(
+        body["tools"][3]["environment"]["network_policy"]["allowed_domains"],
+        json!(["api.example.com"])
+    );
     assert_eq!(response.output().id, "resp_create");
     assert_eq!(response.output().object, "response");
     assert_eq!(response.output().created_at, 1.25);
@@ -256,7 +283,7 @@ fn create_populates_output_text_helper() {
         response.output().tool_choice,
         Some(ResponseToolChoice::Auto)
     );
-    assert_eq!(response.output().tools.len(), 4);
+    assert_eq!(response.output().tools.len(), 5);
     assert_eq!(
         response.output().tools[0],
         ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
@@ -295,7 +322,15 @@ fn create_populates_output_text_helper() {
         &response_code_tool.container,
         ResponseCodeInterpreterContainer::Id(id) if id == "cntr_response"
     ));
-    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[3] else {
+    let ResponseTool::Shell(response_shell_tool) = &response.output().tools[3] else {
+        panic!("expected response shell tool");
+    };
+    assert!(matches!(
+        response_shell_tool.environment.as_ref(),
+        Some(ResponseShellEnvironment::ContainerReference(environment))
+            if environment.container_id == "cntr_shell"
+    ));
+    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[4] else {
         panic!("expected response mcp tool");
     };
     assert_eq!(response_mcp_tool.server_label, "deepwiki");
@@ -1149,6 +1184,13 @@ fn response_payload_tools() -> Value {
         {
             "type": "code_interpreter",
             "container": "cntr_response"
+        },
+        {
+            "type": "shell",
+            "environment": {
+                "type": "container_reference",
+                "container_id": "cntr_shell"
+            }
         },
         {
             "type": "mcp",
