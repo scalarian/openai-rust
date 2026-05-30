@@ -162,7 +162,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .update(
             "proj_research",
             AdminProjectHostedToolPermissionUpdateParams {
-                web_search: Some(json!({"mode": "enabled"})),
+                web_search: Some(AdminHostedToolPermission { enabled: true }),
                 ..Default::default()
             },
         )
@@ -269,6 +269,8 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     assert_eq!(project_role_body["role_name"], json!("auditor"));
     let rate_limit_body: AdminValue = serde_json::from_slice(&requests[18].body).unwrap();
     assert_eq!(rate_limit_body["max_requests_per_1_minute"], json!(120));
+    let hosted_tool_body: AdminValue = serde_json::from_slice(&requests[20].body).unwrap();
+    assert_eq!(hosted_tool_body["web_search"], json!({"enabled": true}));
 
     let blank_project = projects.retrieve(" ").unwrap_err();
     assert!(matches!(blank_project.kind, ErrorKind::Validation));
@@ -310,7 +312,10 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .create(AdminInviteCreateParams {
             email: String::from("new@example.com"),
             role: String::from("reader"),
-            projects: Some(vec![json!({"id": "proj_1", "role": "member"})]),
+            projects: Some(vec![AdminInviteProject {
+                id: String::from("proj_1"),
+                role: String::from("member"),
+            }]),
         })
         .unwrap();
     org.invites()
@@ -469,10 +474,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .create(AdminSpendAlertCreateParams {
             currency: String::from("USD"),
             interval: String::from("month"),
-            notification_channel: json!({
-                "type": "email",
-                "recipients": ["ops@example.com"]
-            }),
+            notification_channel: AdminSpendAlertNotificationChannel {
+                recipients: vec![String::from("ops@example.com")],
+                kind: String::from("email"),
+                subject_prefix: None,
+            },
             threshold_amount: 10_000,
         })
         .unwrap();
@@ -490,10 +496,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             AdminSpendAlertUpdateParams {
                 currency: String::from("USD"),
                 interval: String::from("month"),
-                notification_channel: json!({
-                    "type": "email",
-                    "recipients": ["sec@example.com"]
-                }),
+                notification_channel: AdminSpendAlertNotificationChannel {
+                    recipients: vec![String::from("sec@example.com")],
+                    kind: String::from("email"),
+                    subject_prefix: None,
+                },
                 threshold_amount: 20_000,
             },
         )
@@ -543,6 +550,10 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     assert_eq!(role_body["permissions"], json!(["logs.read"]));
     let spend_alert_body: AdminValue = serde_json::from_slice(&requests[21].body).unwrap();
     assert_eq!(spend_alert_body["threshold_amount"], json!(10_000));
+    assert_eq!(
+        spend_alert_body["notification_channel"],
+        json!({"type": "email", "recipients": ["ops@example.com"]})
+    );
 }
 
 #[test]
@@ -737,10 +748,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectSpendAlertCreateParams {
                 currency: String::from("USD"),
                 interval: String::from("month"),
-                notification_channel: json!({
-                    "type": "email",
-                    "recipients": ["ops@example.com"]
-                }),
+                notification_channel: AdminSpendAlertNotificationChannel {
+                    recipients: vec![String::from("ops@example.com")],
+                    kind: String::from("email"),
+                    subject_prefix: None,
+                },
                 threshold_amount: 30_000,
             },
         )
@@ -765,10 +777,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectSpendAlertUpdateParams {
                 currency: String::from("USD"),
                 interval: String::from("month"),
-                notification_channel: json!({
-                    "type": "email",
-                    "recipients": ["sec@example.com"]
-                }),
+                notification_channel: AdminSpendAlertNotificationChannel {
+                    recipients: vec![String::from("sec@example.com")],
+                    kind: String::from("email"),
+                    subject_prefix: None,
+                },
                 threshold_amount: 40_000,
             },
         )
@@ -837,6 +850,10 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     assert_eq!(group_body["group_id"], json!("grp_eng"));
     let project_alert_body: AdminValue = serde_json::from_slice(&requests[16].body).unwrap();
     assert_eq!(project_alert_body["threshold_amount"], json!(30_000));
+    assert_eq!(
+        project_alert_body["notification_channel"],
+        json!({"type": "email", "recipients": ["ops@example.com"]})
+    );
 }
 
 #[test]

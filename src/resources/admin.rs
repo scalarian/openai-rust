@@ -161,12 +161,19 @@ impl From<AdminApiKeyListParams> for AdminQueryParams {
 }
 
 /// Organization invite creation body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminInviteCreateParams {
     pub email: String,
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub projects: Option<Vec<Value>>,
+    pub projects: Option<Vec<AdminInviteProject>>,
+}
+
+/// Project membership granted when an organization invite is accepted.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminInviteProject {
+    pub id: String,
+    pub role: String,
 }
 
 /// Organization invite list query parameters.
@@ -405,21 +412,31 @@ pub struct AdminDataRetentionUpdateParams {
 }
 
 /// Organization spend-alert creation body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminSpendAlertCreateParams {
     pub currency: String,
     pub interval: String,
-    pub notification_channel: Value,
+    pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
 
 /// Organization spend-alert update body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminSpendAlertUpdateParams {
     pub currency: String,
     pub interval: String,
-    pub notification_channel: Value,
+    pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
+}
+
+/// Email notification settings for an organization or project spend alert.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminSpendAlertNotificationChannel {
+    pub recipients: Vec<String>,
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subject_prefix: Option<String>,
 }
 
 /// Organization spend-alert list query parameters.
@@ -623,18 +640,24 @@ pub struct AdminProjectModelPermissionUpdateParams {
 }
 
 /// Project hosted-tool permission update body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectHostedToolPermissionUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub code_interpreter: Option<Value>,
+    pub code_interpreter: Option<AdminHostedToolPermission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub file_search: Option<Value>,
+    pub file_search: Option<AdminHostedToolPermission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_generation: Option<Value>,
+    pub image_generation: Option<AdminHostedToolPermission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mcp: Option<Value>,
+    pub mcp: Option<AdminHostedToolPermission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_search: Option<Value>,
+    pub web_search: Option<AdminHostedToolPermission>,
+}
+
+/// Permission update for a single project hosted tool.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminHostedToolPermission {
+    pub enabled: bool,
 }
 
 /// Project group creation body.
@@ -741,20 +764,20 @@ pub struct AdminProjectDataRetentionUpdateParams {
 }
 
 /// Project spend-alert creation body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectSpendAlertCreateParams {
     pub currency: String,
     pub interval: String,
-    pub notification_channel: Value,
+    pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
 
 /// Project spend-alert update body.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectSpendAlertUpdateParams {
     pub currency: String,
     pub interval: String,
-    pub notification_channel: Value,
+    pub notification_channel: AdminSpendAlertNotificationChannel,
     pub threshold_amount: i64,
 }
 
