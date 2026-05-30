@@ -1141,7 +1141,7 @@ pub struct ResponseOutputItem {
     pub approve: Option<bool>,
     pub reason: Option<String>,
     pub error: Option<String>,
-    pub tools: Vec<Value>,
+    pub tools: Vec<ResponseMcpListTool>,
     pub summary: Vec<Value>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
@@ -1151,6 +1151,20 @@ pub struct ResponseOutputItem {
     pub acknowledged_safety_checks: Vec<Value>,
     pub content: Vec<ResponseContentPart>,
     pub parsed_arguments: Option<Value>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool entry returned by an MCP list-tools output item.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseMcpListTool {
+    #[serde(default)]
+    pub input_schema: Value,
+    pub name: String,
+    #[serde(default)]
+    pub annotations: Option<Value>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
@@ -1219,7 +1233,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     error: Option<String>,
     #[serde(default)]
-    tools: Vec<Value>,
+    tools: Vec<ResponseMcpListTool>,
     #[serde(default)]
     summary: Option<Value>,
     #[serde(default)]

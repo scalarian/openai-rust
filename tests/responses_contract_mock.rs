@@ -192,6 +192,23 @@ fn create_populates_output_text_helper() {
             }
         )]
     );
+    let mcp_list = response
+        .output()
+        .output
+        .iter()
+        .find(|item| item.item_type == "mcp_list_tools")
+        .expect("mcp list tools item");
+    assert_eq!(mcp_list.server_label.as_deref(), Some("deepwiki"));
+    assert_eq!(mcp_list.tools[0].name, "search_docs");
+    assert_eq!(mcp_list.tools[0].input_schema["type"], "object");
+    assert_eq!(
+        mcp_list.tools[0].annotations.as_ref().unwrap()["readOnlyHint"],
+        true
+    );
+    assert_eq!(
+        mcp_list.tools[0].description.as_deref(),
+        Some("Search docs")
+    );
     assert_eq!(response.output().top_logprobs, Some(2));
     assert_eq!(response.output().top_p, Some(0.8));
     assert_eq!(response.output().truncation.as_deref(), Some("auto"));
@@ -735,6 +752,17 @@ fn response_payload(
                 "id": "reasoning_1",
                 "type": "reasoning",
                 "summary": []
+            },
+            {
+                "id": "mcp_tools_1",
+                "type": "mcp_list_tools",
+                "server_label": "deepwiki",
+                "tools": [{
+                    "name": "search_docs",
+                    "input_schema": {"type": "object"},
+                    "annotations": {"readOnlyHint": true},
+                    "description": "Search docs"
+                }]
             },
             {
                 "id": "msg_2",

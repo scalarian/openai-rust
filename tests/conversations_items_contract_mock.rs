@@ -206,6 +206,7 @@ fn typed_known_fields_are_not_lost() {
         json_response(items_envelope(vec![
             function_call_item("fc_1"),
             refusal_message_item("msg_refusal"),
+            mcp_list_tools_item("mcp_tools_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -275,6 +276,20 @@ fn typed_known_fields_are_not_lost() {
         .expect("output text content");
     assert_eq!(output_text.annotations.len(), 1);
     assert_eq!(output_text.logprobs.as_ref().unwrap().len(), 1);
+
+    let mcp_tools = &listed.output().data[2];
+    assert_eq!(mcp_tools.item_type, "mcp_list_tools");
+    assert_eq!(mcp_tools.server_label.as_deref(), Some("deepwiki"));
+    assert_eq!(mcp_tools.tools[0].name, "search_docs");
+    assert_eq!(mcp_tools.tools[0].input_schema["type"], "object");
+    assert_eq!(
+        mcp_tools.tools[0].annotations.as_ref().unwrap()["readOnlyHint"],
+        true
+    );
+    assert_eq!(
+        mcp_tools.tools[0].description.as_deref(),
+        Some("Search docs")
+    );
 
     let retrieved_function_call = retrieved.output();
     assert_eq!(
@@ -377,6 +392,20 @@ fn refusal_message_item(id: &str) -> Value {
                 "logprobs": [{"token": "See", "bytes": [83, 101, 101], "logprob": -0.1, "top_logprobs": []}]
             }
         ]
+    })
+}
+
+fn mcp_list_tools_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "mcp_list_tools",
+        "server_label": "deepwiki",
+        "tools": [{
+            "name": "search_docs",
+            "input_schema": {"type": "object"},
+            "annotations": {"readOnlyHint": true},
+            "description": "Search docs"
+        }]
     })
 }
 

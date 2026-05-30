@@ -332,7 +332,7 @@ pub struct ConversationItem {
     pub approve: Option<bool>,
     pub reason: Option<String>,
     pub error: Option<String>,
-    pub tools: Vec<Value>,
+    pub tools: Vec<ConversationMcpListTool>,
     pub summary: Vec<Value>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
@@ -341,6 +341,20 @@ pub struct ConversationItem {
     pub pending_safety_checks: Vec<Value>,
     pub acknowledged_safety_checks: Vec<Value>,
     pub content: Vec<ConversationItemContent>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool entry returned by an MCP list-tools conversation item.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ConversationMcpListTool {
+    #[serde(default)]
+    pub input_schema: Value,
+    pub name: String,
+    #[serde(default)]
+    pub annotations: Option<Value>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
@@ -409,7 +423,7 @@ struct WireConversationItem {
     #[serde(default)]
     error: Option<String>,
     #[serde(default)]
-    tools: Vec<Value>,
+    tools: Vec<ConversationMcpListTool>,
     #[serde(default)]
     summary: Option<Value>,
     #[serde(default)]
