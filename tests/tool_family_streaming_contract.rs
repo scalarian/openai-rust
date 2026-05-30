@@ -1,9 +1,10 @@
 use openai_rust::{
     core::metadata::ResponseMetadata,
-    resources::responses::{ResponseItemAction, ResponseStream, ResponseStreamEvent},
+    resources::responses::{
+        ResponseItemAction, ResponseStream, ResponseStreamEvent, ResponseWebSearchAction,
+        ResponseWebSearchActionSourceType,
+    },
 };
-use serde_json::json;
-
 #[test]
 fn tool_family_events_reconcile_with_final_state() {
     let metadata = ResponseMetadata {
@@ -140,9 +141,13 @@ fn tool_family_events_reconcile_with_final_state() {
     assert_eq!(final_response.output[2].code.as_deref(), Some("print(1)"));
     assert!(matches!(
         final_response.output[1].action.as_ref(),
-        Some(ResponseItemAction::Other { action_type, extra })
-            if action_type == "search"
-                && extra.get("query") == Some(&json!("weather"))
-                && extra.get("sources").is_some()
+        Some(ResponseItemAction::WebSearch(ResponseWebSearchAction::Search(action)))
+            if action.query == "weather"
+                && matches!(
+                    action.sources.as_ref().and_then(|sources| sources.first()),
+                    Some(source)
+                        if source.source_type == ResponseWebSearchActionSourceType::Url
+                            && source.url == "https://example.com"
+                )
     ));
 }

@@ -2336,6 +2336,7 @@ pub enum ResponseItemAction {
     Computer(ResponseComputerAction),
     LocalShell(ResponseLocalShellAction),
     Shell(ResponseShellAction),
+    WebSearch(ResponseWebSearchAction),
     Other {
         action_type: String,
         extra: BTreeMap<String, Value>,
@@ -2371,6 +2372,11 @@ impl<'de> Deserialize<'de> for ResponseItemAction {
             "exec" => serde_json::from_value(Value::Object(object))
                 .map(Self::LocalShell)
                 .map_err(serde::de::Error::custom),
+            action_type if is_response_web_search_action_type(action_type) => {
+                serde_json::from_value(Value::Object(object))
+                    .map(Self::WebSearch)
+                    .map_err(serde::de::Error::custom)
+            }
             action_type if is_response_computer_action_type(action_type) => {
                 serde_json::from_value(Value::Object(object))
                     .map(Self::Computer)
@@ -2401,6 +2407,112 @@ fn is_response_computer_action_type(action_type: &str) -> bool {
             | "type"
             | "wait"
     )
+}
+
+fn is_response_web_search_action_type(action_type: &str) -> bool {
+    matches!(action_type, "search" | "open_page" | "find_in_page")
+}
+
+/// Web-search action payloads used by `web_search_call` output items.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseWebSearchAction {
+    Search(ResponseWebSearchSearchAction),
+    OpenPage(ResponseWebSearchOpenPageAction),
+    FindInPage(ResponseWebSearchFindInPageAction),
+    Other {
+        action_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseWebSearchAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(action_type) = object.remove("type").and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        }) else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        let value = Value::Object(object);
+        match action_type.as_str() {
+            "search" => serde_json::from_value(value)
+                .map(Self::Search)
+                .map_err(serde::de::Error::custom),
+            "open_page" => serde_json::from_value(value)
+                .map(Self::OpenPage)
+                .map_err(serde::de::Error::custom),
+            "find_in_page" => serde_json::from_value(value)
+                .map(Self::FindInPage)
+                .map_err(serde::de::Error::custom),
+            _ => match value {
+                Value::Object(object) => Ok(Self::Other {
+                    action_type,
+                    extra: object.into_iter().collect(),
+                }),
+                _ => unreachable!("web-search action helper always receives an object"),
+            },
+        }
+    }
+}
+
+/// Action type `search` - performs web search queries.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseWebSearchSearchAction {
+    #[serde(default)]
+    pub query: String,
+    #[serde(default)]
+    pub queries: Option<Vec<String>>,
+    #[serde(default)]
+    pub sources: Option<Vec<ResponseWebSearchActionSource>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Source used in a web-search action.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseWebSearchActionSource {
+    #[serde(default, rename = "type")]
+    pub source_type: ResponseWebSearchActionSourceType,
+    #[serde(default)]
+    pub url: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+response_string_literal_enum! {
+    /// Web-search action source type.
+    pub enum ResponseWebSearchActionSourceType {
+        Url => "url",
+    }
+}
+
+/// Action type `open_page` - opens a URL from search results.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseWebSearchOpenPageAction {
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Action type `find_in_page` - searches within a loaded page.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseWebSearchFindInPageAction {
+    #[serde(default)]
+    pub pattern: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Execute a shell command on the local shell.
