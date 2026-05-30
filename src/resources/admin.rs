@@ -202,6 +202,93 @@ admin_string_literal_enum! {
     }
 }
 
+admin_string_literal_enum! {
+    /// Bucket width accepted by most organization usage endpoints.
+    pub enum AdminUsageBucketWidth {
+        OneMinute => "1m",
+        OneHour => "1h",
+        OneDay => "1d",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Bucket width accepted by the costs usage endpoint.
+    pub enum AdminUsageCostsBucketWidth {
+        OneDay => "1d",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for audio, embeddings, and moderations usage.
+    pub enum AdminUsageStandardGroupBy {
+        ProjectId => "project_id",
+        UserId => "user_id",
+        ApiKeyId => "api_key_id",
+        Model => "model",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for code-interpreter session and vector-store usage.
+    pub enum AdminUsageProjectGroupBy {
+        ProjectId => "project_id",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for completions usage.
+    pub enum AdminUsageCompletionsGroupBy {
+        ProjectId => "project_id",
+        UserId => "user_id",
+        ApiKeyId => "api_key_id",
+        Model => "model",
+        Batch => "batch",
+        ServiceTier => "service_tier",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for costs usage.
+    pub enum AdminUsageCostsGroupBy {
+        ProjectId => "project_id",
+        LineItem => "line_item",
+        ApiKeyId => "api_key_id",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for file-search-call usage.
+    pub enum AdminUsageFileSearchCallsGroupBy {
+        ProjectId => "project_id",
+        UserId => "user_id",
+        ApiKeyId => "api_key_id",
+        VectorStoreId => "vector_store_id",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for images usage.
+    pub enum AdminUsageImagesGroupBy {
+        ProjectId => "project_id",
+        UserId => "user_id",
+        ApiKeyId => "api_key_id",
+        Model => "model",
+        Size => "size",
+        Source => "source",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Group-by dimensions for web-search-call usage.
+    pub enum AdminUsageWebSearchCallsGroupBy {
+        ProjectId => "project_id",
+        UserId => "user_id",
+        ApiKeyId => "api_key_id",
+        Model => "model",
+        ContextLevel => "context_level",
+    }
+}
+
 /// Query parameters for admin endpoints.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminQueryParams {
@@ -1018,9 +1105,9 @@ impl From<AdminProjectCertificateListParams> for AdminQueryParams {
 pub struct AdminUsageAudioSpeechesParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageStandardGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1049,9 +1136,9 @@ impl From<AdminUsageAudioSpeechesParams> for AdminQueryParams {
 pub struct AdminUsageAudioTranscriptionsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageStandardGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1079,9 +1166,9 @@ impl From<AdminUsageAudioTranscriptionsParams> for AdminQueryParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminUsageCodeInterpreterSessionsParams {
     pub start_time: Option<i64>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageProjectGroupBy>>,
     pub limit: Option<u32>,
     pub page: Option<String>,
     pub project_ids: Option<Vec<String>>,
@@ -1106,9 +1193,9 @@ pub struct AdminUsageCompletionsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
     pub batch: Option<bool>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageCompletionsGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1138,9 +1225,9 @@ impl From<AdminUsageCompletionsParams> for AdminQueryParams {
 pub struct AdminUsageCostsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageCostsBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageCostsGroupBy>>,
     pub limit: Option<u32>,
     pub page: Option<String>,
     pub project_ids: Option<Vec<String>>,
@@ -1165,9 +1252,9 @@ impl From<AdminUsageCostsParams> for AdminQueryParams {
 pub struct AdminUsageEmbeddingsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageStandardGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1196,9 +1283,9 @@ impl From<AdminUsageEmbeddingsParams> for AdminQueryParams {
 pub struct AdminUsageFileSearchCallsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageFileSearchCallsGroupBy>>,
     pub limit: Option<u32>,
     pub page: Option<String>,
     pub project_ids: Option<Vec<String>>,
@@ -1227,9 +1314,9 @@ impl From<AdminUsageFileSearchCallsParams> for AdminQueryParams {
 pub struct AdminUsageImagesParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageImagesGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1262,9 +1349,9 @@ impl From<AdminUsageImagesParams> for AdminQueryParams {
 pub struct AdminUsageModerationsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageStandardGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
@@ -1292,9 +1379,9 @@ impl From<AdminUsageModerationsParams> for AdminQueryParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminUsageVectorStoresParams {
     pub start_time: Option<i64>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageProjectGroupBy>>,
     pub limit: Option<u32>,
     pub page: Option<String>,
     pub project_ids: Option<Vec<String>>,
@@ -1318,10 +1405,10 @@ impl From<AdminUsageVectorStoresParams> for AdminQueryParams {
 pub struct AdminUsageWebSearchCallsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
-    pub bucket_width: Option<String>,
+    pub bucket_width: Option<AdminUsageBucketWidth>,
     pub context_levels: Option<Vec<String>>,
     pub end_time: Option<i64>,
-    pub group_by: Option<Vec<String>>,
+    pub group_by: Option<Vec<AdminUsageWebSearchCallsGroupBy>>,
     pub limit: Option<u32>,
     pub models: Option<Vec<String>>,
     pub page: Option<String>,

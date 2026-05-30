@@ -38,7 +38,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     org.usage()
         .completions(AdminUsageCompletionsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             models: Some(vec![String::from("gpt-5.5"), String::from("gpt-5-mini")]),
             ..Default::default()
         })
@@ -46,8 +46,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     org.usage()
         .costs(AdminUsageCostsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
-            group_by: Some(vec![String::from("project_id"), String::from("line_item")]),
+            bucket_width: Some(AdminUsageCostsBucketWidth::OneDay),
+            group_by: Some(vec![
+                AdminUsageCostsGroupBy::ProjectId,
+                AdminUsageCostsGroupBy::LineItem,
+            ]),
             ..Default::default()
         })
         .unwrap();
@@ -875,7 +878,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .audio_speeches(AdminUsageAudioSpeechesParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -884,7 +887,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .audio_transcriptions(AdminUsageAudioTranscriptionsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -893,7 +896,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .code_interpreter_sessions(AdminUsageCodeInterpreterSessionsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -902,7 +905,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .completions(AdminUsageCompletionsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -911,7 +914,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .embeddings(AdminUsageEmbeddingsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -920,7 +923,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .file_search_calls(AdminUsageFileSearchCallsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -929,7 +932,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .images(AdminUsageImagesParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -938,7 +941,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .moderations(AdminUsageModerationsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -947,7 +950,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .vector_stores(AdminUsageVectorStoresParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -956,7 +959,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
     usage
         .web_search_calls(AdminUsageWebSearchCallsParams {
             start_time: Some(1_717_171_700),
-            bucket_width: Some(String::from("1d")),
+            bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
