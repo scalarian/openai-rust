@@ -10,7 +10,8 @@ use openai_rust::{
         BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
         BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions, BetaThreadCreateParams,
         BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
-        BetaThreadUpdateParams,
+        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunSubmitToolOutputsParams,
+        BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
     },
 };
 use serde_json::json;
@@ -217,7 +218,19 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(
         runs.create_with_query(
             "thread_123",
-            json!({"assistant_id": "asst_123"}),
+            BetaThreadRunCreateParams {
+                assistant_id: String::from("asst_123"),
+                additional_instructions: Some(String::from("Use the support playbook.")),
+                additional_messages: Some(vec![json!({
+                    "role": "user",
+                    "content": "Any update?"
+                })]),
+                max_completion_tokens: Some(256),
+                parallel_tool_calls: Some(true),
+                reasoning_effort: Some(String::from("low")),
+                tools: Some(vec![json!({"type": "code_interpreter"})]),
+                ..Default::default()
+            },
             BetaQueryParams::new().push_array("include", ["run_details"])
         )
         .unwrap()
@@ -232,7 +245,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         runs.update(
             "thread_123",
             "run_123",
-            json!({"metadata": {"owner": "support"}})
+            BetaThreadRunUpdateParams {
+                metadata: Some(json!({"owner": "support"})),
+            },
         )
         .unwrap()
         .output["id"],
@@ -241,10 +256,12 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(
         runs.list(
             "thread_123",
-            BetaQueryParams::new()
-                .push("after", "run_after")
-                .push("limit", 4)
-                .push("order", "asc")
+            BetaThreadRunListParams {
+                after: Some(String::from("run_after")),
+                before: Some(String::from("run_before")),
+                limit: Some(4),
+                order: Some(String::from("asc")),
+            }
         )
         .unwrap()
         .output["data"][0]["id"],
@@ -258,7 +275,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         runs.submit_tool_outputs(
             "thread_123",
             "run_123",
-            json!({"tool_outputs": [{"tool_call_id": "call_123", "output": "done"}]})
+            BetaThreadRunSubmitToolOutputsParams {
+                tool_outputs: vec![BetaThreadRunToolOutput {
+                    tool_call_id: Some(String::from("call_123")),
+                    output: Some(String::from("done")),
+                }],
+                stream: None,
+            },
         )
         .unwrap()
         .output["id"],
@@ -333,7 +356,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(requests[18].path, "/v1/threads/thread_123/runs/run_123");
     assert_eq!(
         requests[19].path,
-        "/v1/threads/thread_123/runs?after=run_after&limit=4&order=asc"
+        "/v1/threads/thread_123/runs?after=run_after&before=run_before&limit=4&order=asc"
     );
     assert_eq!(
         requests[20].path,
@@ -391,6 +414,11 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(message_update_body["metadata"]["seen"], json!("true"));
     let run_body: serde_json::Value = serde_json::from_slice(&requests[16].body).unwrap();
     assert_eq!(run_body["assistant_id"], json!("asst_123"));
+    assert_eq!(run_body["parallel_tool_calls"], json!(true));
+    assert_eq!(run_body["reasoning_effort"], json!("low"));
+    assert_eq!(run_body["tools"][0]["type"], json!("code_interpreter"));
+    let run_update_body: serde_json::Value = serde_json::from_slice(&requests[18].body).unwrap();
+    assert_eq!(run_update_body["metadata"]["owner"], json!("support"));
     let tool_outputs_body: serde_json::Value = serde_json::from_slice(&requests[21].body).unwrap();
     assert_eq!(
         tool_outputs_body["tool_outputs"][0]["tool_call_id"],

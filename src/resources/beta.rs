@@ -535,13 +535,13 @@ impl BetaThreadRuns {
     pub fn list(
         &self,
         thread_id: &str,
-        params: BetaQueryParams,
+        params: impl Into<BetaQueryParams>,
     ) -> Result<ApiResponse<Value>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_get_query(
             &self.runtime,
             format!("/threads/{thread_id}/runs"),
-            params.into_pairs(),
+            params.into().into_pairs(),
         )
     }
 
@@ -627,6 +627,77 @@ impl BetaThreadRuns {
             thread::sleep(sleep_interval);
         }
     }
+}
+
+/// Deprecated beta thread run creation parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaThreadRunCreateParams {
+    pub assistant_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_messages: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_completion_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_prompt_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncation_strategy: Option<Value>,
+}
+
+/// Deprecated beta thread run update parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaThreadRunUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+/// Deprecated beta thread run list parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaThreadRunListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+/// Deprecated beta run tool output payload.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct BetaThreadRunToolOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+/// Deprecated beta submit-tool-outputs parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct BetaThreadRunSubmitToolOutputsParams {
+    pub tool_outputs: Vec<BetaThreadRunToolOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
 }
 
 /// Deprecated beta run step endpoints.
@@ -769,6 +840,16 @@ impl From<BetaThreadMessageListParams> for BetaQueryParams {
             .push_opt("limit", value.limit)
             .push_opt("order", value.order)
             .push_opt("run_id", value.run_id)
+    }
+}
+
+impl From<BetaThreadRunListParams> for BetaQueryParams {
+    fn from(value: BetaThreadRunListParams) -> Self {
+        Self::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
     }
 }
 
