@@ -1,6 +1,8 @@
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::responses::{ResponseComputerAction, ResponseItemOutput},
+    resources::responses::{
+        ResponseComputerAction, ResponseItemOutput, ResponseShellOutputOutcome,
+    },
 };
 use serde_json::{Value, json};
 
@@ -212,6 +214,8 @@ fn typed_known_fields_are_not_lost() {
             mcp_list_tools_item("mcp_tools_1"),
             computer_call_item("computer_1"),
             computer_call_output_item("computer_output_1"),
+            custom_tool_call_output_item("custom_output_1"),
+            shell_call_output_item("shell_output_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -341,6 +345,30 @@ fn typed_known_fields_are_not_lost() {
         computer_output.output.as_ref(),
         Some(ResponseItemOutput::ComputerScreenshot(screenshot))
             if screenshot.image_url.as_deref() == Some("data:image/png;base64,AA==")
+    ));
+
+    let custom_output = &listed.output().data[5];
+    assert_eq!(custom_output.item_type, "custom_tool_call_output");
+    assert!(matches!(
+        custom_output.output.as_ref(),
+        Some(ResponseItemOutput::ContentList(parts))
+            if parts.len() == 1
+                && parts[0].content_type == "input_text"
+                && parts[0].text.as_deref() == Some("custom payload")
+    ));
+
+    let shell_output = &listed.output().data[6];
+    assert_eq!(shell_output.item_type, "shell_call_output");
+    assert_eq!(shell_output.max_output_length, Some(4096));
+    assert!(matches!(
+        shell_output.output.as_ref(),
+        Some(ResponseItemOutput::Shell(outputs))
+            if outputs.len() == 1
+                && outputs[0].stdout == "ok\n"
+                && matches!(
+                    &outputs[0].outcome,
+                    ResponseShellOutputOutcome::Exit(outcome) if outcome.exit_code == 0
+                )
     ));
 
     let retrieved_function_call = retrieved.output();
@@ -492,6 +520,31 @@ fn computer_call_output_item(id: &str) -> Value {
             "id": "safety_ack_1",
             "code": "unsafe_browser",
             "message": "Acknowledged"
+        }]
+    })
+}
+
+fn custom_tool_call_output_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "custom_tool_call_output",
+        "call_id": "call_custom",
+        "status": "completed",
+        "output": [{"type": "input_text", "text": "custom payload"}]
+    })
+}
+
+fn shell_call_output_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "shell_call_output",
+        "call_id": "call_shell",
+        "status": "completed",
+        "max_output_length": 4096,
+        "output": [{
+            "stdout": "ok\n",
+            "stderr": "",
+            "outcome": {"type": "exit", "exit_code": 0}
         }]
     })
 }

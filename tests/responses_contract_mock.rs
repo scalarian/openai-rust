@@ -5,7 +5,8 @@ use openai_rust::{
     resources::responses::{
         ResponseCodeInterpreterTool, ResponseComputerAction, ResponseConversation,
         ResponseConversationObject, ResponseFormatTextConfig, ResponseItemOutput, ResponsePrompt,
-        ResponseReasoning, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+        ResponseReasoning, ResponseShellOutputOutcome, ResponseTool, ResponseToolChoice,
+        ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -541,6 +542,40 @@ fn tool_and_refusal_fields_round_trip() {
             Some(ResponseItemOutput::Text(String::from("sunny")))
         );
 
+        let custom_output = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "custom_tool_call_output")
+            .expect("custom_tool_call_output item");
+        assert!(matches!(
+            custom_output.output.as_ref(),
+            Some(ResponseItemOutput::ContentList(parts))
+                if parts.len() == 2
+                    && parts[0].content_type == "input_text"
+                    && parts[0].text.as_deref() == Some("custom payload")
+                    && parts[1].content_type == "input_file"
+                    && parts[1].filename.as_deref() == Some("result.txt")
+        ));
+
+        let shell_output = response
+            .output
+            .iter()
+            .find(|item| item.item_type == "shell_call_output")
+            .expect("shell_call_output item");
+        assert_eq!(shell_output.max_output_length, Some(4096));
+        assert!(matches!(
+            shell_output.output.as_ref(),
+            Some(ResponseItemOutput::Shell(outputs))
+                if outputs.len() == 1
+                    && outputs[0].stdout == "ok\n"
+                    && outputs[0].stderr.is_empty()
+                    && matches!(
+                        &outputs[0].outcome,
+                        ResponseShellOutputOutcome::Exit(outcome)
+                            if outcome.exit_code == 0
+                    )
+        ));
+
         let image_call = response
             .output
             .iter()
@@ -967,6 +1002,35 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                 "approval_request_id": "approval_123",
                 "output": "sunny",
                 "status": "completed"
+            },
+            {
+                "id": "custom_output_123",
+                "type": "custom_tool_call_output",
+                "call_id": "call_custom",
+                "status": "completed",
+                "created_by": "tool",
+                "output": [
+                    {"type": "input_text", "text": "custom payload"},
+                    {
+                        "type": "input_file",
+                        "filename": "result.txt",
+                        "file_data": "Zm9v"
+                    }
+                ]
+            },
+            {
+                "id": "shell_output_123",
+                "type": "shell_call_output",
+                "call_id": "call_shell",
+                "status": "completed",
+                "created_by": "tool",
+                "max_output_length": 4096,
+                "output": [{
+                    "stdout": "ok\n",
+                    "stderr": "",
+                    "created_by": "runner",
+                    "outcome": {"type": "exit", "exit_code": 0}
+                }]
             },
             {
                 "id": "tool_search_123",

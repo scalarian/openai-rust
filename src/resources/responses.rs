@@ -1204,6 +1204,8 @@ pub enum ResponseComputerAction {
 pub enum ResponseItemOutput {
     Text(String),
     ComputerScreenshot(ResponseComputerScreenshotOutput),
+    ContentList(Vec<ResponseContentPart>),
+    Shell(Vec<ResponseShellOutput>),
     Json(Value),
 }
 
@@ -1222,9 +1224,37 @@ impl<'de> Deserialize<'de> for ResponseItemOutput {
                     .map(Self::ComputerScreenshot)
                     .map_err(serde::de::Error::custom)
             }
+            Value::Array(items) if response_output_array_is_shell(&items) => {
+                serde_json::from_value(Value::Array(items))
+                    .map(Self::Shell)
+                    .map_err(serde::de::Error::custom)
+            }
+            Value::Array(items) if response_output_array_is_content_list(&items) => {
+                serde_json::from_value(Value::Array(items))
+                    .map(Self::ContentList)
+                    .map_err(serde::de::Error::custom)
+            }
             other => Ok(Self::Json(other)),
         }
     }
+}
+
+fn response_output_array_is_shell(items: &[Value]) -> bool {
+    !items.is_empty()
+        && items.iter().all(|item| {
+            item.get("outcome").is_some()
+                && (item.get("stdout").is_some() || item.get("stderr").is_some())
+        })
+}
+
+fn response_output_array_is_content_list(items: &[Value]) -> bool {
+    !items.is_empty()
+        && items.iter().all(|item| {
+            matches!(
+                item.get("type").and_then(Value::as_str),
+                Some("input_text" | "input_image" | "input_file")
+            )
+        })
 }
 
 /// Computer screenshot output payload.
@@ -1234,6 +1264,81 @@ pub struct ResponseComputerScreenshotOutput {
     pub file_id: Option<String>,
     #[serde(default)]
     pub image_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Captured output emitted by a shell tool call.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseShellOutput {
+    pub outcome: ResponseShellOutputOutcome,
+    pub stderr: String,
+    pub stdout: String,
+    #[serde(default)]
+    pub created_by: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Outcome for one emitted shell output chunk.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseShellOutputOutcome {
+    Exit(ResponseShellExitOutcome),
+    Timeout(ResponseShellTimeoutOutcome),
+    Other {
+        outcome_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Raw(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseShellOutputOutcome {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Ok(Self::Raw(value));
+        };
+        let Some(outcome_type) = object.remove("type").and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        }) else {
+            return Ok(Self::Other {
+                outcome_type: String::from("unknown"),
+                extra: object.into_iter().collect(),
+            });
+        };
+
+        let value = Value::Object(object);
+        match outcome_type.as_str() {
+            "exit" => serde_json::from_value(value)
+                .map(Self::Exit)
+                .map_err(serde::de::Error::custom),
+            "timeout" => serde_json::from_value(value)
+                .map(Self::Timeout)
+                .map_err(serde::de::Error::custom),
+            _ => match value {
+                Value::Object(object) => Ok(Self::Other {
+                    outcome_type,
+                    extra: object.into_iter().collect(),
+                }),
+                _ => unreachable!("shell outcome helper always receives an object"),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseShellExitOutcome {
+    pub exit_code: i64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseShellTimeoutOutcome {
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
