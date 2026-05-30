@@ -66,7 +66,7 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
     let edited = client
         .images()
         .edit(openai_rust::resources::images::ImageEditParams {
-            images: vec![first.clone(), second.clone()],
+            image: vec![first.clone(), second.clone()],
             prompt: String::from("Make it brighter"),
             mask: Some(mask.clone()),
             background: Some(String::from("transparent")),

@@ -216,6 +216,8 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_options: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,

@@ -42,6 +42,7 @@ fn create_populates_output_text_helper() {
             safety_identifier: Some(String::from("user_hash")),
             service_tier: Some(String::from("priority")),
             store: Some(true),
+            stream: Some(false),
             stream_options: Some(json!({"include_usage": true})),
             temperature: Some(0.2),
             top_logprobs: Some(2),

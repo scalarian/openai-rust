@@ -57,6 +57,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             seed: Some(7),
             service_tier: Some(String::from("priority")),
             stop: Some(json!(["END"])),
+            stream: Some(false),
             stream_options: Some(json!({"include_usage": true})),
             temperature: Some(0.3),
             tool_choice: Some(json!("auto")),

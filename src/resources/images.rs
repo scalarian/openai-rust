@@ -220,6 +220,7 @@ impl ImageGenerateParams {
 /// Image edit parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ImageEditParams {
+    pub image: Vec<ImageInput>,
     pub images: Vec<ImageInput>,
     pub prompt: String,
     pub background: Option<String>,
@@ -250,10 +251,11 @@ impl ImageEditParams {
     }
 
     fn into_multipart(
-        self,
+        mut self,
         stream: bool,
     ) -> Result<crate::helpers::multipart::MultipartPayload, OpenAIError> {
-        if self.images.is_empty() {
+        self.image.append(&mut self.images);
+        if self.image.is_empty() {
             return Err(OpenAIError::new(
                 ErrorKind::Validation,
                 "images.edit requires at least one source image",
@@ -261,7 +263,7 @@ impl ImageEditParams {
         }
 
         let mut builder = MultipartBuilder::new();
-        for image in &self.images {
+        for image in &self.image {
             builder.add_file("image", image.to_multipart_file());
         }
         builder.add_text("prompt", self.prompt);

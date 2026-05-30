@@ -591,6 +591,8 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_options: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
@@ -724,6 +726,7 @@ impl ResponseParseParams {
             safety_identifier: self.safety_identifier,
             service_tier: self.service_tier,
             store: self.store,
+            stream: None,
             stream_options: self.stream_options,
             temperature: self.temperature,
             text: self.text,
