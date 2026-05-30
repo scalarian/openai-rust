@@ -262,7 +262,7 @@ pub struct EvalCreateParams {
     pub data_source_config: EvalCreateDataSourceConfig,
     pub testing_criteria: Vec<EvalGrader>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -369,7 +369,7 @@ pub enum EvalGrader {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct EvalUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -425,7 +425,7 @@ pub struct Eval {
     pub created_at: u64,
     pub data_source_config: EvalDataSourceConfig,
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -477,7 +477,7 @@ pub struct EvalDeleteResponse {
 pub struct EvalRunCreateParams {
     pub data_source: EvalRunDataSource,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -772,7 +772,7 @@ pub struct EvalRun {
     #[serde(default)]
     pub eval_id: String,
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]

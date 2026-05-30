@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
     resources::evals::{
@@ -37,7 +39,10 @@ fn live_eval_run_smoke_proves_create_cancel_and_status_request_ids() {
                 operation: String::from("eq"),
                 reference: String::from("{{item.expected}}"),
             }],
-            metadata: Some(json!({"suite": "live-eval-run-smoke"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("live-eval-run-smoke"),
+            )])),
             name: Some(String::from("live eval run smoke")),
         })
         .expect("live eval create should succeed");
@@ -57,7 +62,10 @@ fn live_eval_run_smoke_proves_create_cancel_and_status_request_ids() {
                         }],
                     },
                 },
-                metadata: Some(json!({"suite": "live-eval-run-smoke"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("suite"),
+                    String::from("live-eval-run-smoke"),
+                )])),
                 name: Some(String::from("live eval run smoke run")),
             },
         )

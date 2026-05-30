@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use openai_rust::{DEFAULT_BASE_URL, OpenAI};
 
 #[test]
@@ -29,7 +31,10 @@ fn live_evals_crud_smoke_captures_request_ids() {
                 operation: String::from("eq"),
                 reference: String::from("{{item.expected}}"),
             }],
-            metadata: Some(serde_json::json!({"suite": "live-evals-smoke"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("live-evals-smoke"),
+            )])),
             name: Some(String::from("live evals smoke")),
         })
         .expect("live eval create should succeed");
@@ -44,9 +49,10 @@ fn live_evals_crud_smoke_captures_request_ids() {
         .update(
             &eval_id,
             openai_rust::resources::evals::EvalUpdateParams {
-                metadata: Some(
-                    serde_json::json!({"suite": "live-evals-smoke", "phase": "updated"}),
-                ),
+                metadata: Some(BTreeMap::from([
+                    (String::from("suite"), String::from("live-evals-smoke")),
+                    (String::from("phase"), String::from("updated")),
+                ])),
                 name: Some(String::from("live evals smoke updated")),
             },
         )

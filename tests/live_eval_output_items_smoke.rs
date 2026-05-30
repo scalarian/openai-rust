@@ -1,4 +1,4 @@
-use std::{thread, time::Duration};
+use std::{collections::BTreeMap, thread, time::Duration};
 
 use openai_rust::{
     DEFAULT_BASE_URL, OpenAI,
@@ -39,7 +39,10 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
                 operation: String::from("eq"),
                 reference: String::from("{{item.expected}}"),
             }],
-            metadata: Some(json!({"suite": "live-eval-output-items-smoke"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("live-eval-output-items-smoke"),
+            )])),
             name: Some(String::from("live eval output items smoke")),
         })
         .expect("live eval create should succeed");
@@ -59,7 +62,10 @@ fn live_eval_output_items_smoke_proves_item_listing_and_inspection() {
                         }],
                     },
                 },
-                metadata: Some(json!({"suite": "live-eval-output-items-smoke"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("suite"),
+                    String::from("live-eval-output-items-smoke"),
+                )])),
                 name: Some(String::from("live eval output items smoke run")),
             },
         )

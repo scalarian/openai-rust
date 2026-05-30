@@ -9,6 +9,7 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[test]
 fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts() {
@@ -102,7 +103,10 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
                     sampling_params: Some(json!({"temperature": 0.1})),
                 },
             ],
-            metadata: Some(json!({"suite": "advanced-platform"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("advanced-platform"),
+            )])),
             name: Some(String::from("Custom eval")),
         })
         .unwrap();
@@ -134,7 +138,10 @@ fn evals_crud_preserves_schema_bearing_datasource_and_testing_criteria_contracts
         .update(
             "eval_sc",
             EvalUpdateParams {
-                metadata: Some(json!({"source": "archive", "env": "prod"})),
+                metadata: Some(BTreeMap::from([
+                    (String::from("source"), String::from("archive")),
+                    (String::from("env"), String::from("prod")),
+                ])),
                 name: Some(String::from("Stored completions")),
             },
         )

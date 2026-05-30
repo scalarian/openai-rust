@@ -9,6 +9,7 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[test]
 fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
@@ -62,7 +63,10 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
                     tools: Some(json!([{"type": "function", "name": "grade"}])),
                 }),
             },
-            metadata: Some(json!({"suite": "advanced-platform"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("advanced-platform"),
+            )])),
             name: Some(String::from("responses run")),
         },
     ).unwrap();
