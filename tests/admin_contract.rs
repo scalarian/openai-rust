@@ -176,6 +176,14 @@ fn organization_group_role_create_json(group_id: &str, role_id: &str) -> Value {
     })
 }
 
+fn organization_user_role_create_json(user_id: &str, role_id: &str) -> Value {
+    json!({
+        "object": "user.role",
+        "role": organization_role_json(role_id),
+        "user": organization_user_json(user_id)
+    })
+}
+
 fn organization_role_assignment_json(id: &str) -> Value {
     json!({
         "id": id,
@@ -263,6 +271,8 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     responses.extend(
         (4..23).map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string())),
     );
+    responses[6] =
+        json_response(organization_user_role_create_json("user_admin", "role_viewer").to_string());
     responses[17] = json_response(project_api_key_json("key_project").to_string());
     responses[19] = json_response(
         json!({
@@ -600,6 +610,14 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .to_string(),
     );
     responses[4] = json_response(organization_user_json("user_admin").to_string());
+    responses[5] = json_response(
+        json!({
+            "data": [organization_role_assignment_json("role_viewer")],
+            "has_more": true,
+            "next": "role_viewer"
+        })
+        .to_string(),
+    );
     responses[6] = json_response(organization_group_json("grp_eng").to_string());
     responses[7] = json_response(organization_group_update_json("grp_eng").to_string());
     responses[8] = json_response(
@@ -716,7 +734,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         updated_user.output.technical_level.as_deref(),
         Some("advanced")
     );
-    org.users()
+    let user_roles = org
+        .users()
         .roles()
         .list(
             "user_admin",
@@ -727,6 +746,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(user_roles.output.data[0].id, "role_viewer");
+    assert_eq!(user_roles.output.next_after(), Some("role_viewer"));
 
     let group = org
         .groups()
@@ -1617,6 +1638,85 @@ fn admin_role_retrieve_list_and_delete_return_typed_responses() {
     assert_eq!(requests[1].path, "/v1/organization/roles?limit=2&order=asc");
     assert_eq!(requests[2].method, "DELETE");
     assert_eq!(requests[2].path, "/v1/organization/roles/role_audit");
+}
+
+#[test]
+fn admin_user_role_create_retrieve_list_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_user_role_create_json("user_admin", "role_viewer").to_string()),
+        json_response(organization_role_assignment_json("role_viewer").to_string()),
+        json_response(
+            json!({
+                "data": [organization_role_assignment_json("role_viewer")],
+                "has_more": true,
+                "next": "role_viewer"
+            })
+            .to_string(),
+        ),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "user.role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let user_roles = client.admin().organization().users().roles();
+
+    let created = user_roles
+        .create(
+            "user_admin",
+            AdminUserRoleCreateParams {
+                role_id: String::from("role_viewer"),
+            },
+        )
+        .unwrap();
+    assert_eq!(created.output.object, AdminUserRoleObject::UserRole);
+    assert_eq!(created.output.user.id, "user_admin");
+    assert_eq!(created.output.role.object, AdminRoleObject::Role);
+
+    let role = user_roles.retrieve("user_admin", "role_viewer").unwrap();
+    assert_eq!(role.output.name, "audit_reader");
+    assert_eq!(
+        role.output.assignment_sources.as_ref().unwrap()[0].principal_type,
+        "group"
+    );
+
+    let roles = user_roles
+        .list(
+            "user_admin",
+            AdminUserRoleListParams {
+                limit: Some(2),
+                order: Some(ListOrder::Asc),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(roles.output.data[0].resource_type, "api.organization");
+    assert_eq!(roles.output.next_after(), Some("role_viewer"));
+
+    let deleted = user_roles.delete("user_admin", "role_viewer").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, "user.role.deleted");
+
+    let requests = server.captured_requests(4).unwrap();
+    assert_eq!(requests[0].method, "POST");
+    assert_eq!(requests[0].path, "/v1/organization/users/user_admin/roles");
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/users/user_admin/roles/role_viewer"
+    );
+    assert_eq!(
+        requests[2].path,
+        "/v1/organization/users/user_admin/roles?limit=2&order=asc"
+    );
+    assert_eq!(requests[3].method, "DELETE");
+    assert_eq!(
+        requests[3].path,
+        "/v1/organization/users/user_admin/roles/role_viewer"
+    );
 }
 
 #[test]

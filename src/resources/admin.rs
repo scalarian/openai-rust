@@ -368,6 +368,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization user-role assignment object type.
+    pub enum AdminUserRoleObject {
+        UserRole => "user.role",
+    }
+}
+
+admin_string_literal_enum! {
     /// Include fields accepted by organization certificate retrieve.
     pub enum AdminCertificateInclude {
         Content => "content",
@@ -1105,6 +1112,16 @@ pub struct AdminUserRoleCreateParams {
     pub role_id: String,
 }
 
+/// Role assignment linking a user to a role.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminUserRoleCreateResponse {
+    pub object: AdminUserRoleObject,
+    pub role: AdminRole,
+    pub user: AdminOrganizationUser,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Organization user-role list query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminUserRoleListParams {
@@ -1121,6 +1138,9 @@ impl From<AdminUserRoleListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+pub type AdminUserRoleRetrieveResponse = AdminRoleAssignment;
+pub type AdminUserRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
 
 /// Organization group creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -2656,12 +2676,13 @@ impl OrganizationUserRoles {
         &self,
         user_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUserRoleCreateResponse>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/users/{user_id}/roles"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -2669,12 +2690,13 @@ impl OrganizationUserRoles {
         &self,
         user_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUserRoleRetrieveResponse>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
         let role_id = path_id("role_id", role_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/users/{user_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -2682,12 +2704,12 @@ impl OrganizationUserRoles {
         &self,
         user_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUserRoleListResponse>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/users/{user_id}/roles"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(format!("/organization/users/{user_id}/roles"), params),
+            RequestOptions::default(),
         )
     }
 
@@ -2695,12 +2717,13 @@ impl OrganizationUserRoles {
         &self,
         user_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminRoleAssignmentDeleteResponse>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
         let role_id = path_id("role_id", role_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/users/{user_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 }
