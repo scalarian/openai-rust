@@ -11,6 +11,7 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[test]
 fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
@@ -44,7 +45,10 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
                     ..Default::default()
                 },
             }]),
-            metadata: Some(json!({"suite": "fine-tuning"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("suite"),
+                String::from("fine-tuning"),
+            )])),
             ..Default::default()
         })
         .unwrap();

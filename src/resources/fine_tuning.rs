@@ -347,7 +347,7 @@ pub struct FineTuningJobCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrations: Option<Vec<FineTuningJobIntegration>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<FineTuningMethod>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -652,7 +652,7 @@ pub struct FineTuningJob {
     #[serde(default)]
     pub integrations: Option<Vec<FineTuningJobIntegration>>,
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub method: Option<FineTuningMethod>,
     #[serde(flatten)]
