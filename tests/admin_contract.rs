@@ -307,7 +307,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
                 lte: Some(200),
                 ..Default::default()
             }),
-            event_types: Some(vec![String::from("project.created")]),
+            event_types: Some(vec![AdminAuditLogEventType::ProjectCreated]),
             limit: Some(5),
             project_ids: Some(vec![String::from("proj_1")]),
             resource_ids: Some(vec![String::from("res_1")]),
@@ -451,7 +451,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .retrieve(
             "cert_org",
             AdminCertificateRetrieveParams {
-                include: Some(vec![String::from("content")]),
+                include: Some(vec![AdminCertificateInclude::Content]),
             },
         )
         .unwrap();

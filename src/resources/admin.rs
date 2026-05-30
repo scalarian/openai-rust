@@ -203,6 +203,70 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Include fields accepted by organization certificate retrieve.
+    pub enum AdminCertificateInclude {
+        Content => "content",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Audit-log event type filter.
+    pub enum AdminAuditLogEventType {
+        ApiKeyCreated => "api_key.created",
+        ApiKeyUpdated => "api_key.updated",
+        ApiKeyDeleted => "api_key.deleted",
+        CertificateCreated => "certificate.created",
+        CertificateUpdated => "certificate.updated",
+        CertificateDeleted => "certificate.deleted",
+        CertificatesActivated => "certificates.activated",
+        CertificatesDeactivated => "certificates.deactivated",
+        CheckpointPermissionCreated => "checkpoint.permission.created",
+        CheckpointPermissionDeleted => "checkpoint.permission.deleted",
+        ExternalKeyRegistered => "external_key.registered",
+        ExternalKeyRemoved => "external_key.removed",
+        GroupCreated => "group.created",
+        GroupUpdated => "group.updated",
+        GroupDeleted => "group.deleted",
+        InviteSent => "invite.sent",
+        InviteAccepted => "invite.accepted",
+        InviteDeleted => "invite.deleted",
+        IpAllowlistCreated => "ip_allowlist.created",
+        IpAllowlistUpdated => "ip_allowlist.updated",
+        IpAllowlistDeleted => "ip_allowlist.deleted",
+        IpAllowlistConfigActivated => "ip_allowlist.config.activated",
+        IpAllowlistConfigDeactivated => "ip_allowlist.config.deactivated",
+        LoginSucceeded => "login.succeeded",
+        LoginFailed => "login.failed",
+        LogoutSucceeded => "logout.succeeded",
+        LogoutFailed => "logout.failed",
+        OrganizationUpdated => "organization.updated",
+        ProjectCreated => "project.created",
+        ProjectUpdated => "project.updated",
+        ProjectArchived => "project.archived",
+        ProjectDeleted => "project.deleted",
+        RateLimitUpdated => "rate_limit.updated",
+        RateLimitDeleted => "rate_limit.deleted",
+        ResourceDeleted => "resource.deleted",
+        TunnelCreated => "tunnel.created",
+        TunnelUpdated => "tunnel.updated",
+        TunnelDeleted => "tunnel.deleted",
+        RoleCreated => "role.created",
+        RoleUpdated => "role.updated",
+        RoleDeleted => "role.deleted",
+        RoleAssignmentCreated => "role.assignment.created",
+        RoleAssignmentDeleted => "role.assignment.deleted",
+        ScimEnabled => "scim.enabled",
+        ScimDisabled => "scim.disabled",
+        ServiceAccountCreated => "service_account.created",
+        ServiceAccountUpdated => "service_account.updated",
+        ServiceAccountDeleted => "service_account.deleted",
+        UserAdded => "user.added",
+        UserUpdated => "user.updated",
+        UserDeleted => "user.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Bucket width accepted by most organization usage endpoints.
     pub enum AdminUsageBucketWidth {
         OneMinute => "1m",
@@ -415,7 +479,7 @@ pub struct AdminAuditLogListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub effective_at: Option<AdminAuditLogEffectiveAtParams>,
-    pub event_types: Option<Vec<String>>,
+    pub event_types: Option<Vec<AdminAuditLogEventType>>,
     pub limit: Option<u32>,
     pub project_ids: Option<Vec<String>>,
     pub resource_ids: Option<Vec<String>>,
@@ -685,7 +749,7 @@ pub struct AdminCertificateIdsParams {
 /// Organization certificate retrieve query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminCertificateRetrieveParams {
-    pub include: Option<Vec<String>>,
+    pub include: Option<Vec<AdminCertificateInclude>>,
 }
 
 impl From<AdminCertificateRetrieveParams> for AdminQueryParams {
