@@ -220,28 +220,36 @@ impl OrganizationUsage {
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("audio_speeches", params)
+        get_query(&self.runtime, "/organization/usage/audio_speeches", params)
     }
 
     pub fn audio_transcriptions(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("audio_transcriptions", params)
+        get_query(
+            &self.runtime,
+            "/organization/usage/audio_transcriptions",
+            params,
+        )
     }
 
     pub fn code_interpreter_sessions(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("code_interpreter_sessions", params)
+        get_query(
+            &self.runtime,
+            "/organization/usage/code_interpreter_sessions",
+            params,
+        )
     }
 
     pub fn completions(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("completions", params)
+        get_query(&self.runtime, "/organization/usage/completions", params)
     }
 
     pub fn costs(
@@ -255,50 +263,50 @@ impl OrganizationUsage {
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("embeddings", params)
+        get_query(&self.runtime, "/organization/usage/embeddings", params)
     }
 
     pub fn file_search_calls(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("file_search_calls", params)
+        get_query(
+            &self.runtime,
+            "/organization/usage/file_search_calls",
+            params,
+        )
     }
 
     pub fn images(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("images", params)
+        get_query(&self.runtime, "/organization/usage/images", params)
     }
 
     pub fn moderations(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("moderations", params)
+        get_query(&self.runtime, "/organization/usage/moderations", params)
     }
 
     pub fn vector_stores(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("vector_stores", params)
+        get_query(&self.runtime, "/organization/usage/vector_stores", params)
     }
 
     pub fn web_search_calls(
         &self,
         params: impl Into<AdminQueryParams>,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        self.usage("web_search_calls", params)
-    }
-
-    fn usage(
-        &self,
-        name: &str,
-        params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, format!("/organization/usage/{name}"), params)
+        get_query(
+            &self.runtime,
+            "/organization/usage/web_search_calls",
+            params,
+        )
     }
 }
 

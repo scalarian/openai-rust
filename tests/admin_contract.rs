@@ -227,6 +227,56 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     assert!(matches!(blank_project.kind, ErrorKind::Validation));
 }
 
+#[test]
+fn admin_organization_usage_categories_match_upstream_paths() {
+    let server = mock_http::MockHttpServer::spawn_sequence(
+        (0..10)
+            .map(|index| json_response(json!({"id": format!("usage_{index}")}).to_string()))
+            .collect(),
+    )
+    .unwrap();
+    let client = client(&server.url());
+    let usage = client.admin().organization().usage();
+    let params = AdminQueryParams::new()
+        .push("start_time", 1_717_171_700)
+        .push("bucket_width", "1d")
+        .push("page", "cursor_123")
+        .push("limit", 1);
+
+    usage.audio_speeches(params.clone()).unwrap();
+    usage.audio_transcriptions(params.clone()).unwrap();
+    usage.code_interpreter_sessions(params.clone()).unwrap();
+    usage.completions(params.clone()).unwrap();
+    usage.embeddings(params.clone()).unwrap();
+    usage.file_search_calls(params.clone()).unwrap();
+    usage.images(params.clone()).unwrap();
+    usage.moderations(params.clone()).unwrap();
+    usage.vector_stores(params.clone()).unwrap();
+    usage.web_search_calls(params).unwrap();
+
+    let requests = server.captured_requests(10).unwrap();
+    let paths = requests
+        .iter()
+        .map(|request| request.path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        paths,
+        vec![
+            "/v1/organization/usage/audio_speeches?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/audio_transcriptions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/code_interpreter_sessions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/completions?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/embeddings?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/file_search_calls?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/images?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/moderations?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/vector_stores?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+            "/v1/organization/usage/web_search_calls?start_time=1717171700&bucket_width=1d&page=cursor_123&limit=1",
+        ]
+    );
+    assert!(requests.iter().all(|request| request.method == "GET"));
+}
+
 fn client(base_url: &str) -> OpenAI {
     OpenAI::builder()
         .api_key("sk-test")
