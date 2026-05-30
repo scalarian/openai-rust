@@ -51,7 +51,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .list("grp_eng", AdminQueryParams::new().push("limit", 100))
         .unwrap();
     org.certificates()
-        .activate("cert_org", json!({"activated": true}))
+        .activate(json!({"certificate_ids": ["cert_org"]}))
         .unwrap();
 
     let projects = org.projects();
@@ -135,10 +135,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         requests[6].path,
         "/v1/organization/groups/grp_eng/users?limit=100"
     );
-    assert_eq!(
-        requests[7].path,
-        "/v1/organization/certificates/cert_org/activate"
-    );
+    assert_eq!(requests[7].path, "/v1/organization/certificates/activate");
     assert_eq!(requests[8].path, "/v1/organization/projects");
     assert_eq!(requests[9].path, "/v1/organization/projects/proj_research");
     assert_eq!(
@@ -184,6 +181,8 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
 
     let key_body: AdminValue = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(key_body["name"], json!("ops-key"));
+    let certificate_body: AdminValue = serde_json::from_slice(&requests[7].body).unwrap();
+    assert_eq!(certificate_body["certificate_ids"], json!(["cert_org"]));
     let project_user_body: AdminValue = serde_json::from_slice(&requests[12].body).unwrap();
     assert_eq!(project_user_body["role"], json!("owner"));
     let rate_limit_body: AdminValue = serde_json::from_slice(&requests[15].body).unwrap();

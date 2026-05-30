@@ -795,26 +795,18 @@ impl OrganizationCertificates {
 
     pub fn activate<B: Serialize>(
         &self,
-        certificate_id: &str,
         params: B,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        let certificate_id = path_id("certificate_id", certificate_id)?;
-        post_body(
-            &self.runtime,
-            format!("/organization/certificates/{certificate_id}/activate"),
-            params,
-        )
+        post_body(&self.runtime, "/organization/certificates/activate", params)
     }
 
     pub fn deactivate<B: Serialize>(
         &self,
-        certificate_id: &str,
         params: B,
     ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        let certificate_id = path_id("certificate_id", certificate_id)?;
         post_body(
             &self.runtime,
-            format!("/organization/certificates/{certificate_id}/deactivate"),
+            "/organization/certificates/deactivate",
             params,
         )
     }
