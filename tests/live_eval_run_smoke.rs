@@ -87,6 +87,7 @@ fn live_eval_run_smoke_proves_create_cancel_and_status_request_ids() {
                 after: None,
                 limit: Some(20),
                 order: Some(openai_rust::resources::evals::EvalOrderDirection::Desc),
+                status: None,
             },
         )
         .expect("live eval run list should succeed");

@@ -35,6 +35,12 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
             validation_file: Some(String::from("file-valid")),
             suffix: Some(String::from("weather-mini")),
             seed: Some(7),
+            integrations: Some(json!([{
+                "type": "wandb",
+                "wandb": {
+                    "project": "weather"
+                }
+            }])),
             metadata: Some(json!({"suite": "fine-tuning"})),
             ..Default::default()
         })
@@ -161,6 +167,11 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
     assert_eq!(create_body["validation_file"], json!("file-valid"));
     assert_eq!(create_body["suffix"], json!("weather-mini"));
     assert_eq!(create_body["seed"], json!(7));
+    assert_eq!(create_body["integrations"][0]["type"], json!("wandb"));
+    assert_eq!(
+        create_body["integrations"][0]["wandb"]["project"],
+        json!("weather")
+    );
     assert_eq!(create_body["metadata"]["suite"], json!("fine-tuning"));
 
     let permission_create_body: serde_json::Value =

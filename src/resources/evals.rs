@@ -155,6 +155,9 @@ impl EvalRuns {
         if let Some(order) = params.order {
             serializer.append_pair("order", order.as_str());
         }
+        if let Some(status) = params.status {
+            serializer.append_pair("status", status.as_str());
+        }
         let query = serializer.finish();
         let path = if query.is_empty() {
             format!("/evals/{eval_id}/runs")
@@ -794,6 +797,7 @@ pub struct EvalRunListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
     pub order: Option<EvalOrderDirection>,
+    pub status: Option<EvalRunStatus>,
 }
 
 /// Cursor page of eval runs.

@@ -113,6 +113,7 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
                 after: Some(String::from("run_000")),
                 limit: Some(3),
                 order: Some(openai_rust::resources::evals::EvalOrderDirection::Desc),
+                status: Some(EvalRunStatus::Queued),
             },
         )
         .unwrap();
@@ -155,7 +156,7 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
     assert_eq!(requests[1].path, "/v1/evals/eval_123/runs/run_comp");
     assert_eq!(
         requests[2].path,
-        "/v1/evals/eval_123/runs?after=run_000&limit=3&order=desc"
+        "/v1/evals/eval_123/runs?after=run_000&limit=3&order=desc&status=queued"
     );
     assert_eq!(requests[3].path, "/v1/evals/eval_123/runs/run_jsonl");
     assert_eq!(requests[4].path, "/v1/evals/eval_123/runs/run_resp");

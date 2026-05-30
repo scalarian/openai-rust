@@ -345,6 +345,8 @@ pub struct FineTuningJobCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hyperparameters: Option<FineTuningSupervisedHyperparameters>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrations: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method: Option<FineTuningMethod>,
