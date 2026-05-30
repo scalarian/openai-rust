@@ -35,6 +35,7 @@ fn crud_and_path_guards() {
         .base_url(server.url())
         .max_retries(0)
         .build();
+    let conversation_id = "conv_create/tenant a?x=y";
 
     let created = client
         .conversations()
@@ -57,14 +58,14 @@ fn crud_and_path_guards() {
         json!({"topic": "onboarding", "phase": "draft"})
     );
 
-    let retrieved = client.conversations().retrieve("conv_create").unwrap();
+    let retrieved = client.conversations().retrieve(conversation_id).unwrap();
     assert_eq!(retrieved.output().id, "conv_create");
     assert_eq!(retrieved.output().metadata["phase"], "draft");
 
     let updated = client
         .conversations()
         .update(
-            "conv_create",
+            conversation_id,
             openai_rust::resources::conversations::ConversationUpdateParams {
                 metadata: json!({"topic": "onboarding", "phase": "published"}),
                 ..Default::default()
@@ -73,7 +74,7 @@ fn crud_and_path_guards() {
         .unwrap();
     assert_eq!(updated.output().metadata["phase"], "published");
 
-    let deleted = client.conversations().delete("conv_create").unwrap();
+    let deleted = client.conversations().delete(conversation_id).unwrap();
     assert_eq!(deleted.output().id, "conv_create");
     assert_eq!(deleted.output().object, "conversation.deleted");
     assert!(deleted.output().deleted);
@@ -86,10 +87,16 @@ fn crud_and_path_guards() {
     assert_eq!(create_body["items"][0]["content"][0]["text"], "Hello");
 
     assert_eq!(requests[1].method, "GET");
-    assert_eq!(requests[1].path, "/v1/conversations/conv_create");
+    assert_eq!(
+        requests[1].path,
+        "/v1/conversations/conv_create%2Ftenant%20a%3Fx%3Dy"
+    );
 
     assert_eq!(requests[2].method, "POST");
-    assert_eq!(requests[2].path, "/v1/conversations/conv_create");
+    assert_eq!(
+        requests[2].path,
+        "/v1/conversations/conv_create%2Ftenant%20a%3Fx%3Dy"
+    );
     let update_body: Value = serde_json::from_slice(&requests[2].body).unwrap();
     assert_eq!(
         update_body,
@@ -97,7 +104,10 @@ fn crud_and_path_guards() {
     );
 
     assert_eq!(requests[3].method, "DELETE");
-    assert_eq!(requests[3].path, "/v1/conversations/conv_create");
+    assert_eq!(
+        requests[3].path,
+        "/v1/conversations/conv_create%2Ftenant%20a%3Fx%3Dy"
+    );
 
     for invalid in ["", "   "] {
         let retrieve_error = client

@@ -28,12 +28,14 @@ fn routes_and_pagination() {
         .base_url(server.url())
         .max_retries(0)
         .build();
+    let conversation_id = "conv_123/tenant a?x=y";
+    let item_id = "item_1/seed a?x=y";
 
     let created = client
         .conversations()
         .items()
         .create(
-            "conv_123",
+            conversation_id,
             openai_rust::resources::conversations::ConversationItemCreateParams {
                 items: vec![
                     json!({
@@ -45,7 +47,7 @@ fn routes_and_pagination() {
                 ],
                 include: vec![
                     String::from("message.output_text.logprobs"),
-                    String::from("reasoning.encrypted_content"),
+                    String::from("reasoning.encrypted_content/preview?x=y"),
                 ],
                 ..Default::default()
             },
@@ -55,6 +57,11 @@ fn routes_and_pagination() {
     assert_eq!(created.output().data.len(), 2);
     assert_eq!(created.output().data[0].id.as_deref(), Some("item_1"));
     assert_eq!(created.output().data[1].item_type, "reasoning");
+    assert_eq!(created.output().data[1].summary.len(), 1);
+    assert_eq!(
+        created.output().data[1].encrypted_content.as_deref(),
+        Some("encrypted_reasoning")
+    );
     assert!(created.output().has_more);
     assert_eq!(created.output().next_after(), Some("rs_1"));
 
@@ -62,10 +69,10 @@ fn routes_and_pagination() {
         .conversations()
         .items()
         .retrieve(
-            "conv_123",
-            "item_1",
+            conversation_id,
+            item_id,
             openai_rust::resources::conversations::ConversationItemRetrieveParams {
-                include: vec![String::from("message.output_text.logprobs")],
+                include: vec![String::from("message.output_text.logprobs/with space")],
             },
         )
         .unwrap();
@@ -76,10 +83,10 @@ fn routes_and_pagination() {
         .conversations()
         .items()
         .list(
-            "conv_123",
+            conversation_id,
             openai_rust::resources::conversations::ConversationItemListParams {
                 after: Some(String::from("item_1")),
-                include: vec![String::from("message.output_text.logprobs")],
+                include: vec![String::from("message.output_text.logprobs/with space")],
                 limit: Some(2),
                 order: Some(String::from("asc")),
             },
@@ -94,7 +101,7 @@ fn routes_and_pagination() {
     let deleted = client
         .conversations()
         .items()
-        .delete("conv_123", "item_1")
+        .delete(conversation_id, item_id)
         .unwrap();
     assert_eq!(deleted.output().id, "conv_123");
     assert_eq!(deleted.output().object, "conversation");
@@ -104,7 +111,7 @@ fn routes_and_pagination() {
     assert_eq!(requests[0].method, "POST");
     assert_eq!(
         requests[0].path,
-        "/v1/conversations/conv_123/items?include=message.output_text.logprobs&include=reasoning.encrypted_content"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?include=message.output_text.logprobs&include=reasoning.encrypted_content%2Fpreview%3Fx%3Dy"
     );
     let create_body: Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(create_body["items"][0]["content"][0]["text"], "hello");
@@ -113,17 +120,20 @@ fn routes_and_pagination() {
     assert_eq!(requests[1].method, "GET");
     assert_eq!(
         requests[1].path,
-        "/v1/conversations/conv_123/items/item_1?include=message.output_text.logprobs"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items/item_1%2Fseed%20a%3Fx%3Dy?include=message.output_text.logprobs%2Fwith+space"
     );
 
     assert_eq!(requests[2].method, "GET");
     assert_eq!(
         requests[2].path,
-        "/v1/conversations/conv_123/items?after=item_1&include=message.output_text.logprobs&limit=2&order=asc"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?after=item_1&include=message.output_text.logprobs%2Fwith+space&limit=2&order=asc"
     );
 
     assert_eq!(requests[3].method, "DELETE");
-    assert_eq!(requests[3].path, "/v1/conversations/conv_123/items/item_1");
+    assert_eq!(
+        requests[3].path,
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items/item_1%2Fseed%20a%3Fx%3Dy"
+    );
 
     let invalid_create = client
         .conversations()
@@ -227,6 +237,11 @@ fn typed_known_fields_are_not_lost() {
     );
     assert_eq!(function_call.call_id.as_deref(), Some("call_123"));
     assert_eq!(function_call.status.as_deref(), Some("completed"));
+    assert_eq!(function_call.created_by.as_deref(), Some("model"));
+    assert_eq!(
+        function_call.arguments_json.as_ref(),
+        Some(&json!({"city": "Paris"}))
+    );
     assert!(!function_call.extra.contains_key("name"));
     assert!(!function_call.extra.contains_key("arguments"));
     assert!(!function_call.extra.contains_key("call_id"));
@@ -242,6 +257,24 @@ fn typed_known_fields_are_not_lost() {
         Some("I can't help with that")
     );
     assert!(!refusal_part.extra.contains_key("refusal"));
+    let image_part = refusal_message
+        .content
+        .iter()
+        .find(|part| part.content_type == "input_image")
+        .expect("image content");
+    assert_eq!(image_part.detail.as_deref(), Some("high"));
+    assert_eq!(image_part.file_id.as_deref(), Some("file_img"));
+    assert_eq!(
+        image_part.image_url.as_deref(),
+        Some("https://example.com/cat.png")
+    );
+    let output_text = refusal_message
+        .content
+        .iter()
+        .find(|part| part.content_type == "output_text")
+        .expect("output text content");
+    assert_eq!(output_text.annotations.len(), 1);
+    assert_eq!(output_text.logprobs.as_ref().unwrap().len(), 1);
 
     let retrieved_function_call = retrieved.output();
     assert_eq!(
@@ -306,7 +339,8 @@ fn reasoning_item(id: &str) -> Value {
         "id": id,
         "type": "reasoning",
         "status": "completed",
-        "summary": []
+        "summary": [{"type": "summary_text", "text": "Plan"}],
+        "encrypted_content": "encrypted_reasoning"
     })
 }
 
@@ -315,9 +349,10 @@ fn function_call_item(id: &str) -> Value {
         "id": id,
         "type": "function_call",
         "name": "lookup_weather",
-        "arguments": "{\"city\":\"Paris\"}",
+        "arguments": {"city": "Paris"},
         "call_id": "call_123",
-        "status": "completed"
+        "status": "completed",
+        "created_by": "model"
     })
 }
 
@@ -327,7 +362,21 @@ fn refusal_message_item(id: &str) -> Value {
         "type": "message",
         "role": "assistant",
         "status": "completed",
-        "content": [{"type": "refusal", "refusal": "I can't help with that"}]
+        "content": [
+            {"type": "refusal", "refusal": "I can't help with that"},
+            {
+                "type": "input_image",
+                "detail": "high",
+                "file_id": "file_img",
+                "image_url": "https://example.com/cat.png"
+            },
+            {
+                "type": "output_text",
+                "text": "See source",
+                "annotations": [{"type": "url_citation", "url": "https://example.com"}],
+                "logprobs": [{"token": "See", "bytes": [83, 101, 101], "logprob": -0.1, "top_logprobs": []}]
+            }
+        ]
     })
 }
 

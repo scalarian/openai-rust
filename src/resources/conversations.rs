@@ -43,7 +43,7 @@ impl Conversations {
         &self,
         conversation_id: &str,
     ) -> Result<ApiResponse<Conversation>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
         self.runtime.execute_json(
             "GET",
             format!("/conversations/{conversation_id}"),
@@ -57,7 +57,7 @@ impl Conversations {
         conversation_id: &str,
         params: ConversationUpdateParams,
     ) -> Result<ApiResponse<Conversation>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
         self.runtime.execute_json_with_body(
             "POST",
             format!("/conversations/{conversation_id}"),
@@ -71,7 +71,7 @@ impl Conversations {
         &self,
         conversation_id: &str,
     ) -> Result<ApiResponse<ConversationDeletedResource>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
         self.runtime.execute_json(
             "DELETE",
             format!("/conversations/{conversation_id}"),
@@ -97,7 +97,7 @@ impl Items {
         conversation_id: &str,
         params: ConversationItemCreateParams,
     ) -> Result<ApiResponse<ConversationItemList>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
         let path = append_query(
             &format!("/conversations/{conversation_id}/items"),
             params.to_query_pairs(),
@@ -117,8 +117,8 @@ impl Items {
         item_id: &str,
         params: ConversationItemRetrieveParams,
     ) -> Result<ApiResponse<ConversationItem>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
-        let item_id = validate_path_id("item_id", item_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
+        let item_id = encode_path_id(validate_path_id("item_id", item_id)?);
         let path = append_query(
             &format!("/conversations/{conversation_id}/items/{item_id}"),
             params.to_query_pairs(),
@@ -133,7 +133,7 @@ impl Items {
         conversation_id: &str,
         params: ConversationItemListParams,
     ) -> Result<ApiResponse<ConversationItemList>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
         let path = append_query(
             &format!("/conversations/{conversation_id}/items"),
             params.to_query_pairs(),
@@ -148,8 +148,8 @@ impl Items {
         conversation_id: &str,
         item_id: &str,
     ) -> Result<ApiResponse<Conversation>, OpenAIError> {
-        let conversation_id = validate_path_id("conversation_id", conversation_id)?;
-        let item_id = validate_path_id("item_id", item_id)?;
+        let conversation_id = encode_path_id(validate_path_id("conversation_id", conversation_id)?);
+        let item_id = encode_path_id(validate_path_id("item_id", item_id)?);
         self.runtime.execute_json(
             "DELETE",
             format!("/conversations/{conversation_id}/items/{item_id}"),
@@ -303,30 +303,185 @@ impl ConversationItemList {
 }
 
 /// Typed conversation item with forward-compatible extra fields.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ConversationItem {
-    #[serde(default)]
     pub id: Option<String>,
-    #[serde(rename = "type")]
     pub item_type: String,
-    #[serde(default)]
     pub role: Option<String>,
-    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default)]
     pub arguments: Option<String>,
-    #[serde(default)]
+    pub arguments_json: Option<Value>,
     pub input: Option<String>,
-    #[serde(default)]
     pub code: Option<String>,
-    #[serde(default)]
     pub call_id: Option<String>,
-    #[serde(default)]
     pub status: Option<String>,
-    #[serde(default)]
+    pub phase: Option<String>,
+    pub namespace: Option<String>,
+    pub created_by: Option<String>,
+    pub action: Option<Value>,
+    pub actions: Option<Value>,
+    pub operation: Option<Value>,
+    pub environment: Option<Value>,
+    pub execution: Option<String>,
+    pub output: Option<Value>,
+    pub result: Option<String>,
+    pub queries: Vec<String>,
+    pub results: Option<Vec<Value>>,
+    pub server_label: Option<String>,
+    pub approval_request_id: Option<String>,
+    pub approve: Option<bool>,
+    pub reason: Option<String>,
+    pub error: Option<String>,
+    pub tools: Vec<Value>,
+    pub summary: Vec<Value>,
+    pub encrypted_content: Option<String>,
+    pub container_id: Option<String>,
+    pub outputs: Option<Vec<Value>>,
+    pub max_output_length: Option<u64>,
+    pub pending_safety_checks: Vec<Value>,
+    pub acknowledged_safety_checks: Vec<Value>,
     pub content: Vec<ConversationItemContent>,
-    #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl<'de> Deserialize<'de> for ConversationItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = WireConversationItem::deserialize(deserializer)?;
+        Ok(value.into())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+struct WireConversationItem {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(rename = "type")]
+    item_type: String,
+    #[serde(default)]
+    role: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<Value>,
+    #[serde(default)]
+    input: Option<String>,
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    call_id: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    phase: Option<String>,
+    #[serde(default)]
+    namespace: Option<String>,
+    #[serde(default)]
+    created_by: Option<String>,
+    #[serde(default)]
+    action: Option<Value>,
+    #[serde(default)]
+    actions: Option<Value>,
+    #[serde(default)]
+    operation: Option<Value>,
+    #[serde(default)]
+    environment: Option<Value>,
+    #[serde(default)]
+    execution: Option<String>,
+    #[serde(default)]
+    output: Option<Value>,
+    #[serde(default)]
+    result: Option<String>,
+    #[serde(default)]
+    queries: Vec<String>,
+    #[serde(default)]
+    results: Option<Vec<Value>>,
+    #[serde(default)]
+    server_label: Option<String>,
+    #[serde(default)]
+    approval_request_id: Option<String>,
+    #[serde(default)]
+    approve: Option<bool>,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    tools: Vec<Value>,
+    #[serde(default)]
+    summary: Option<Value>,
+    #[serde(default)]
+    encrypted_content: Option<String>,
+    #[serde(default)]
+    container_id: Option<String>,
+    #[serde(default)]
+    outputs: Option<Vec<Value>>,
+    #[serde(default)]
+    max_output_length: Option<u64>,
+    #[serde(default)]
+    pending_safety_checks: Vec<Value>,
+    #[serde(default)]
+    acknowledged_safety_checks: Vec<Value>,
+    #[serde(default)]
+    content: Vec<ConversationItemContent>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, Value>,
+}
+
+impl From<WireConversationItem> for ConversationItem {
+    fn from(value: WireConversationItem) -> Self {
+        let arguments = value.arguments.as_ref().map(argument_value_to_string);
+        let mut extra = value.extra;
+        let summary = match value.summary {
+            Some(Value::Array(summary)) => summary,
+            Some(summary) => {
+                extra.insert(String::from("summary"), summary);
+                Vec::new()
+            }
+            None => Vec::new(),
+        };
+        Self {
+            id: value.id,
+            item_type: value.item_type,
+            role: value.role,
+            name: value.name,
+            arguments,
+            arguments_json: value.arguments,
+            input: value.input,
+            code: value.code,
+            call_id: value.call_id,
+            status: value.status,
+            phase: value.phase,
+            namespace: value.namespace,
+            created_by: value.created_by,
+            action: value.action,
+            actions: value.actions,
+            operation: value.operation,
+            environment: value.environment,
+            execution: value.execution,
+            output: value.output,
+            result: value.result,
+            queries: value.queries,
+            results: value.results,
+            server_label: value.server_label,
+            approval_request_id: value.approval_request_id,
+            approve: value.approve,
+            reason: value.reason,
+            error: value.error,
+            tools: value.tools,
+            summary,
+            encrypted_content: value.encrypted_content,
+            container_id: value.container_id,
+            outputs: value.outputs,
+            max_output_length: value.max_output_length,
+            pending_safety_checks: value.pending_safety_checks,
+            acknowledged_safety_checks: value.acknowledged_safety_checks,
+            content: value.content,
+            extra,
+        }
+    }
 }
 
 /// Typed conversation item content part.
@@ -338,6 +493,24 @@ pub struct ConversationItemContent {
     pub text: Option<String>,
     #[serde(default)]
     pub refusal: Option<String>,
+    #[serde(default)]
+    pub annotations: Vec<Value>,
+    #[serde(default)]
+    pub logprobs: Option<Vec<Value>>,
+    #[serde(default)]
+    pub detail: Option<String>,
+    #[serde(default)]
+    pub file_data: Option<String>,
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub file_url: Option<String>,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default)]
+    pub image_url: Option<String>,
+    #[serde(default)]
+    pub input_audio: Option<Value>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -358,10 +531,45 @@ fn append_query(path: &str, pairs: Vec<(String, String)>) -> String {
         return path.to_string();
     }
 
-    let query = pairs
-        .into_iter()
-        .map(|(key, value)| format!("{key}={value}"))
-        .collect::<Vec<_>>()
-        .join("&");
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+    for (key, value) in pairs {
+        serializer.append_pair(&key, &value);
+    }
+    let query = serializer.finish();
     format!("{path}?{query}")
+}
+
+fn encode_path_id(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if matches!(
+            byte,
+            b'A'..=b'Z'
+                | b'a'..=b'z'
+                | b'0'..=b'9'
+                | b'-'
+                | b'.'
+                | b'_'
+                | b'~'
+        ) {
+            encoded.push(byte as char);
+        } else {
+            write_percent_encoded_byte(&mut encoded, byte);
+        }
+    }
+    encoded
+}
+
+fn write_percent_encoded_byte(output: &mut String, byte: u8) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    output.push('%');
+    output.push(HEX[(byte >> 4) as usize] as char);
+    output.push(HEX[(byte & 0x0F) as usize] as char);
+}
+
+fn argument_value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        value => value.to_string(),
+    }
 }
