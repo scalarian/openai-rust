@@ -8,12 +8,20 @@ use std::{
     time::Duration,
 };
 
+use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::Value;
+use tokio::net::TcpStream;
 use tokio::sync::watch;
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream, connect_async,
+    tungstenite::{Message, client::IntoClientRequest},
+};
+use url::Url;
 
 use crate::{
     OpenAIError,
+    config::normalize_base_url,
     core::{
         metadata::ResponseMetadata,
         request::{PreparedRequest, RequestOptions, ResolvedRequestOptions},
@@ -170,6 +178,238 @@ impl Responses {
             output: response.output.into(),
             metadata: response.metadata,
         })
+    }
+
+    /// Resolves the persistent Responses websocket target without opening a socket.
+    pub fn prepare_ws_target(
+        &self,
+        options: ResponsesConnectOptions,
+    ) -> Result<PreparedResponsesWsTarget, OpenAIError> {
+        prepare_responses_ws_target(&self.runtime, options)
+    }
+
+    /// Connects to the persistent Responses websocket endpoint.
+    pub async fn connect(
+        &self,
+        options: ResponsesConnectOptions,
+    ) -> Result<ResponsesConnection, OpenAIError> {
+        let target = self.prepare_ws_target(options)?;
+        ResponsesConnection::connect(target).await
+    }
+}
+
+/// Websocket connection options for the persistent Responses API.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ResponsesConnectOptions {
+    pub extra_query: Vec<(String, String)>,
+    pub extra_headers: BTreeMap<String, String>,
+}
+
+impl ResponsesConnectOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn query(mut self, key: impl Into<String>, value: impl ToString) -> Self {
+        self.extra_query.push((key.into(), value.to_string()));
+        self
+    }
+
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.extra_headers.insert(name.into(), value.into());
+        self
+    }
+}
+
+/// Resolved websocket target for the persistent Responses API.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PreparedResponsesWsTarget {
+    pub url: String,
+    pub headers: BTreeMap<String, String>,
+}
+
+/// One JSON event received from the persistent Responses websocket.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResponsesConnectionEvent {
+    pub event_type: Option<String>,
+    pub payload: Value,
+}
+
+/// Minimal async websocket connection for the persistent Responses API.
+pub struct ResponsesConnection {
+    socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    closed: bool,
+}
+
+impl ResponsesConnection {
+    async fn connect(target: PreparedResponsesWsTarget) -> Result<Self, OpenAIError> {
+        let mut request = target.url.as_str().into_client_request().map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Configuration,
+                format!("failed to build Responses websocket request: {error}"),
+            )
+            .with_source(error)
+        })?;
+        for (name, value) in &target.headers {
+            request.headers_mut().insert(
+                reqwest::header::HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
+                    OpenAIError::new(
+                        ErrorKind::Configuration,
+                        format!("invalid Responses websocket header name `{name}`: {error}"),
+                    )
+                    .with_source(error)
+                })?,
+                reqwest::header::HeaderValue::from_str(value).map_err(|error| {
+                    OpenAIError::new(
+                        ErrorKind::Configuration,
+                        format!("invalid Responses websocket header value for `{name}`: {error}"),
+                    )
+                    .with_source(error)
+                })?,
+            );
+        }
+
+        let (socket, _) = connect_async(request).await.map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("failed to connect Responses websocket: {error}"),
+            )
+            .with_source(error)
+        })?;
+
+        Ok(Self {
+            socket,
+            closed: false,
+        })
+    }
+
+    pub async fn send<B: Serialize>(&mut self, event: B) -> Result<(), OpenAIError> {
+        let payload = serde_json::to_string(&event).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("failed to serialize Responses websocket event: {error}"),
+            )
+            .with_source(error)
+        })?;
+        self.send_raw(payload).await
+    }
+
+    pub async fn send_raw(&mut self, payload: impl Into<String>) -> Result<(), OpenAIError> {
+        if self.closed {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                "cannot send a Responses websocket event after the socket has been closed",
+            ));
+        }
+        self.socket
+            .send(Message::Text(payload.into().into()))
+            .await
+            .map_err(|error| {
+                OpenAIError::new(
+                    ErrorKind::Transport,
+                    format!("failed to send Responses websocket event: {error}"),
+                )
+                .with_source(error)
+            })
+    }
+
+    pub async fn recv(&mut self) -> Option<Result<ResponsesConnectionEvent, OpenAIError>> {
+        loop {
+            let message = self.recv_message().await?;
+            match message {
+                Ok(Message::Text(text)) => {
+                    return Some(parse_responses_ws_event(&text));
+                }
+                Ok(Message::Binary(bytes)) => {
+                    let text = match String::from_utf8(bytes.to_vec()) {
+                        Ok(text) => text,
+                        Err(error) => {
+                            return Some(Err(OpenAIError::new(
+                                ErrorKind::Parse,
+                                format!(
+                                    "failed to decode Responses websocket binary event as UTF-8: {error}"
+                                ),
+                            )
+                            .with_source(error)));
+                        }
+                    };
+                    return Some(parse_responses_ws_event(&text));
+                }
+                Ok(Message::Ping(payload)) => {
+                    if let Err(error) = self.socket.send(Message::Pong(payload)).await {
+                        return Some(Err(OpenAIError::new(
+                            ErrorKind::Transport,
+                            format!("failed to reply to Responses websocket ping: {error}"),
+                        )
+                        .with_source(error)));
+                    }
+                }
+                Ok(Message::Pong(_) | Message::Frame(_)) => {}
+                Ok(Message::Close(_)) => {
+                    self.closed = true;
+                    return None;
+                }
+                Err(error) => return Some(Err(error)),
+            }
+        }
+    }
+
+    pub async fn recv_bytes(&mut self) -> Option<Result<Vec<u8>, OpenAIError>> {
+        loop {
+            let message = self.recv_message().await?;
+            match message {
+                Ok(Message::Text(text)) => return Some(Ok(text.as_bytes().to_vec())),
+                Ok(Message::Binary(bytes)) => return Some(Ok(bytes.to_vec())),
+                Ok(Message::Ping(payload)) => {
+                    if let Err(error) = self.socket.send(Message::Pong(payload)).await {
+                        return Some(Err(OpenAIError::new(
+                            ErrorKind::Transport,
+                            format!("failed to reply to Responses websocket ping: {error}"),
+                        )
+                        .with_source(error)));
+                    }
+                }
+                Ok(Message::Pong(_) | Message::Frame(_)) => {}
+                Ok(Message::Close(_)) => {
+                    self.closed = true;
+                    return None;
+                }
+                Err(error) => return Some(Err(error)),
+            }
+        }
+    }
+
+    pub async fn close(&mut self) -> Result<(), OpenAIError> {
+        if self.closed {
+            return Ok(());
+        }
+        self.socket.close(None).await.map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Transport,
+                format!("failed to close Responses websocket cleanly: {error}"),
+            )
+            .with_source(error)
+        })?;
+        self.closed = true;
+        Ok(())
+    }
+
+    async fn recv_message(&mut self) -> Option<Result<Message, OpenAIError>> {
+        if self.closed {
+            return None;
+        }
+        match self.socket.next().await {
+            Some(Ok(message)) => Some(Ok(message)),
+            Some(Err(error)) => Some(Err(OpenAIError::new(
+                ErrorKind::Transport,
+                format!("failed to read Responses websocket frame: {error}"),
+            )
+            .with_source(error))),
+            None => {
+                self.closed = true;
+                None
+            }
+        }
     }
 }
 
@@ -2253,6 +2493,78 @@ where
             format!("failed to serialize {label}: {error}"),
         )
         .with_source(error)
+    })
+}
+
+fn prepare_responses_ws_target(
+    runtime: &ClientRuntime,
+    options: ResponsesConnectOptions,
+) -> Result<PreparedResponsesWsTarget, OpenAIError> {
+    let resolved = runtime.resolved_config()?;
+    let mut headers = resolved.headers();
+    for (name, value) in options.extra_headers {
+        headers.insert(name.to_ascii_lowercase(), value);
+    }
+
+    let base_url = normalize_base_url(&resolved.base_url)?;
+    let mut url = Url::parse(&base_url).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Configuration,
+            format!("invalid OpenAI base URL `{base_url}`: {error}"),
+        )
+        .with_source(error)
+    })?;
+    let scheme = match url.scheme() {
+        "http" => "ws",
+        "https" => "wss",
+        "ws" => "ws",
+        "wss" => "wss",
+        other => {
+            return Err(OpenAIError::new(
+                ErrorKind::Configuration,
+                format!("unsupported base URL scheme for Responses websocket: {other}"),
+            ));
+        }
+    };
+    url.set_scheme(scheme).map_err(|_| {
+        OpenAIError::new(
+            ErrorKind::Configuration,
+            "failed to convert the configured base URL to a Responses websocket target",
+        )
+    })?;
+
+    let mut path = url.path().trim_end_matches('/').to_string();
+    path.push_str("/responses");
+    url.set_path(&path);
+    url.set_query(None);
+    if !options.extra_query.is_empty() {
+        let mut query = url.query_pairs_mut();
+        for (key, value) in options.extra_query {
+            query.append_pair(&key, &value);
+        }
+    }
+
+    Ok(PreparedResponsesWsTarget {
+        url: url.to_string(),
+        headers,
+    })
+}
+
+fn parse_responses_ws_event(text: &str) -> Result<ResponsesConnectionEvent, OpenAIError> {
+    let payload = serde_json::from_str::<Value>(text).map_err(|error| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse Responses websocket event: {error}"),
+        )
+        .with_source(error)
+    })?;
+    let event_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    Ok(ResponsesConnectionEvent {
+        event_type,
+        payload,
     })
 }
 

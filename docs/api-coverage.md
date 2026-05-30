@@ -4,7 +4,7 @@ This note tracks the public surface that is already shipped in the crate.
 
 ## Primary modern surface
 
-- `src/resources/responses.rs` — create, parse, stream, retrieve, cancel, compact, input helpers — `examples/responses_quickstart.rs`, `examples/responses_streaming.rs`, `examples/structured_outputs.rs`
+- `src/resources/responses.rs` — create, parse, stream, persistent websocket connect, retrieve, cancel, compact, input helpers — `examples/responses_quickstart.rs`, `examples/responses_streaming.rs`, `examples/structured_outputs.rs`, `tests/responses_websocket_contract.rs`
 - `src/resources/conversations.rs` — conversation CRUD and item helpers — `examples/live_conversations_crud_smoke.rs`, `examples/live_conversations_items_smoke.rs`
 
 ## Compatibility surface
