@@ -9,8 +9,9 @@ use openai_rust::{
         RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpRequireApproval,
         RealtimeMcpTool, RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
         RealtimeResponseAudioConfig, RealtimeResponseAudioOutputConfig,
-        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
-        RealtimeSessionType, RealtimeTool, RealtimeToolChoice, RealtimeVoice, ResponsePrompt,
+        RealtimeResponseConversation, RealtimeResponseCreateParams, RealtimeServerEvent,
+        RealtimeSessionConfig, RealtimeSessionType, RealtimeTool, RealtimeToolChoice,
+        RealtimeVoice, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -534,6 +535,10 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
                     }),
                     ..Default::default()
                 }),
+                conversation: Some(RealtimeResponseConversation::None),
+                input: Some(vec![RealtimeConversationItem::user_message(vec![
+                    RealtimeConversationMessageContentPart::input_text("Context only"),
+                ])]),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 metadata: Some(json!({"source": "test"})),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
@@ -663,6 +668,13 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         "audio/pcmu"
     );
     assert_eq!(captured[1]["response"]["audio"]["output"]["voice"], "marin");
+    assert_eq!(captured[1]["response"]["conversation"], "none");
+    assert_eq!(captured[1]["response"]["input"][0]["type"], "message");
+    assert_eq!(captured[1]["response"]["input"][0]["role"], "user");
+    assert_eq!(
+        captured[1]["response"]["input"][0]["content"][0]["text"],
+        "Context only"
+    );
     assert_eq!(captured[1]["response"]["metadata"]["source"], "test");
     assert_eq!(
         captured[1]["response"]["output_modalities"],

@@ -509,6 +509,44 @@ pub struct RealtimeResponseAudioOutputConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Controls which conversation a Realtime response writes to.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeResponseConversation {
+    Auto,
+    None,
+    Id(String),
+}
+
+impl RealtimeResponseConversation {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Auto => "auto",
+            Self::None => "none",
+            Self::Id(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for RealtimeResponseConversation {
+    fn from(value: &str) -> Self {
+        match value {
+            "auto" => Self::Auto,
+            "none" => Self::None,
+            _ => Self::Id(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for RealtimeResponseConversation {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "auto" => Self::Auto,
+            "none" => Self::None,
+            _ => Self::Id(value),
+        }
+    }
+}
+
 /// Realtime audio wire format.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RealtimeAudioFormat {
@@ -1028,6 +1066,25 @@ impl<'de> Deserialize<'de> for RealtimeVoice {
     }
 }
 
+impl Serialize for RealtimeResponseConversation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeResponseConversation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
 impl Serialize for RealtimeToolChoice {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1354,9 +1411,9 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<RealtimeResponseAudioConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
+    pub conversation: Option<RealtimeResponseConversation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub input: Option<Vec<Value>>,
+    pub input: Option<Vec<RealtimeConversationItem>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
