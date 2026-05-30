@@ -1147,8 +1147,8 @@ pub struct ResponseOutputItem {
     pub container_id: Option<String>,
     pub outputs: Option<Vec<Value>>,
     pub max_output_length: Option<u64>,
-    pub pending_safety_checks: Vec<Value>,
-    pub acknowledged_safety_checks: Vec<Value>,
+    pub pending_safety_checks: Vec<ResponseComputerSafetyCheck>,
+    pub acknowledged_safety_checks: Vec<ResponseComputerSafetyCheck>,
     pub content: Vec<ResponseContentPart>,
     pub parsed_arguments: Option<Value>,
     pub extra: BTreeMap<String, Value>,
@@ -1164,6 +1164,18 @@ pub struct ResponseMcpListTool {
     pub annotations: Option<Value>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Safety check entry used by computer-call items.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerSafetyCheck {
+    pub id: String,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1245,9 +1257,9 @@ struct WireResponseOutputItem {
     #[serde(default)]
     max_output_length: Option<u64>,
     #[serde(default)]
-    pending_safety_checks: Vec<Value>,
+    pending_safety_checks: Vec<ResponseComputerSafetyCheck>,
     #[serde(default)]
-    acknowledged_safety_checks: Vec<Value>,
+    acknowledged_safety_checks: Vec<ResponseComputerSafetyCheck>,
     #[serde(default)]
     content: Vec<ResponseContentPart>,
     #[serde(flatten)]

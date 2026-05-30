@@ -207,6 +207,8 @@ fn typed_known_fields_are_not_lost() {
             function_call_item("fc_1"),
             refusal_message_item("msg_refusal"),
             mcp_list_tools_item("mcp_tools_1"),
+            computer_call_item("computer_1"),
+            computer_call_output_item("computer_output_1"),
         ])),
         json_response(function_call_item("fc_1").to_string()),
     ])
@@ -289,6 +291,35 @@ fn typed_known_fields_are_not_lost() {
     assert_eq!(
         mcp_tools.tools[0].description.as_deref(),
         Some("Search docs")
+    );
+
+    let computer_call = &listed.output().data[3];
+    assert_eq!(computer_call.item_type, "computer_call");
+    assert_eq!(computer_call.call_id.as_deref(), Some("call_computer"));
+    assert_eq!(
+        computer_call.pending_safety_checks[0].id,
+        "safety_pending_1"
+    );
+    assert_eq!(
+        computer_call.pending_safety_checks[0].code.as_deref(),
+        Some("unsafe_browser")
+    );
+    assert_eq!(
+        computer_call.pending_safety_checks[0].message.as_deref(),
+        Some("Browser confirmation required")
+    );
+
+    let computer_output = &listed.output().data[4];
+    assert_eq!(computer_output.item_type, "computer_call_output");
+    assert_eq!(
+        computer_output.acknowledged_safety_checks[0].id,
+        "safety_ack_1"
+    );
+    assert_eq!(
+        computer_output.acknowledged_safety_checks[0]
+            .message
+            .as_deref(),
+        Some("Acknowledged")
     );
 
     let retrieved_function_call = retrieved.output();
@@ -405,6 +436,35 @@ fn mcp_list_tools_item(id: &str) -> Value {
             "input_schema": {"type": "object"},
             "annotations": {"readOnlyHint": true},
             "description": "Search docs"
+        }]
+    })
+}
+
+fn computer_call_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "computer_call",
+        "call_id": "call_computer",
+        "status": "completed",
+        "pending_safety_checks": [{
+            "id": "safety_pending_1",
+            "code": "unsafe_browser",
+            "message": "Browser confirmation required"
+        }]
+    })
+}
+
+fn computer_call_output_item(id: &str) -> Value {
+    json!({
+        "id": id,
+        "type": "computer_call_output",
+        "call_id": "call_computer",
+        "status": "completed",
+        "output": {"type": "computer_screenshot", "image_url": "data:image/png;base64,AA=="},
+        "acknowledged_safety_checks": [{
+            "id": "safety_ack_1",
+            "code": "unsafe_browser",
+            "message": "Acknowledged"
         }]
     })
 }

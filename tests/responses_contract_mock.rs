@@ -209,6 +209,41 @@ fn create_populates_output_text_helper() {
         mcp_list.tools[0].description.as_deref(),
         Some("Search docs")
     );
+    let computer_call = response
+        .output()
+        .output
+        .iter()
+        .find(|item| item.item_type == "computer_call")
+        .expect("computer call item");
+    assert_eq!(computer_call.call_id.as_deref(), Some("call_computer"));
+    assert_eq!(
+        computer_call.pending_safety_checks[0].id,
+        "safety_pending_1"
+    );
+    assert_eq!(
+        computer_call.pending_safety_checks[0].code.as_deref(),
+        Some("unsafe_browser")
+    );
+    assert_eq!(
+        computer_call.pending_safety_checks[0].message.as_deref(),
+        Some("Browser confirmation required")
+    );
+    let computer_output = response
+        .output()
+        .output
+        .iter()
+        .find(|item| item.item_type == "computer_call_output")
+        .expect("computer output item");
+    assert_eq!(
+        computer_output.acknowledged_safety_checks[0].id,
+        "safety_ack_1"
+    );
+    assert_eq!(
+        computer_output.acknowledged_safety_checks[0]
+            .message
+            .as_deref(),
+        Some("Acknowledged")
+    );
     assert_eq!(response.output().top_logprobs, Some(2));
     assert_eq!(response.output().top_p, Some(0.8));
     assert_eq!(response.output().truncation.as_deref(), Some("auto"));
@@ -762,6 +797,29 @@ fn response_payload(
                     "input_schema": {"type": "object"},
                     "annotations": {"readOnlyHint": true},
                     "description": "Search docs"
+                }]
+            },
+            {
+                "id": "computer_1",
+                "type": "computer_call",
+                "call_id": "call_computer",
+                "status": "completed",
+                "pending_safety_checks": [{
+                    "id": "safety_pending_1",
+                    "code": "unsafe_browser",
+                    "message": "Browser confirmation required"
+                }]
+            },
+            {
+                "id": "computer_output_1",
+                "type": "computer_call_output",
+                "call_id": "call_computer",
+                "status": "completed",
+                "output": {"type": "computer_screenshot", "image_url": "data:image/png;base64,AA=="},
+                "acknowledged_safety_checks": [{
+                    "id": "safety_ack_1",
+                    "code": "unsafe_browser",
+                    "message": "Acknowledged"
                 }]
             },
             {

@@ -338,8 +338,8 @@ pub struct ConversationItem {
     pub container_id: Option<String>,
     pub outputs: Option<Vec<Value>>,
     pub max_output_length: Option<u64>,
-    pub pending_safety_checks: Vec<Value>,
-    pub acknowledged_safety_checks: Vec<Value>,
+    pub pending_safety_checks: Vec<ConversationComputerSafetyCheck>,
+    pub acknowledged_safety_checks: Vec<ConversationComputerSafetyCheck>,
     pub content: Vec<ConversationItemContent>,
     pub extra: BTreeMap<String, Value>,
 }
@@ -354,6 +354,18 @@ pub struct ConversationMcpListTool {
     pub annotations: Option<Value>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Safety check entry used by computer-call conversation items.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ConversationComputerSafetyCheck {
+    pub id: String,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -435,9 +447,9 @@ struct WireConversationItem {
     #[serde(default)]
     max_output_length: Option<u64>,
     #[serde(default)]
-    pending_safety_checks: Vec<Value>,
+    pending_safety_checks: Vec<ConversationComputerSafetyCheck>,
     #[serde(default)]
-    acknowledged_safety_checks: Vec<Value>,
+    acknowledged_safety_checks: Vec<ConversationComputerSafetyCheck>,
     #[serde(default)]
     content: Vec<ConversationItemContent>,
     #[serde(flatten)]
