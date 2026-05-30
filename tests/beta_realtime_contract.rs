@@ -67,10 +67,7 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
             ..Default::default()
         })
         .unwrap();
-    assert_eq!(
-        session.output["client_secret"]["value"],
-        json!("ek_realtime")
-    );
+    assert_eq!(session.output.client_secret.value, "ek_realtime");
 
     let transcription = realtime
         .transcription_sessions()
@@ -99,10 +96,7 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
             ..Default::default()
         })
         .unwrap();
-    assert_eq!(
-        transcription.output["client_secret"]["value"],
-        json!("ek_transcription")
-    );
+    assert_eq!(transcription.output.client_secret.value, "ek_transcription");
 
     let requests = server.captured_requests(2).unwrap();
     assert_eq!(requests[0].method, "POST");

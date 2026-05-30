@@ -203,6 +203,49 @@ beta_string_literal_enum! {
 }
 
 beta_string_literal_enum! {
+    /// Deprecated beta thread message lifecycle status.
+    pub enum BetaThreadMessageStatus {
+        InProgress => "in_progress",
+        Incomplete => "incomplete",
+        Completed => "completed",
+    }
+}
+
+beta_string_literal_enum! {
+    /// Deprecated beta thread run lifecycle status.
+    pub enum BetaThreadRunStatus {
+        Queued => "queued",
+        InProgress => "in_progress",
+        RequiresAction => "requires_action",
+        Cancelling => "cancelling",
+        Cancelled => "cancelled",
+        Failed => "failed",
+        Completed => "completed",
+        Incomplete => "incomplete",
+        Expired => "expired",
+    }
+}
+
+beta_string_literal_enum! {
+    /// Deprecated beta thread run-step lifecycle status.
+    pub enum BetaThreadRunStepStatus {
+        InProgress => "in_progress",
+        Cancelled => "cancelled",
+        Failed => "failed",
+        Completed => "completed",
+        Expired => "expired",
+    }
+}
+
+beta_string_literal_enum! {
+    /// Deprecated beta thread run-step type.
+    pub enum BetaThreadRunStepType {
+        MessageCreation => "message_creation",
+        ToolCalls => "tool_calls",
+    }
+}
+
+beta_string_literal_enum! {
     /// ChatKit attachment discriminator.
     pub enum ChatKitAttachmentType {
         Image => "image",
@@ -275,12 +318,15 @@ impl BetaAssistants {
     }
 
     /// Creates an assistant.
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<BetaAssistant>, OpenAIError> {
         assistants_beta_post_body(&self.runtime, "/assistants", &params)
     }
 
     /// Retrieves one assistant by id.
-    pub fn retrieve(&self, assistant_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn retrieve(&self, assistant_id: &str) -> Result<ApiResponse<BetaAssistant>, OpenAIError> {
         let assistant_id = path_id("assistant_id", assistant_id)?;
         assistants_beta_get(&self.runtime, format!("/assistants/{assistant_id}"))
     }
@@ -290,7 +336,7 @@ impl BetaAssistants {
         &self,
         assistant_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaAssistant>, OpenAIError> {
         let assistant_id = path_id("assistant_id", assistant_id)?;
         assistants_beta_post_body(
             &self.runtime,
@@ -303,15 +349,63 @@ impl BetaAssistants {
     pub fn list(
         &self,
         params: impl Into<BetaQueryParams>,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaAssistantListResponse>, OpenAIError> {
         assistants_beta_get_query(&self.runtime, "/assistants", params.into().into_pairs())
     }
 
     /// Deletes one assistant by id.
-    pub fn delete(&self, assistant_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn delete(
+        &self,
+        assistant_id: &str,
+    ) -> Result<ApiResponse<BetaAssistantDeleted>, OpenAIError> {
         let assistant_id = path_id("assistant_id", assistant_id)?;
         assistants_beta_delete(&self.runtime, format!("/assistants/{assistant_id}"))
     }
+}
+
+/// Deprecated beta assistant resource.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaAssistant {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    pub created_at: u64,
+    pub model: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub response_format: Option<Value>,
+    #[serde(default)]
+    pub temperature: Option<f64>,
+    #[serde(default)]
+    pub tool_resources: Option<Value>,
+    #[serde(default)]
+    pub tools: Vec<Value>,
+    #[serde(default)]
+    pub top_p: Option<f64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta assistant list response.
+pub type BetaAssistantListResponse = BetaCursorPage<BetaAssistant>;
+
+/// Deprecated beta assistant deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaAssistantDeleted {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub deleted: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Deprecated beta assistant creation parameters.
@@ -713,18 +807,18 @@ impl BetaThreads {
     }
 
     /// Creates an empty thread.
-    pub fn create_empty(&self) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn create_empty(&self) -> Result<ApiResponse<BetaThread>, OpenAIError> {
         let params = Value::Object(serde_json::Map::new());
         assistants_beta_post_body(&self.runtime, "/threads", &params)
     }
 
     /// Creates a thread.
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<BetaThread>, OpenAIError> {
         assistants_beta_post_body(&self.runtime, "/threads", &params)
     }
 
     /// Retrieves one thread by id.
-    pub fn retrieve(&self, thread_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn retrieve(&self, thread_id: &str) -> Result<ApiResponse<BetaThread>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_get(&self.runtime, format!("/threads/{thread_id}"))
     }
@@ -734,13 +828,13 @@ impl BetaThreads {
         &self,
         thread_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThread>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_post_body(&self.runtime, format!("/threads/{thread_id}"), &params)
     }
 
     /// Deletes one thread by id.
-    pub fn delete(&self, thread_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn delete(&self, thread_id: &str) -> Result<ApiResponse<BetaThreadDeleted>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_delete(&self.runtime, format!("/threads/{thread_id}"))
     }
@@ -749,7 +843,7 @@ impl BetaThreads {
     pub fn create_and_run<B: Serialize>(
         &self,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         assistants_beta_post_body(&self.runtime, "/threads/runs", &params)
     }
 
@@ -772,12 +866,39 @@ impl BetaThreads {
         &self,
         params: B,
         options: BetaRunPollOptions,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let created = self.create_and_run(params)?;
-        let run_id = value_string_field(&created.output, "id")?;
-        let thread_id = value_string_field(&created.output, "thread_id")?;
+        let run_id = required_string_field("id", Some(created.output.id.as_str()))?;
+        let thread_id = required_string_field("thread_id", created.output.thread_id.as_deref())?;
         self.runs().poll(&thread_id, &run_id, options)
     }
+}
+
+/// Deprecated beta thread resource.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThread {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    pub created_at: u64,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub tool_resources: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta thread deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadDeleted {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub deleted: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Deprecated beta thread creation parameters.
@@ -852,7 +973,7 @@ impl BetaThreadMessages {
         &self,
         thread_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadMessage>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_post_body(
             &self.runtime,
@@ -866,7 +987,7 @@ impl BetaThreadMessages {
         &self,
         thread_id: &str,
         message_id: &str,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadMessage>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let message_id = path_id("message_id", message_id)?;
         assistants_beta_get(
@@ -881,7 +1002,7 @@ impl BetaThreadMessages {
         thread_id: &str,
         message_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadMessage>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let message_id = path_id("message_id", message_id)?;
         assistants_beta_post_body(
@@ -896,7 +1017,7 @@ impl BetaThreadMessages {
         &self,
         thread_id: &str,
         params: impl Into<BetaQueryParams>,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadMessageListResponse>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_get_query(
             &self.runtime,
@@ -910,7 +1031,7 @@ impl BetaThreadMessages {
         &self,
         thread_id: &str,
         message_id: &str,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadMessageDeleted>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let message_id = path_id("message_id", message_id)?;
         assistants_beta_delete(
@@ -918,6 +1039,53 @@ impl BetaThreadMessages {
             format!("/threads/{thread_id}/messages/{message_id}"),
         )
     }
+}
+
+/// Deprecated beta thread message resource.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessage {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    pub created_at: u64,
+    pub thread_id: String,
+    #[serde(default)]
+    pub assistant_id: Option<String>,
+    #[serde(default)]
+    pub attachments: Option<Vec<Value>>,
+    #[serde(default)]
+    pub completed_at: Option<u64>,
+    #[serde(default)]
+    pub content: Vec<Value>,
+    #[serde(default)]
+    pub incomplete_at: Option<u64>,
+    #[serde(default)]
+    pub incomplete_details: Option<Value>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub role: Option<BetaThreadMessageRole>,
+    #[serde(default)]
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub status: Option<BetaThreadMessageStatus>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta thread message list response.
+pub type BetaThreadMessageListResponse = BetaCursorPage<BetaThreadMessage>;
+
+/// Deprecated beta thread message deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessageDeleted {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub deleted: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Deprecated beta thread message creation parameters.
@@ -1079,7 +1247,7 @@ impl BetaThreadRuns {
         &self,
         thread_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         self.create_with_query(thread_id, params, BetaQueryParams::default())
     }
 
@@ -1089,7 +1257,7 @@ impl BetaThreadRuns {
         thread_id: &str,
         params: B,
         query: BetaQueryParams,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_post_body(
             &self.runtime,
@@ -1148,7 +1316,7 @@ impl BetaThreadRuns {
         thread_id: &str,
         params: B,
         options: BetaRunPollOptions,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         self.create_and_poll_with_query(thread_id, params, BetaQueryParams::default(), options)
     }
 
@@ -1159,9 +1327,9 @@ impl BetaThreadRuns {
         params: B,
         query: BetaQueryParams,
         options: BetaRunPollOptions,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let created = self.create_with_query(thread_id, params, query)?;
-        let run_id = value_string_field(&created.output, "id")?;
+        let run_id = required_string_field("id", Some(created.output.id.as_str()))?;
         self.poll(thread_id, &run_id, options)
     }
 
@@ -1170,7 +1338,7 @@ impl BetaThreadRuns {
         &self,
         thread_id: &str,
         run_id: &str,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_get(&self.runtime, format!("/threads/{thread_id}/runs/{run_id}"))
@@ -1182,7 +1350,7 @@ impl BetaThreadRuns {
         thread_id: &str,
         run_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_post_body(
@@ -1197,7 +1365,7 @@ impl BetaThreadRuns {
         &self,
         thread_id: &str,
         params: impl Into<BetaQueryParams>,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRunListResponse>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_get_query(
             &self.runtime,
@@ -1207,7 +1375,11 @@ impl BetaThreadRuns {
     }
 
     /// Cancels one run within a thread.
-    pub fn cancel(&self, thread_id: &str, run_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn cancel(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_post(
@@ -1222,7 +1394,7 @@ impl BetaThreadRuns {
         thread_id: &str,
         run_id: &str,
         params: B,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_post_body(
@@ -1257,9 +1429,13 @@ impl BetaThreadRuns {
         run_id: &str,
         params: B,
         options: BetaRunPollOptions,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let submitted = self.submit_tool_outputs(thread_id, run_id, params)?;
-        let run_id = value_string_field(&submitted.output, "id").unwrap_or_else(|_| run_id.into());
+        let run_id = if submitted.output.id.trim().is_empty() {
+            run_id.to_string()
+        } else {
+            submitted.output.id.clone()
+        };
         self.poll(thread_id, &run_id, options)
     }
 
@@ -1269,7 +1445,7 @@ impl BetaThreadRuns {
         thread_id: &str,
         run_id: &str,
         options: BetaRunPollOptions,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRun>, OpenAIError> {
         let started_at = Instant::now();
         loop {
             let response = self.retrieve(thread_id, run_id)?;
@@ -1289,6 +1465,68 @@ impl BetaThreadRuns {
         }
     }
 }
+
+/// Deprecated beta thread run resource.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRun {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    pub created_at: u64,
+    #[serde(default)]
+    pub assistant_id: Option<String>,
+    #[serde(default)]
+    pub cancelled_at: Option<u64>,
+    #[serde(default)]
+    pub completed_at: Option<u64>,
+    #[serde(default)]
+    pub expires_at: Option<u64>,
+    #[serde(default)]
+    pub failed_at: Option<u64>,
+    #[serde(default)]
+    pub incomplete_details: Option<Value>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+    #[serde(default)]
+    pub last_error: Option<Value>,
+    #[serde(default)]
+    pub max_completion_tokens: Option<u64>,
+    #[serde(default)]
+    pub max_prompt_tokens: Option<u64>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub parallel_tool_calls: Option<bool>,
+    #[serde(default)]
+    pub required_action: Option<Value>,
+    #[serde(default)]
+    pub response_format: Option<Value>,
+    #[serde(default)]
+    pub started_at: Option<u64>,
+    #[serde(default)]
+    pub status: Option<BetaThreadRunStatus>,
+    #[serde(default)]
+    pub thread_id: Option<String>,
+    #[serde(default)]
+    pub tool_choice: Option<Value>,
+    #[serde(default)]
+    pub tools: Vec<Value>,
+    #[serde(default)]
+    pub truncation_strategy: Option<Value>,
+    #[serde(default)]
+    pub usage: Option<Value>,
+    #[serde(default)]
+    pub temperature: Option<f64>,
+    #[serde(default)]
+    pub top_p: Option<f64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta thread run list response.
+pub type BetaThreadRunListResponse = BetaCursorPage<BetaThreadRun>;
 
 /// Deprecated beta thread run creation parameters.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
@@ -1389,7 +1627,7 @@ impl BetaThreadRunSteps {
         thread_id: &str,
         run_id: &str,
         step_id: &str,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRunStep>, OpenAIError> {
         self.retrieve_with_query(thread_id, run_id, step_id, BetaQueryParams::default())
     }
 
@@ -1400,7 +1638,7 @@ impl BetaThreadRunSteps {
         run_id: &str,
         step_id: &str,
         query: impl Into<BetaQueryParams>,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRunStep>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         let step_id = path_id("step_id", step_id)?;
@@ -1417,7 +1655,7 @@ impl BetaThreadRunSteps {
         thread_id: &str,
         run_id: &str,
         params: impl Into<BetaQueryParams>,
-    ) -> Result<ApiResponse<Value>, OpenAIError> {
+    ) -> Result<ApiResponse<BetaThreadRunStepListResponse>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_get_query(
@@ -1427,6 +1665,46 @@ impl BetaThreadRunSteps {
         )
     }
 }
+
+/// Deprecated beta thread run-step resource.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStep {
+    pub id: String,
+    #[serde(default)]
+    pub object: String,
+    pub created_at: u64,
+    #[serde(default)]
+    pub assistant_id: Option<String>,
+    #[serde(default)]
+    pub cancelled_at: Option<u64>,
+    #[serde(default)]
+    pub completed_at: Option<u64>,
+    #[serde(default)]
+    pub expired_at: Option<u64>,
+    #[serde(default)]
+    pub failed_at: Option<u64>,
+    #[serde(default)]
+    pub last_error: Option<Value>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub status: Option<BetaThreadRunStepStatus>,
+    #[serde(default)]
+    pub step_details: Option<Value>,
+    #[serde(default)]
+    pub thread_id: Option<String>,
+    #[serde(rename = "type", default)]
+    pub step_type: Option<BetaThreadRunStepType>,
+    #[serde(default)]
+    pub usage: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta thread run-step list response.
+pub type BetaThreadRunStepListResponse = BetaCursorPage<BetaThreadRunStep>;
 
 /// Deprecated beta run-step retrieve query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1562,6 +1840,34 @@ impl From<BetaThreadRunStepListParams> for BetaQueryParams {
             params = params.push_array("include", include);
         }
         params
+    }
+}
+
+/// Cursor page returned by deprecated beta list endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(bound(deserialize = "T: Deserialize<'de>"))]
+pub struct BetaCursorPage<T> {
+    #[serde(default)]
+    pub object: String,
+    #[serde(default)]
+    pub data: Vec<T>,
+    #[serde(default)]
+    pub first_id: Option<String>,
+    #[serde(default)]
+    pub last_id: Option<String>,
+    #[serde(default)]
+    pub has_more: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl<T> BetaCursorPage<T> {
+    pub fn has_next_page(&self) -> bool {
+        self.has_more
+    }
+
+    pub fn next_after(&self) -> Option<&str> {
+        self.last_id.as_deref().filter(|_| self.has_more)
     }
 }
 
@@ -1841,7 +2147,10 @@ impl BetaRealtimeSessions {
     }
 
     /// Creates an ephemeral Realtime API token with session configuration.
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<BetaRealtimeSession>, OpenAIError> {
         realtime_beta_post_body(&self.runtime, "/realtime/sessions", &params)
     }
 }
@@ -1858,9 +2167,114 @@ impl BetaRealtimeTranscriptionSessions {
     }
 
     /// Creates an ephemeral Realtime transcription API token.
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<BetaRealtimeTranscriptionSession>, OpenAIError> {
         realtime_beta_post_body(&self.runtime, "/realtime/transcription_sessions", &params)
     }
+}
+
+/// Beta realtime session-token creation response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeSession {
+    pub client_secret: BetaRealtimeClientSecretResponse,
+    #[serde(default)]
+    pub input_audio_format: Option<String>,
+    #[serde(default)]
+    pub input_audio_transcription: Option<BetaRealtimeInputAudioTranscriptionResponse>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+    #[serde(default)]
+    pub max_response_output_tokens: Option<Value>,
+    #[serde(default)]
+    pub modalities: Option<Vec<String>>,
+    #[serde(default)]
+    pub output_audio_format: Option<String>,
+    #[serde(default)]
+    pub speed: Option<f64>,
+    #[serde(default)]
+    pub temperature: Option<f64>,
+    #[serde(default)]
+    pub tool_choice: Option<Value>,
+    #[serde(default)]
+    pub tools: Option<Vec<BetaRealtimeToolResponse>>,
+    #[serde(default)]
+    pub tracing: Option<Value>,
+    #[serde(default)]
+    pub turn_detection: Option<BetaRealtimeTurnDetectionResponse>,
+    #[serde(default)]
+    pub voice: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Beta realtime transcription-session creation response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeTranscriptionSession {
+    pub client_secret: BetaRealtimeClientSecretResponse,
+    #[serde(default)]
+    pub input_audio_format: Option<String>,
+    #[serde(default)]
+    pub input_audio_transcription: Option<BetaRealtimeInputAudioTranscriptionResponse>,
+    #[serde(default)]
+    pub modalities: Option<Vec<String>>,
+    #[serde(default)]
+    pub turn_detection: Option<BetaRealtimeTurnDetectionResponse>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Ephemeral realtime client secret returned by the beta realtime REST endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeClientSecretResponse {
+    pub value: String,
+    pub expires_at: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime transcription settings returned by the beta realtime REST endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeInputAudioTranscriptionResponse {
+    #[serde(default)]
+    pub language: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub prompt: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime function tool returned by the beta realtime REST endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeToolResponse {
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub parameters: Option<Value>,
+    #[serde(rename = "type", default)]
+    pub tool_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime turn-detection settings returned by the beta realtime REST endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaRealtimeTurnDetectionResponse {
+    #[serde(default)]
+    pub prefix_padding_ms: Option<u32>,
+    #[serde(default)]
+    pub silence_duration_ms: Option<u32>,
+    #[serde(default)]
+    pub threshold: Option<f64>,
+    #[serde(rename = "type", default)]
+    pub turn_detection_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Beta realtime session-token creation parameters.
@@ -2856,35 +3270,45 @@ fn assistants_beta_post_stream_value(
     BetaAssistantStream::start_live(request, options)
 }
 
-fn assistants_beta_get(
+fn assistants_beta_get<T>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
-) -> Result<ApiResponse<Value>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
     assistants_beta_execute(runtime, "GET", path, None)
 }
 
-fn assistants_beta_get_query(
+fn assistants_beta_get_query<T>(
     runtime: &ClientRuntime,
     base: impl Into<String>,
     query: Vec<(String, String)>,
-) -> Result<ApiResponse<Value>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
     assistants_beta_get(runtime, path_with_query(base, query))
 }
 
-fn assistants_beta_post(
+fn assistants_beta_post<T>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
-) -> Result<ApiResponse<Value>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
     assistants_beta_execute(runtime, "POST", path, None)
 }
 
-fn assistants_beta_post_body<B>(
+fn assistants_beta_post_body<B, T>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
     body: &B,
-) -> Result<ApiResponse<Value>, OpenAIError>
+) -> Result<ApiResponse<T>, OpenAIError>
 where
     B: Serialize,
+    T: DeserializeOwned,
 {
     let mut request = runtime.prepare_json_request("POST", path, body)?;
     request.headers.insert(
@@ -2913,10 +3337,8 @@ fn body_with_stream_flag<B: Serialize>(params: B) -> Result<Value, OpenAIError> 
     Ok(value)
 }
 
-fn value_string_field(value: &Value, field: &str) -> Result<String, OpenAIError> {
+fn required_string_field(field: &str, value: Option<&str>) -> Result<String, OpenAIError> {
     value
-        .get(field)
-        .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .map(String::from)
         .ok_or_else(|| {
@@ -2927,15 +3349,22 @@ fn value_string_field(value: &Value, field: &str) -> Result<String, OpenAIError>
         })
 }
 
-fn is_terminal_run_status(value: &Value) -> bool {
+fn is_terminal_run_status(run: &BetaThreadRun) -> bool {
     matches!(
-        value.get("status").and_then(Value::as_str),
-        Some("requires_action" | "cancelled" | "completed" | "failed" | "expired" | "incomplete")
+        run.status.as_ref(),
+        Some(
+            BetaThreadRunStatus::RequiresAction
+                | BetaThreadRunStatus::Cancelled
+                | BetaThreadRunStatus::Completed
+                | BetaThreadRunStatus::Failed
+                | BetaThreadRunStatus::Expired
+                | BetaThreadRunStatus::Incomplete
+        )
     )
 }
 
-fn poll_interval(
-    response: &ApiResponse<Value>,
+fn poll_interval<T>(
+    response: &ApiResponse<T>,
     options: &BetaRunPollOptions,
 ) -> Result<Duration, OpenAIError> {
     if let Some(interval) = options.poll_interval {
@@ -3038,19 +3467,25 @@ fn map_beta_live_transport_error(error: reqwest::Error) -> OpenAIError {
     OpenAIError::new(kind, error.to_string()).with_source(error)
 }
 
-fn assistants_beta_delete(
+fn assistants_beta_delete<T>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
-) -> Result<ApiResponse<Value>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
     assistants_beta_execute(runtime, "DELETE", path, None)
 }
 
-fn assistants_beta_execute(
+fn assistants_beta_execute<T>(
     runtime: &ClientRuntime,
     method: impl AsRef<str>,
     path: impl AsRef<str>,
     body: Option<Vec<u8>>,
-) -> Result<ApiResponse<Value>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
     let mut request = runtime.prepare_request_with_body(method, path, body)?;
     request
         .headers
@@ -3063,13 +3498,14 @@ fn assistants_beta_execute(
     execute_json(&request, &options)
 }
 
-fn realtime_beta_post_body<B>(
+fn realtime_beta_post_body<B, T>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
     body: &B,
-) -> Result<ApiResponse<Value>, OpenAIError>
+) -> Result<ApiResponse<T>, OpenAIError>
 where
     B: Serialize,
+    T: DeserializeOwned,
 {
     let mut request = runtime.prepare_json_request("POST", path, body)?;
     request.headers.insert(

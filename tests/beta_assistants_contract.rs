@@ -18,8 +18,8 @@ use openai_rust::{
             BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool, BetaThreadMessageContent,
             BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageRole,
             BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
-            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepInclude,
-            BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStatus,
+            BetaThreadRunStepInclude, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
             BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
             BetaThreadRunUpdateParams, BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides,
             BetaToolResourceOverrides, BetaToolResources, BetaToolResourcesCodeInterpreter,
@@ -85,11 +85,12 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             ..Default::default()
         })
         .unwrap();
-    assert_eq!(assistant.output["id"], json!("asst_123"));
+    assert_eq!(assistant.output.id, "asst_123");
+    assert_eq!(assistant.output.object, "assistant");
 
     assert_eq!(
-        assistants.retrieve("asst_123").unwrap().output["object"],
-        json!("assistant")
+        assistants.retrieve("asst_123").unwrap().output.object,
+        "assistant"
     );
     assert_eq!(
         assistants
@@ -106,8 +107,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["id"],
-        json!("asst_123")
+            .output
+            .id,
+        "asst_123"
     );
     assert_eq!(
         assistants
@@ -118,18 +120,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 order: Some(ListOrder::Asc),
             })
             .unwrap()
-            .output["data"][0]["id"],
-        json!("asst_123")
+            .output
+            .data[0]
+            .id,
+        "asst_123"
     );
-    assert_eq!(
-        assistants.delete("asst_123").unwrap().output["deleted"],
-        json!(true)
-    );
+    assert!(assistants.delete("asst_123").unwrap().output.deleted);
 
-    assert_eq!(
-        threads.create_empty().unwrap().output["id"],
-        json!("thread_empty")
-    );
+    assert_eq!(threads.create_empty().unwrap().output.id, "thread_empty");
     assert_eq!(
         threads
             .create(BetaThreadCreateParams {
@@ -155,12 +153,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 }),
             })
             .unwrap()
-            .output["id"],
-        json!("thread_123")
+            .output
+            .id,
+        "thread_123"
     );
     assert_eq!(
-        threads.retrieve("thread_123").unwrap().output["id"],
-        json!("thread_123")
+        threads.retrieve("thread_123").unwrap().output.id,
+        "thread_123"
     );
     assert_eq!(
         threads
@@ -181,13 +180,11 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["id"],
-        json!("thread_123")
+            .output
+            .id,
+        "thread_123"
     );
-    assert_eq!(
-        threads.delete("thread_123").unwrap().output["deleted"],
-        json!(true)
-    );
+    assert!(threads.delete("thread_123").unwrap().output.deleted);
     assert_eq!(
         threads
             .create_and_run(BetaThreadCreateAndRunParams {
@@ -214,8 +211,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 ..Default::default()
             })
             .unwrap()
-            .output["id"],
-        json!("run_created")
+            .output
+            .id,
+        "run_created"
     );
 
     let messages = threads.messages();
@@ -237,12 +235,17 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["id"],
-        json!("msg_123")
+            .output
+            .id,
+        "msg_123"
     );
     assert_eq!(
-        messages.retrieve("thread_123", "msg_123").unwrap().output["id"],
-        json!("msg_123")
+        messages
+            .retrieve("thread_123", "msg_123")
+            .unwrap()
+            .output
+            .id,
+        "msg_123"
     );
     assert_eq!(
         messages
@@ -257,8 +260,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["id"],
-        json!("msg_123")
+            .output
+            .id,
+        "msg_123"
     );
     assert_eq!(
         messages
@@ -273,12 +277,17 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 }
             )
             .unwrap()
-            .output["data"][0]["id"],
-        json!("msg_123")
+            .output
+            .data[0]
+            .id,
+        "msg_123"
     );
-    assert_eq!(
-        messages.delete("thread_123", "msg_123").unwrap().output["deleted"],
-        json!(true)
+    assert!(
+        messages
+            .delete("thread_123", "msg_123")
+            .unwrap()
+            .output
+            .deleted
     );
 
     let runs = threads.runs();
@@ -322,12 +331,16 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             )
         )
         .unwrap()
-        .output["id"],
-        json!("run_123")
+        .output
+        .id,
+        "run_123"
     );
     assert_eq!(
-        runs.retrieve("thread_123", "run_123").unwrap().output["status"],
-        json!("in_progress")
+        runs.retrieve("thread_123", "run_123")
+            .unwrap()
+            .output
+            .status,
+        Some(BetaThreadRunStatus::InProgress)
     );
     assert_eq!(
         runs.update(
@@ -341,8 +354,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             },
         )
         .unwrap()
-        .output["id"],
-        json!("run_123")
+        .output
+        .id,
+        "run_123"
     );
     assert_eq!(
         runs.list(
@@ -355,12 +369,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             }
         )
         .unwrap()
-        .output["data"][0]["id"],
-        json!("run_123")
+        .output
+        .data[0]
+            .id,
+        "run_123"
     );
     assert_eq!(
-        runs.cancel("thread_123", "run_123").unwrap().output["status"],
-        json!("cancelled")
+        runs.cancel("thread_123", "run_123").unwrap().output.status,
+        Some(BetaThreadRunStatus::Cancelled)
     );
     assert_eq!(
         runs.submit_tool_outputs(
@@ -375,8 +391,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             },
         )
         .unwrap()
-        .output["id"],
-        json!("run_123")
+        .output
+        .id,
+        "run_123"
     );
 
     let steps = runs.steps();
@@ -393,8 +410,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["id"],
-        json!("step_123")
+            .output
+            .id,
+        "step_123"
     );
     assert_eq!(
         steps
@@ -412,8 +430,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 },
             )
             .unwrap()
-            .output["data"][0]["id"],
-        json!("step_123")
+            .output
+            .data[0]
+            .id,
+        "step_123"
     );
 
     let requests = server.captured_requests(24).unwrap();
@@ -779,7 +799,7 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
             },
         )
         .expect("direct poll");
-    assert_eq!(direct.output["status"], json!("completed"));
+    assert_eq!(direct.output.status, Some(BetaThreadRunStatus::Completed));
 
     let created = runs
         .create_and_poll(
@@ -788,7 +808,7 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
             poll_options.clone(),
         )
         .expect("create and poll");
-    assert_eq!(created.output["status"], json!("completed"));
+    assert_eq!(created.output.status, Some(BetaThreadRunStatus::Completed));
 
     let submitted = runs
         .submit_tool_outputs_and_poll(
@@ -798,7 +818,10 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
             poll_options.clone(),
         )
         .expect("submit tool outputs and poll");
-    assert_eq!(submitted.output["status"], json!("completed"));
+    assert_eq!(
+        submitted.output.status,
+        Some(BetaThreadRunStatus::Completed)
+    );
 
     let thread_created = threads
         .create_and_run_poll(
@@ -813,7 +836,10 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
             poll_options,
         )
         .expect("create thread and poll");
-    assert_eq!(thread_created.output["status"], json!("requires_action"));
+    assert_eq!(
+        thread_created.output.status,
+        Some(BetaThreadRunStatus::RequiresAction)
+    );
 
     let requests = server.captured_requests(8).unwrap();
     assert_methods(
@@ -947,13 +973,50 @@ fn step_payload(id: &str) -> String {
 }
 
 fn list_payload(object: &str, id: &str) -> String {
-    json!({
-        "object": "list",
-        "data": [{
+    let item = match object {
+        "assistant" => json!({
+            "id": id,
+            "object": "assistant",
+            "created_at": 1_800_000_010u64,
+            "model": "gpt-4.1",
+            "tools": []
+        }),
+        "thread.message" => json!({
+            "id": id,
+            "object": "thread.message",
+            "created_at": 1_800_000_010u64,
+            "thread_id": "thread_123",
+            "role": "user",
+            "status": "completed",
+            "content": []
+        }),
+        "thread.run" => json!({
+            "id": id,
+            "object": "thread.run",
+            "created_at": 1_800_000_010u64,
+            "thread_id": "thread_123",
+            "assistant_id": "asst_123",
+            "status": "in_progress"
+        }),
+        "thread.run.step" => json!({
+            "id": id,
+            "object": "thread.run.step",
+            "created_at": 1_800_000_010u64,
+            "run_id": "run_123",
+            "thread_id": "thread_123",
+            "type": "message_creation",
+            "status": "completed"
+        }),
+        _ => json!({
             "id": id,
             "object": object,
             "created_at": 1_800_000_010u64
-        }],
+        }),
+    };
+
+    json!({
+        "object": "list",
+        "data": [item],
         "first_id": id,
         "last_id": id,
         "has_more": false
