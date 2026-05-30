@@ -386,7 +386,7 @@ pub struct BetaAssistant {
     #[serde(default)]
     pub tool_resources: Option<Value>,
     #[serde(default)]
-    pub tools: Vec<Value>,
+    pub tools: Vec<BetaAssistantTool>,
     #[serde(default)]
     pub top_p: Option<f64>,
     #[serde(flatten)]
@@ -603,7 +603,7 @@ pub struct BetaAssistantToolChoiceFunction {
 }
 
 /// Deprecated beta thread/run truncation strategy.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaTruncationStrategy {
     #[serde(rename = "type")]
     pub strategy_type: BetaTruncationStrategyType,
@@ -632,7 +632,7 @@ impl BetaTruncationStrategy {
 }
 
 /// Tool definition accepted by deprecated beta assistants and runs.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BetaAssistantTool {
     CodeInterpreter,
@@ -660,7 +660,7 @@ impl BetaAssistantTool {
 }
 
 /// File-search overrides for deprecated beta assistant tools.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaAssistantFileSearchTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_num_results: Option<u32>,
@@ -671,7 +671,7 @@ pub struct BetaAssistantFileSearchTool {
 }
 
 /// Ranking options for deprecated beta file-search tools.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BetaAssistantFileSearchRankingOptions {
     pub score_threshold: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -681,7 +681,7 @@ pub struct BetaAssistantFileSearchRankingOptions {
 }
 
 /// Function definition for deprecated beta assistant tools.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaAssistantFunctionDefinition {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1060,7 +1060,7 @@ pub struct BetaThreadMessage {
     #[serde(default)]
     pub incomplete_at: Option<u64>,
     #[serde(default)]
-    pub incomplete_details: Option<Value>,
+    pub incomplete_details: Option<BetaThreadRunIncompleteDetails>,
     #[serde(default)]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
@@ -1488,7 +1488,7 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub instructions: Option<String>,
     #[serde(default)]
-    pub last_error: Option<Value>,
+    pub last_error: Option<BetaThreadRunLastError>,
     #[serde(default)]
     pub max_completion_tokens: Option<u64>,
     #[serde(default)]
@@ -1512,11 +1512,11 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub tool_choice: Option<Value>,
     #[serde(default)]
-    pub tools: Vec<Value>,
+    pub tools: Vec<BetaAssistantTool>,
     #[serde(default)]
-    pub truncation_strategy: Option<Value>,
+    pub truncation_strategy: Option<BetaTruncationStrategy>,
     #[serde(default)]
-    pub usage: Option<Value>,
+    pub usage: Option<BetaThreadRunUsage>,
     #[serde(default)]
     pub temperature: Option<f64>,
     #[serde(default)]
@@ -1527,6 +1527,35 @@ pub struct BetaThreadRun {
 
 /// Deprecated beta thread run list response.
 pub type BetaThreadRunListResponse = BetaCursorPage<BetaThreadRun>;
+
+/// Details on why a deprecated beta thread run is incomplete.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunIncompleteDetails {
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Last error returned on a deprecated beta thread run.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunLastError {
+    #[serde(default)]
+    pub code: Option<String>,
+    pub message: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Token usage returned on a terminal deprecated beta thread run.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunUsage {
+    pub completion_tokens: u64,
+    pub prompt_tokens: u64,
+    pub total_tokens: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
 
 /// Deprecated beta thread run creation parameters.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]

@@ -87,6 +87,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         .unwrap();
     assert_eq!(assistant.output.id, "asst_123");
     assert_eq!(assistant.output.object, "assistant");
+    assert!(matches!(
+        assistant.output.tools.first(),
+        Some(BetaAssistantTool::CodeInterpreter)
+    ));
 
     assert_eq!(
         assistants.retrieve("asst_123").unwrap().output.object,
@@ -335,12 +339,22 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         .id,
         "run_123"
     );
+    let retrieved_run = runs.retrieve("thread_123", "run_123").unwrap();
     assert_eq!(
-        runs.retrieve("thread_123", "run_123")
-            .unwrap()
-            .output
-            .status,
+        retrieved_run.output.status,
         Some(BetaThreadRunStatus::InProgress)
+    );
+    assert!(matches!(
+        retrieved_run.output.tools.first(),
+        Some(BetaAssistantTool::CodeInterpreter)
+    ));
+    assert_eq!(
+        retrieved_run
+            .output
+            .truncation_strategy
+            .as_ref()
+            .map(|strategy| strategy.strategy_type.as_str()),
+        Some("auto")
     );
     assert_eq!(
         runs.update(
@@ -928,7 +942,8 @@ fn assistant_payload(id: &str) -> String {
         "object": "assistant",
         "created_at": 1_800_000_000u64,
         "model": "gpt-4.1",
-        "name": "Support analyst"
+        "name": "Support analyst",
+        "tools": [{"type": "code_interpreter"}]
     })
     .to_string()
 }
@@ -962,7 +977,9 @@ fn run_payload(id: &str, status: &str) -> String {
         "created_at": 1_800_000_003u64,
         "thread_id": "thread_123",
         "assistant_id": "asst_123",
-        "status": status
+        "status": status,
+        "tools": [{"type": "code_interpreter"}],
+        "truncation_strategy": {"type": "auto"}
     })
     .to_string()
 }
@@ -987,7 +1004,7 @@ fn list_payload(object: &str, id: &str) -> String {
             "object": "assistant",
             "created_at": 1_800_000_010u64,
             "model": "gpt-4.1",
-            "tools": []
+            "tools": [{"type": "code_interpreter"}]
         }),
         "thread.message" => json!({
             "id": id,
@@ -1004,7 +1021,9 @@ fn list_payload(object: &str, id: &str) -> String {
             "created_at": 1_800_000_010u64,
             "thread_id": "thread_123",
             "assistant_id": "asst_123",
-            "status": "in_progress"
+            "status": "in_progress",
+            "tools": [{"type": "code_interpreter"}],
+            "truncation_strategy": {"type": "auto"}
         }),
         "thread.run.step" => json!({
             "id": id,
