@@ -338,15 +338,78 @@ pub enum RealtimeServerEvent {
         event_id: String,
         session: RealtimeSessionConfig,
     },
+    ConversationCreated {
+        event_id: String,
+        conversation: Value,
+    },
+    ConversationItemAdded {
+        event_id: String,
+        previous_item_id: Option<String>,
+        item: RealtimeConversationItem,
+    },
     ConversationItemCreated {
         event_id: String,
         previous_item_id: Option<String>,
         item: RealtimeConversationItem,
     },
+    ConversationItemDeleted {
+        event_id: String,
+        item_id: String,
+    },
+    ConversationItemDone {
+        event_id: String,
+        previous_item_id: Option<String>,
+        item: RealtimeConversationItem,
+    },
+    ConversationItemRetrieved {
+        event_id: String,
+        item: RealtimeConversationItem,
+    },
+    ConversationItemInputAudioTranscriptionCompleted {
+        event_id: String,
+        item_id: String,
+        content_index: usize,
+        transcript: String,
+        usage: Value,
+        logprobs: Option<Value>,
+    },
+    ConversationItemInputAudioTranscriptionDelta {
+        event_id: String,
+        item_id: String,
+        content_index: Option<usize>,
+        delta: Option<String>,
+        logprobs: Option<Value>,
+    },
+    ConversationItemInputAudioTranscriptionFailed {
+        event_id: String,
+        item_id: String,
+        content_index: usize,
+        error: Value,
+    },
+    ConversationItemInputAudioTranscriptionSegment {
+        event_id: String,
+        item_id: String,
+        content_index: usize,
+        id: String,
+        start: f64,
+        end: f64,
+        speaker: String,
+        text: String,
+    },
     InputAudioBufferCommitted {
         event_id: String,
         item_id: String,
         previous_item_id: Option<String>,
+    },
+    InputAudioBufferDtmfEventReceived {
+        event: String,
+        received_at: u64,
+    },
+    InputAudioBufferTimeoutTriggered {
+        event_id: String,
+        item_id: String,
+        audio_start_ms: u64,
+        audio_end_ms: u64,
     },
     InputAudioBufferSpeechStarted {
         event_id: String,
@@ -474,11 +537,20 @@ pub enum RealtimeServerEvent {
         output_index: usize,
         arguments: String,
     },
+    McpListToolsStatus {
+        event_id: String,
+        event_type: String,
+        item_id: String,
+    },
     ResponseItemStatus {
         event_id: String,
         event_type: String,
         item_id: String,
         output_index: usize,
+    },
+    RateLimitsUpdated {
+        event_id: String,
+        rate_limits: Vec<Value>,
     },
     OutputAudioBufferStarted {
         event_id: String,
@@ -516,8 +588,29 @@ impl RealtimeServerEvent {
         match self {
             Self::SessionCreated { .. } => "session.created",
             Self::SessionUpdated { .. } => "session.updated",
+            Self::ConversationCreated { .. } => "conversation.created",
+            Self::ConversationItemAdded { .. } => "conversation.item.added",
             Self::ConversationItemCreated { .. } => "conversation.item.created",
+            Self::ConversationItemDeleted { .. } => "conversation.item.deleted",
+            Self::ConversationItemDone { .. } => "conversation.item.done",
+            Self::ConversationItemRetrieved { .. } => "conversation.item.retrieved",
+            Self::ConversationItemInputAudioTranscriptionCompleted { .. } => {
+                "conversation.item.input_audio_transcription.completed"
+            }
+            Self::ConversationItemInputAudioTranscriptionDelta { .. } => {
+                "conversation.item.input_audio_transcription.delta"
+            }
+            Self::ConversationItemInputAudioTranscriptionFailed { .. } => {
+                "conversation.item.input_audio_transcription.failed"
+            }
+            Self::ConversationItemInputAudioTranscriptionSegment { .. } => {
+                "conversation.item.input_audio_transcription.segment"
+            }
             Self::InputAudioBufferCommitted { .. } => "input_audio_buffer.committed",
+            Self::InputAudioBufferDtmfEventReceived { .. } => {
+                "input_audio_buffer.dtmf_event_received"
+            }
+            Self::InputAudioBufferTimeoutTriggered { .. } => "input_audio_buffer.timeout_triggered",
             Self::InputAudioBufferSpeechStarted { .. } => "input_audio_buffer.speech_started",
             Self::InputAudioBufferSpeechStopped { .. } => "input_audio_buffer.speech_stopped",
             Self::InputAudioBufferCleared { .. } => "input_audio_buffer.cleared",
@@ -536,7 +629,9 @@ impl RealtimeServerEvent {
             Self::FunctionCallArgumentsDone { .. } => "response.function_call_arguments.done",
             Self::McpCallArgumentsDelta { .. } => "response.mcp_call_arguments.delta",
             Self::McpCallArgumentsDone { .. } => "response.mcp_call_arguments.done",
+            Self::McpListToolsStatus { event_type, .. } => event_type.as_str(),
             Self::ResponseItemStatus { event_type, .. } => event_type.as_str(),
+            Self::RateLimitsUpdated { .. } => "rate_limits.updated",
             Self::OutputAudioBufferStarted { .. } => "output_audio_buffer.started",
             Self::OutputAudioBufferStopped { .. } => "output_audio_buffer.stopped",
             Self::OutputAudioBufferCleared { .. } => "output_audio_buffer.cleared",
@@ -572,16 +667,91 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
             event_id: required_string(object, "event_id")?,
             session: required_json(object, "session")?,
         }),
+        "conversation.created" => Ok(RealtimeServerEvent::ConversationCreated {
+            event_id: required_string(object, "event_id")?,
+            conversation: object.get("conversation").cloned().unwrap_or(Value::Null),
+        }),
+        "conversation.item.added" => Ok(RealtimeServerEvent::ConversationItemAdded {
+            event_id: required_string(object, "event_id")?,
+            previous_item_id: optional_string(object, "previous_item_id"),
+            item: required_json(object, "item")?,
+        }),
         "conversation.item.created" => Ok(RealtimeServerEvent::ConversationItemCreated {
             event_id: required_string(object, "event_id")?,
             previous_item_id: optional_string(object, "previous_item_id"),
             item: required_json(object, "item")?,
         }),
+        "conversation.item.deleted" => Ok(RealtimeServerEvent::ConversationItemDeleted {
+            event_id: required_string(object, "event_id")?,
+            item_id: required_string(object, "item_id")?,
+        }),
+        "conversation.item.done" => Ok(RealtimeServerEvent::ConversationItemDone {
+            event_id: required_string(object, "event_id")?,
+            previous_item_id: optional_string(object, "previous_item_id"),
+            item: required_json(object, "item")?,
+        }),
+        "conversation.item.retrieved" => Ok(RealtimeServerEvent::ConversationItemRetrieved {
+            event_id: required_string(object, "event_id")?,
+            item: required_json(object, "item")?,
+        }),
+        "conversation.item.input_audio_transcription.completed" => Ok(
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionCompleted {
+                event_id: required_string(object, "event_id")?,
+                item_id: required_string(object, "item_id")?,
+                content_index: required_usize(object, "content_index")?,
+                transcript: required_string(object, "transcript")?,
+                usage: object.get("usage").cloned().unwrap_or(Value::Null),
+                logprobs: object.get("logprobs").cloned(),
+            },
+        ),
+        "conversation.item.input_audio_transcription.delta" => Ok(
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionDelta {
+                event_id: required_string(object, "event_id")?,
+                item_id: required_string(object, "item_id")?,
+                content_index: optional_usize(object, "content_index")?,
+                delta: optional_string(object, "delta"),
+                logprobs: object.get("logprobs").cloned(),
+            },
+        ),
+        "conversation.item.input_audio_transcription.failed" => Ok(
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionFailed {
+                event_id: required_string(object, "event_id")?,
+                item_id: required_string(object, "item_id")?,
+                content_index: required_usize(object, "content_index")?,
+                error: object.get("error").cloned().unwrap_or(Value::Null),
+            },
+        ),
+        "conversation.item.input_audio_transcription.segment" => Ok(
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionSegment {
+                event_id: required_string(object, "event_id")?,
+                item_id: required_string(object, "item_id")?,
+                content_index: required_usize(object, "content_index")?,
+                id: required_string(object, "id")?,
+                start: required_f64(object, "start")?,
+                end: required_f64(object, "end")?,
+                speaker: required_string(object, "speaker")?,
+                text: required_string(object, "text")?,
+            },
+        ),
         "input_audio_buffer.committed" => Ok(RealtimeServerEvent::InputAudioBufferCommitted {
             event_id: required_string(object, "event_id")?,
             item_id: required_string(object, "item_id")?,
             previous_item_id: optional_string(object, "previous_item_id"),
         }),
+        "input_audio_buffer.dtmf_event_received" => {
+            Ok(RealtimeServerEvent::InputAudioBufferDtmfEventReceived {
+                event: required_string(object, "event")?,
+                received_at: required_u64(object, "received_at")?,
+            })
+        }
+        "input_audio_buffer.timeout_triggered" => {
+            Ok(RealtimeServerEvent::InputAudioBufferTimeoutTriggered {
+                event_id: required_string(object, "event_id")?,
+                item_id: required_string(object, "item_id")?,
+                audio_start_ms: required_u64(object, "audio_start_ms")?,
+                audio_end_ms: required_u64(object, "audio_end_ms")?,
+            })
+        }
         "input_audio_buffer.speech_started" => {
             Ok(RealtimeServerEvent::InputAudioBufferSpeechStarted {
                 event_id: required_string(object, "event_id")?,
@@ -726,6 +896,13 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
             output_index: required_usize(object, "output_index")?,
             arguments: required_string(object, "arguments")?,
         }),
+        "mcp_list_tools.in_progress" | "mcp_list_tools.completed" | "mcp_list_tools.failed" => {
+            Ok(RealtimeServerEvent::McpListToolsStatus {
+                event_id: required_string(object, "event_id")?,
+                event_type: event_type.to_string(),
+                item_id: required_string(object, "item_id")?,
+            })
+        }
         "response.mcp_call.in_progress"
         | "response.mcp_call.completed"
         | "response.mcp_call.failed" => Ok(RealtimeServerEvent::ResponseItemStatus {
@@ -733,6 +910,10 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
             event_type: event_type.to_string(),
             item_id: required_string(object, "item_id")?,
             output_index: required_usize(object, "output_index")?,
+        }),
+        "rate_limits.updated" => Ok(RealtimeServerEvent::RateLimitsUpdated {
+            event_id: required_string(object, "event_id")?,
+            rate_limits: required_json(object, "rate_limits")?,
         }),
         "output_audio_buffer.started" => Ok(RealtimeServerEvent::OutputAudioBufferStarted {
             event_id: required_string(object, "event_id")?,
@@ -841,8 +1022,36 @@ fn required_usize(object: &Map<String, Value>, key: &str) -> Result<usize, OpenA
         })
 }
 
+fn optional_usize(object: &Map<String, Value>, key: &str) -> Result<Option<usize>, OpenAIError> {
+    let Some(value) = object.get(key) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_u64()
+        .and_then(|value| usize::try_from(value).ok())
+        .map(Some)
+        .ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Parse,
+                format!("failed to parse Realtime websocket event field `{key}` as usize"),
+            )
+        })
+}
+
 fn required_u64(object: &Map<String, Value>, key: &str) -> Result<u64, OpenAIError> {
     object.get(key).and_then(Value::as_u64).ok_or_else(|| {
+        OpenAIError::new(
+            ErrorKind::Parse,
+            format!("failed to parse Realtime websocket event: missing `{key}`"),
+        )
+    })
+}
+
+fn required_f64(object: &Map<String, Value>, key: &str) -> Result<f64, OpenAIError> {
+    object.get(key).and_then(Value::as_f64).ok_or_else(|| {
         OpenAIError::new(
             ErrorKind::Parse,
             format!("failed to parse Realtime websocket event: missing `{key}`"),

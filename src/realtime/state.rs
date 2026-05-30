@@ -104,7 +104,18 @@ impl RealtimeEventState {
             | RealtimeServerEvent::SessionUpdated { session, .. } => {
                 self.session = Some(session.clone());
             }
-            RealtimeServerEvent::ConversationItemCreated {
+            RealtimeServerEvent::ConversationCreated { .. } => {}
+            RealtimeServerEvent::ConversationItemAdded {
+                previous_item_id,
+                item,
+                ..
+            }
+            | RealtimeServerEvent::ConversationItemCreated {
+                previous_item_id,
+                item,
+                ..
+            }
+            | RealtimeServerEvent::ConversationItemDone {
                 previous_item_id,
                 item,
                 ..
@@ -115,6 +126,89 @@ impl RealtimeEventState {
                     item.clone(),
                 );
             }
+            RealtimeServerEvent::ConversationItemRetrieved { item, .. } => {
+                upsert_conversation_item(&mut self.conversation, None, item.clone());
+            }
+            RealtimeServerEvent::ConversationItemDeleted { item_id, .. } => {
+                self.conversation
+                    .retain(|item| item.id.as_deref() != Some(item_id));
+            }
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionDelta {
+                item_id,
+                content_index,
+                delta,
+                logprobs,
+                ..
+            } => {
+                if let Some(content_index) = content_index {
+                    let part = self.conversation_content_mut(item_id, *content_index)?;
+                    if let Some(delta) = delta {
+                        part.transcript
+                            .get_or_insert_with(String::new)
+                            .push_str(delta);
+                    }
+                    if let Some(logprobs) = logprobs {
+                        part.extra
+                            .insert(String::from("transcription_logprobs"), logprobs.clone());
+                    }
+                }
+            }
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionCompleted {
+                item_id,
+                content_index,
+                transcript,
+                usage,
+                logprobs,
+                ..
+            } => {
+                let part = self.conversation_content_mut(item_id, *content_index)?;
+                part.transcript = Some(transcript.clone());
+                part.extra
+                    .insert(String::from("transcription_usage"), usage.clone());
+                if let Some(logprobs) = logprobs {
+                    part.extra
+                        .insert(String::from("transcription_logprobs"), logprobs.clone());
+                }
+            }
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionFailed {
+                item_id,
+                content_index,
+                error,
+                ..
+            } => {
+                let part = self.conversation_content_mut(item_id, *content_index)?;
+                part.extra
+                    .insert(String::from("transcription_error"), error.clone());
+            }
+            RealtimeServerEvent::ConversationItemInputAudioTranscriptionSegment {
+                item_id,
+                content_index,
+                id,
+                start,
+                end,
+                speaker,
+                text,
+                ..
+            } => {
+                let part = self.conversation_content_mut(item_id, *content_index)?;
+                let segments = part
+                    .extra
+                    .entry(String::from("transcription_segments"))
+                    .or_insert_with(|| Value::Array(Vec::new()));
+                let segments = segments.as_array_mut().ok_or_else(|| {
+                    OpenAIError::new(
+                        ErrorKind::Validation,
+                        "realtime transcription segments field is not an array",
+                    )
+                })?;
+                segments.push(serde_json::json!({
+                    "id": id,
+                    "start": start,
+                    "end": end,
+                    "speaker": speaker,
+                    "text": text
+                }));
+            }
             RealtimeServerEvent::InputAudioBufferCommitted {
                 item_id,
                 previous_item_id,
@@ -122,6 +216,18 @@ impl RealtimeEventState {
             } => {
                 self.audio_buffer.committed_item_id = Some(item_id.clone());
                 self.audio_buffer.previous_item_id = previous_item_id.clone();
+                self.audio_buffer.cleared = false;
+            }
+            RealtimeServerEvent::InputAudioBufferDtmfEventReceived { .. } => {}
+            RealtimeServerEvent::InputAudioBufferTimeoutTriggered {
+                item_id,
+                audio_start_ms,
+                audio_end_ms,
+                ..
+            } => {
+                self.audio_buffer.committed_item_id = Some(item_id.clone());
+                self.audio_buffer.speech_started_ms = Some(*audio_start_ms);
+                self.audio_buffer.speech_stopped_ms = Some(*audio_end_ms);
                 self.audio_buffer.cleared = false;
             }
             RealtimeServerEvent::InputAudioBufferSpeechStarted {
@@ -339,6 +445,8 @@ impl RealtimeEventState {
             RealtimeServerEvent::OutputAudioBufferStarted { .. }
             | RealtimeServerEvent::OutputAudioBufferStopped { .. }
             | RealtimeServerEvent::OutputAudioBufferCleared { .. }
+            | RealtimeServerEvent::McpListToolsStatus { .. }
+            | RealtimeServerEvent::RateLimitsUpdated { .. }
             | RealtimeServerEvent::Error { .. }
             | RealtimeServerEvent::Unknown { .. } => {}
         }
@@ -384,6 +492,20 @@ impl RealtimeEventState {
                     format!("realtime response referenced missing content_index {content_index}"),
                 )
             })
+    }
+
+    fn conversation_content_mut(
+        &mut self,
+        item_id: &str,
+        content_index: usize,
+    ) -> Result<&mut RealtimeConversationMessageContentPart, OpenAIError> {
+        let item = get_conversation_item_mut(&mut self.conversation, item_id)?;
+        item.content.get_mut(content_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("conversation item `{item_id}` missing content_index {content_index}"),
+            )
+        })
     }
 }
 
