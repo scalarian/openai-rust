@@ -6,9 +6,10 @@ use openai_rust::{
         ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool,
         ResponseComputerAction, ResponseConversation, ResponseConversationObject,
         ResponseFileSearchAttributeValue, ResponseFormatTextConfig, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponsePrompt, ResponseReasoning,
-        ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
-        ResponseWebSearchPreviewTool,
+        ResponseItemEnvironment, ResponseItemOutput, ResponseMcpAllowedTools,
+        ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
+        ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome,
+        ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -82,6 +83,39 @@ fn create_populates_output_text_helper() {
                     container: json!("auto"),
                     extra: BTreeMap::new(),
                 }),
+                ResponseTool::Mcp(ResponseMcpTool {
+                    server_label: String::from("deepwiki"),
+                    allowed_tools: Some(ResponseMcpAllowedTools::Filter(ResponseMcpToolFilter {
+                        read_only: Some(true),
+                        tool_names: vec![String::from("search_docs")],
+                        extra: BTreeMap::new(),
+                    })),
+                    authorization: None,
+                    connector_id: None,
+                    defer_loading: Some(false),
+                    headers: Some(BTreeMap::from([(
+                        String::from("x-tenant"),
+                        String::from("docs"),
+                    )])),
+                    require_approval: Some(ResponseMcpRequireApproval::Filter(
+                        ResponseMcpApprovalFilter {
+                            always: Some(ResponseMcpToolFilter {
+                                read_only: Some(false),
+                                tool_names: vec![String::from("write_docs")],
+                                extra: BTreeMap::new(),
+                            }),
+                            never: Some(ResponseMcpToolFilter {
+                                read_only: Some(true),
+                                tool_names: Vec::new(),
+                                extra: BTreeMap::new(),
+                            }),
+                            extra: BTreeMap::new(),
+                        },
+                    )),
+                    server_description: Some(String::from("Docs MCP")),
+                    server_url: Some(String::from("https://mcp.example.test")),
+                    extra: BTreeMap::new(),
+                }),
             ],
             ..Default::default()
         })
@@ -124,6 +158,25 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["tools"][0]["search_context_size"], "low");
     assert_eq!(body["tools"][1]["type"], "code_interpreter");
     assert_eq!(body["tools"][1]["container"], "auto");
+    assert_eq!(body["tools"][2]["type"], "mcp");
+    assert_eq!(body["tools"][2]["server_label"], "deepwiki");
+    assert_eq!(body["tools"][2]["server_url"], "https://mcp.example.test");
+    assert_eq!(body["tools"][2]["server_description"], "Docs MCP");
+    assert_eq!(body["tools"][2]["defer_loading"], false);
+    assert_eq!(body["tools"][2]["headers"]["x-tenant"], "docs");
+    assert_eq!(body["tools"][2]["allowed_tools"]["read_only"], true);
+    assert_eq!(
+        body["tools"][2]["allowed_tools"]["tool_names"],
+        json!(["search_docs"])
+    );
+    assert_eq!(
+        body["tools"][2]["require_approval"]["always"]["tool_names"],
+        json!(["write_docs"])
+    );
+    assert_eq!(
+        body["tools"][2]["require_approval"]["never"]["read_only"],
+        true
+    );
     assert_eq!(response.output().id, "resp_create");
     assert_eq!(response.output().object, "response");
     assert_eq!(response.output().created_at, 1.25);
@@ -184,17 +237,29 @@ fn create_populates_output_text_helper() {
         response.output().tool_choice,
         Some(ResponseToolChoice::Auto)
     );
+    assert_eq!(response.output().tools.len(), 2);
     assert_eq!(
-        response.output().tools,
-        vec![ResponseTool::WebSearchPreview(
-            ResponseWebSearchPreviewTool {
-                search_content_types: Vec::new(),
-                search_context_size: None,
-                user_location: None,
-                extra: BTreeMap::new(),
-            }
-        )]
+        response.output().tools[0],
+        ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
+            search_content_types: Vec::new(),
+            search_context_size: None,
+            user_location: None,
+            extra: BTreeMap::new(),
+        })
     );
+    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[1] else {
+        panic!("expected response mcp tool");
+    };
+    assert_eq!(response_mcp_tool.server_label, "deepwiki");
+    assert!(matches!(
+        response_mcp_tool.allowed_tools.as_ref(),
+        Some(ResponseMcpAllowedTools::Names(names))
+            if names.len() == 1 && names[0] == "search_docs"
+    ));
+    assert!(matches!(
+        response_mcp_tool.require_approval.as_ref(),
+        Some(ResponseMcpRequireApproval::Never)
+    ));
     let mcp_list = response
         .output()
         .output
@@ -997,7 +1062,16 @@ fn response_payload(
         "temperature": 0.2,
         "text": {"format": {"type": "text"}},
         "tool_choice": "auto",
-        "tools": [{"type": "web_search_preview"}],
+        "tools": [
+            {"type": "web_search_preview"},
+            {
+                "type": "mcp",
+                "server_label": "deepwiki",
+                "allowed_tools": ["search_docs"],
+                "require_approval": "never",
+                "server_url": "https://mcp.example.test"
+            }
+        ],
         "top_logprobs": 2,
         "top_p": 0.8,
         "truncation": "auto",

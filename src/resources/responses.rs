@@ -1172,7 +1172,7 @@ pub struct ResponseMcpListTool {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseItemTool {
     McpList(ResponseMcpListTool),
-    Definition(ResponseTool),
+    Definition(Box<ResponseTool>),
     Json(Value),
 }
 
@@ -1186,7 +1186,7 @@ impl ResponseItemTool {
 
     pub fn as_definition(&self) -> Option<&ResponseTool> {
         match self {
-            Self::Definition(tool) => Some(tool),
+            Self::Definition(tool) => Some(tool.as_ref()),
             _ => None,
         }
     }
@@ -1204,6 +1204,7 @@ impl<'de> Deserialize<'de> for ResponseItemTool {
                 let value = Value::Object(object);
                 if has_tool_type {
                     serde_json::from_value(value)
+                        .map(Box::new)
                         .map(Self::Definition)
                         .map_err(serde::de::Error::custom)
                 } else {
@@ -3470,7 +3471,7 @@ pub struct ResponseComputerUsePreviewTool {
 pub struct ResponseMcpTool {
     pub server_label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_tools: Option<Value>,
+    pub allowed_tools: Option<ResponseMcpAllowedTools>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3480,7 +3481,7 @@ pub struct ResponseMcpTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub require_approval: Option<Value>,
+    pub require_approval: Option<ResponseMcpRequireApproval>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3488,6 +3489,106 @@ pub struct ResponseMcpTool {
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseMcpAllowedTools {
+    Names(Vec<String>),
+    Filter(ResponseMcpToolFilter),
+    Json(Value),
+}
+
+impl Serialize for ResponseMcpAllowedTools {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Names(names) => names.serialize(serializer),
+            Self::Filter(filter) => filter.serialize(serializer),
+            Self::Json(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseMcpAllowedTools {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::Array(_) => match serde_json::from_value(value.clone()) {
+                Ok(names) => Ok(Self::Names(names)),
+                Err(_) => Ok(Self::Json(value)),
+            },
+            Value::Object(_) => serde_json::from_value(value.clone())
+                .map(Self::Filter)
+                .or_else(|_| Ok(Self::Json(value))),
+            value => Ok(Self::Json(value)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseMcpToolFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tool_names: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseMcpRequireApproval {
+    Always,
+    Never,
+    Filter(ResponseMcpApprovalFilter),
+    Json(Value),
+}
+
+impl Serialize for ResponseMcpRequireApproval {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Always => serializer.serialize_str("always"),
+            Self::Never => serializer.serialize_str("never"),
+            Self::Filter(filter) => filter.serialize(serializer),
+            Self::Json(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseMcpRequireApproval {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) if value == "always" => Ok(Self::Always),
+            Value::String(value) if value == "never" => Ok(Self::Never),
+            Value::Object(_) => serde_json::from_value(value.clone())
+                .map(Self::Filter)
+                .or_else(|_| Ok(Self::Json(value))),
+            value => Ok(Self::Json(value)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseMcpApprovalFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always: Option<ResponseMcpApprovalToolFilter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub never: Option<ResponseMcpApprovalToolFilter>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type ResponseMcpApprovalToolFilter = ResponseMcpToolFilter;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseCodeInterpreterTool {
