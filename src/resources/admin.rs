@@ -209,6 +209,27 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization user object type.
+    pub enum AdminOrganizationUserObject {
+        OrganizationUser => "organization.user",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Nested user object type.
+    pub enum AdminUserObject {
+        User => "user",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization user deletion object type.
+    pub enum AdminOrganizationUserDeletedObject {
+        OrganizationUserDeleted => "organization.user.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project membership role used by invite project grants and service accounts.
     pub enum AdminProjectMembershipRole {
         Member => "member",
@@ -834,6 +855,99 @@ pub struct AdminUserUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub technical_level: Option<String>,
 }
+
+/// Project summary associated with an organization user.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminOrganizationUserProject {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Projects associated with an organization user, if included.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminOrganizationUserProjects {
+    #[serde(default)]
+    pub data: Vec<AdminOrganizationUserProject>,
+    #[serde(default)]
+    pub object: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Nested user details inside an organization user response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminOrganizationUserDetails {
+    pub id: String,
+    pub object: AdminUserObject,
+    #[serde(default)]
+    pub banned: Option<bool>,
+    #[serde(default)]
+    pub banned_at: Option<u64>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub picture: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual user within an organization.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminOrganizationUser {
+    pub id: String,
+    pub added_at: u64,
+    pub object: AdminOrganizationUserObject,
+    #[serde(default)]
+    pub api_key_last_used_at: Option<u64>,
+    #[serde(default)]
+    pub created: Option<u64>,
+    #[serde(default)]
+    pub developer_persona: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub is_default: Option<bool>,
+    #[serde(default)]
+    pub is_scale_tier_authorized_purchaser: Option<bool>,
+    #[serde(default)]
+    pub is_scim_managed: Option<bool>,
+    #[serde(default)]
+    pub is_service_account: Option<bool>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub projects: Option<AdminOrganizationUserProjects>,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub technical_level: Option<String>,
+    #[serde(default)]
+    pub user: Option<AdminOrganizationUserDetails>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Organization user deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminOrganizationUserDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminOrganizationUserDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminOrganizationUserListResponse = AdminConversationCursorPage<AdminOrganizationUser>;
 
 /// Organization role creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -2213,34 +2327,53 @@ impl OrganizationUsers {
         OrganizationUserRoles::new(self.runtime.clone())
     }
 
-    pub fn retrieve(&self, user_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(
+        &self,
+        user_id: &str,
+    ) -> Result<ApiResponse<AdminOrganizationUser>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
-        get(&self.runtime, format!("/organization/users/{user_id}"))
+        self.runtime.execute_json(
+            "GET",
+            format!("/organization/users/{user_id}"),
+            RequestOptions::default(),
+        )
     }
 
     pub fn update<B: Serialize>(
         &self,
         user_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminOrganizationUser>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/users/{user_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/users", params)
+    ) -> Result<ApiResponse<AdminOrganizationUserListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/users", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, user_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        user_id: &str,
+    ) -> Result<ApiResponse<AdminOrganizationUserDeleteResponse>, OpenAIError> {
         let user_id = path_id("user_id", user_id)?;
-        delete(&self.runtime, format!("/organization/users/{user_id}"))
+        self.runtime.execute_json(
+            "DELETE",
+            format!("/organization/users/{user_id}"),
+            RequestOptions::default(),
+        )
     }
 }
 

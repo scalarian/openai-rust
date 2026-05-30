@@ -74,6 +74,36 @@ fn organization_invite_json(id: &str) -> Value {
     })
 }
 
+fn organization_user_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "added_at": 1_717_172_000u64,
+        "object": "organization.user",
+        "api_key_last_used_at": null,
+        "created": 1_717_171_400u64,
+        "developer_persona": "builder",
+        "email": "ops@example.com",
+        "is_default": false,
+        "is_scale_tier_authorized_purchaser": false,
+        "is_scim_managed": false,
+        "is_service_account": false,
+        "name": "Ops User",
+        "projects": {
+            "object": "list",
+            "data": [{"id": "proj_1", "name": "Research", "role": "owner"}]
+        },
+        "role": "owner",
+        "technical_level": "advanced",
+        "user": {
+            "id": id,
+            "object": "user",
+            "email": "ops@example.com",
+            "enabled": true,
+            "name": "Ops User"
+        }
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -455,6 +485,15 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[3] = json_response(
+        json!({
+            "data": [organization_user_json("user_admin")],
+            "has_more": true,
+            "last_id": "user_admin"
+        })
+        .to_string(),
+    );
+    responses[4] = json_response(organization_user_json("user_admin").to_string());
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -510,14 +549,21 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     assert_eq!(invites.output.data[0].id, "invite_new");
     assert_eq!(invites.output.next_after(), Some("invite_new"));
 
-    org.users()
+    let users = org
+        .users()
         .list(AdminUserListParams {
             after: Some(String::from("user_after")),
             emails: Some(vec![String::from("ops@example.com")]),
             limit: Some(7),
         })
         .unwrap();
-    org.users()
+    assert_eq!(
+        users.output.data[0].object,
+        AdminOrganizationUserObject::OrganizationUser
+    );
+    assert_eq!(users.output.next_after(), Some("user_admin"));
+    let updated_user = org
+        .users()
         .update(
             "user_admin",
             AdminUserUpdateParams {
@@ -527,6 +573,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(updated_user.output.role.as_deref(), Some("owner"));
+    assert_eq!(
+        updated_user.output.technical_level.as_deref(),
+        Some("advanced")
+    );
     org.users()
         .roles()
         .list(
@@ -1148,6 +1199,46 @@ fn admin_invite_retrieve_and_delete_return_typed_responses() {
     assert_eq!(requests[0].path, "/v1/organization/invites/invite_new");
     assert_eq!(requests[1].method, "DELETE");
     assert_eq!(requests[1].path, "/v1/organization/invites/invite_new");
+}
+
+#[test]
+fn admin_user_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_user_json("user_admin").to_string()),
+        json_response(
+            json!({
+                "id": "user_admin",
+                "deleted": true,
+                "object": "organization.user.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let users = client.admin().organization().users();
+
+    let user = users.retrieve("user_admin").unwrap();
+    assert_eq!(
+        user.output.object,
+        AdminOrganizationUserObject::OrganizationUser
+    );
+    assert_eq!(
+        user.output.user.as_ref().map(|inner| &inner.object),
+        Some(&AdminUserObject::User)
+    );
+
+    let deleted = users.delete("user_admin").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminOrganizationUserDeletedObject::OrganizationUserDeleted
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(requests[0].path, "/v1/organization/users/user_admin");
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(requests[1].path, "/v1/organization/users/user_admin");
 }
 
 #[test]
