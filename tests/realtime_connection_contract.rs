@@ -128,6 +128,63 @@ fn websocket_target_builds_ws_urls_and_safe_auth_inputs() {
     assert_eq!(missing_target.kind, ErrorKind::Validation);
 }
 
+#[test]
+fn client_event_enum_serializes_all_upstream_event_types() {
+    let events = vec![
+        RealtimeClientEvent::session_update(RealtimeSessionConfig {
+            instructions: Some(String::from("Be direct.")),
+            ..Default::default()
+        })
+        .with_event_id("evt_update"),
+        RealtimeClientEvent::response_create(Some(json!({"metadata": {"source": "enum"}}))),
+        RealtimeClientEvent::response_cancel(Some(String::from("resp_123"))),
+        RealtimeClientEvent::input_audio_buffer_append("AQID"),
+        RealtimeClientEvent::input_audio_buffer_commit(),
+        RealtimeClientEvent::input_audio_buffer_clear(),
+        RealtimeClientEvent::conversation_item_create(RealtimeConversationItem::user_message(
+            vec![RealtimeConversationMessageContentPart::input_text("Hello")],
+        ))
+        .with_previous_item_id("root"),
+        RealtimeClientEvent::conversation_item_truncate("item_assistant", 0, 240),
+        RealtimeClientEvent::conversation_item_retrieve("item_user"),
+        RealtimeClientEvent::conversation_item_delete("item_user"),
+        RealtimeClientEvent::output_audio_buffer_clear(),
+    ];
+    let serialized = events
+        .iter()
+        .map(RealtimeClientEvent::to_json_value)
+        .collect::<Vec<_>>();
+    let event_types = serialized
+        .iter()
+        .map(|event| event["type"].as_str().unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        event_types,
+        vec![
+            "session.update",
+            "response.create",
+            "response.cancel",
+            "input_audio_buffer.append",
+            "input_audio_buffer.commit",
+            "input_audio_buffer.clear",
+            "conversation.item.create",
+            "conversation.item.truncate",
+            "conversation.item.retrieve",
+            "conversation.item.delete",
+            "output_audio_buffer.clear",
+        ]
+    );
+    assert_eq!(serialized[0]["event_id"], "evt_update");
+    assert_eq!(serialized[1]["response"]["metadata"]["source"], "enum");
+    assert_eq!(serialized[2]["response_id"], "resp_123");
+    assert_eq!(serialized[3]["audio"], "AQID");
+    assert_eq!(serialized[6]["previous_item_id"], "root");
+    assert_eq!(serialized[7]["audio_end_ms"], 240);
+    assert_eq!(serialized[8]["item_id"], "item_user");
+    assert_eq!(serialized[9]["item_id"], "item_user");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bootstrap_and_clean_close() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();

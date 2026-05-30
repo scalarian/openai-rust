@@ -200,14 +200,45 @@ pub enum RealtimeClientEvent {
         event_id: Option<String>,
         session: RealtimeSessionConfig,
     },
+    InputAudioBufferAppend {
+        event_id: Option<String>,
+        audio: String,
+    },
+    InputAudioBufferClear {
+        event_id: Option<String>,
+    },
+    InputAudioBufferCommit {
+        event_id: Option<String>,
+    },
     ConversationItemCreate {
         event_id: Option<String>,
         previous_item_id: Option<String>,
         item: RealtimeConversationItem,
     },
+    ConversationItemDelete {
+        event_id: Option<String>,
+        item_id: String,
+    },
+    ConversationItemRetrieve {
+        event_id: Option<String>,
+        item_id: String,
+    },
+    ConversationItemTruncate {
+        event_id: Option<String>,
+        item_id: String,
+        content_index: usize,
+        audio_end_ms: u64,
+    },
     ResponseCreate {
         event_id: Option<String>,
         response: Option<Value>,
+    },
+    ResponseCancel {
+        event_id: Option<String>,
+        response_id: Option<String>,
+    },
+    OutputAudioBufferClear {
+        event_id: Option<String>,
     },
 }
 
@@ -227,11 +258,64 @@ impl RealtimeClientEvent {
         }
     }
 
+    pub fn conversation_item_delete(item_id: impl Into<String>) -> Self {
+        Self::ConversationItemDelete {
+            event_id: None,
+            item_id: item_id.into(),
+        }
+    }
+
+    pub fn conversation_item_retrieve(item_id: impl Into<String>) -> Self {
+        Self::ConversationItemRetrieve {
+            event_id: None,
+            item_id: item_id.into(),
+        }
+    }
+
+    pub fn conversation_item_truncate(
+        item_id: impl Into<String>,
+        content_index: usize,
+        audio_end_ms: u64,
+    ) -> Self {
+        Self::ConversationItemTruncate {
+            event_id: None,
+            item_id: item_id.into(),
+            content_index,
+            audio_end_ms,
+        }
+    }
+
+    pub fn input_audio_buffer_append(audio: impl Into<String>) -> Self {
+        Self::InputAudioBufferAppend {
+            event_id: None,
+            audio: audio.into(),
+        }
+    }
+
+    pub fn input_audio_buffer_clear() -> Self {
+        Self::InputAudioBufferClear { event_id: None }
+    }
+
+    pub fn input_audio_buffer_commit() -> Self {
+        Self::InputAudioBufferCommit { event_id: None }
+    }
+
     pub fn response_create(response: Option<Value>) -> Self {
         Self::ResponseCreate {
             event_id: None,
             response,
         }
+    }
+
+    pub fn response_cancel(response_id: Option<String>) -> Self {
+        Self::ResponseCancel {
+            event_id: None,
+            response_id,
+        }
+    }
+
+    pub fn output_audio_buffer_clear() -> Self {
+        Self::OutputAudioBufferClear { event_id: None }
     }
 
     pub fn response_create_params(
@@ -250,8 +334,16 @@ impl RealtimeClientEvent {
     pub fn with_event_id(mut self, event_id: impl Into<String>) -> Self {
         match &mut self {
             Self::SessionUpdate { event_id: slot, .. }
+            | Self::InputAudioBufferAppend { event_id: slot, .. }
+            | Self::InputAudioBufferClear { event_id: slot }
+            | Self::InputAudioBufferCommit { event_id: slot }
             | Self::ConversationItemCreate { event_id: slot, .. }
-            | Self::ResponseCreate { event_id: slot, .. } => *slot = Some(event_id.into()),
+            | Self::ConversationItemDelete { event_id: slot, .. }
+            | Self::ConversationItemRetrieve { event_id: slot, .. }
+            | Self::ConversationItemTruncate { event_id: slot, .. }
+            | Self::ResponseCreate { event_id: slot, .. }
+            | Self::ResponseCancel { event_id: slot, .. }
+            | Self::OutputAudioBufferClear { event_id: slot } => *slot = Some(event_id.into()),
         }
         self
     }
@@ -309,6 +401,49 @@ impl RealtimeClientEvent {
                 }
                 Value::Object(object)
             }
+            Self::ConversationItemDelete { event_id, item_id } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("conversation.item.delete")),
+                );
+                object.insert(String::from("item_id"), Value::String(item_id.clone()));
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
+            Self::ConversationItemRetrieve { event_id, item_id } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("conversation.item.retrieve")),
+                );
+                object.insert(String::from("item_id"), Value::String(item_id.clone()));
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
+            Self::ConversationItemTruncate {
+                event_id,
+                item_id,
+                content_index,
+                audio_end_ms,
+            } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("conversation.item.truncate")),
+                );
+                object.insert(String::from("item_id"), Value::String(item_id.clone()));
+                object.insert(String::from("content_index"), Value::from(*content_index));
+                object.insert(String::from("audio_end_ms"), Value::from(*audio_end_ms));
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
             Self::ResponseCreate { event_id, response } => {
                 let mut object = Map::new();
                 object.insert(
@@ -320,6 +455,71 @@ impl RealtimeClientEvent {
                 }
                 if let Some(response) = response {
                     object.insert(String::from("response"), response.clone());
+                }
+                Value::Object(object)
+            }
+            Self::ResponseCancel {
+                event_id,
+                response_id,
+            } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("response.cancel")),
+                );
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                if let Some(response_id) = response_id {
+                    object.insert(
+                        String::from("response_id"),
+                        Value::String(response_id.clone()),
+                    );
+                }
+                Value::Object(object)
+            }
+            Self::InputAudioBufferAppend { event_id, audio } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("input_audio_buffer.append")),
+                );
+                object.insert(String::from("audio"), Value::String(audio.clone()));
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
+            Self::InputAudioBufferClear { event_id } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("input_audio_buffer.clear")),
+                );
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
+            Self::InputAudioBufferCommit { event_id } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("input_audio_buffer.commit")),
+                );
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
+                }
+                Value::Object(object)
+            }
+            Self::OutputAudioBufferClear { event_id } => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("output_audio_buffer.clear")),
+                );
+                if let Some(event_id) = event_id {
+                    object.insert(String::from("event_id"), Value::String(event_id.clone()));
                 }
                 Value::Object(object)
             }
