@@ -123,13 +123,16 @@ impl UploadParts {
     }
 
     /// Adds one multipart part to an upload.
-    pub fn create(
+    pub fn create<P>(
         &self,
         upload_id: &str,
-        part: UploadPartInput,
-    ) -> Result<ApiResponse<UploadPart>, OpenAIError> {
+        params: P,
+    ) -> Result<ApiResponse<UploadPart>, OpenAIError>
+    where
+        P: Into<UploadPartCreateParams>,
+    {
         let upload_id = encode_path_id(validate_path_id("upload_id", upload_id)?);
-        let multipart = part.into_multipart();
+        let multipart = params.into().into_multipart();
         let content_type = multipart.content_type();
         let mut request = self.runtime.prepare_request_with_body(
             "POST",
@@ -188,6 +191,28 @@ impl UploadPurpose {
 impl std::fmt::Display for UploadPurpose {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+/// Upload part creation parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct UploadPartCreateParams {
+    pub data: UploadPartInput,
+}
+
+impl UploadPartCreateParams {
+    pub fn new(data: UploadPartInput) -> Self {
+        Self { data }
+    }
+
+    fn into_multipart(self) -> crate::helpers::multipart::MultipartPayload {
+        self.data.into_multipart()
+    }
+}
+
+impl From<UploadPartInput> for UploadPartCreateParams {
+    fn from(data: UploadPartInput) -> Self {
+        Self::new(data)
     }
 }
 

@@ -8,7 +8,8 @@ use openai_rust::{
     resources::{
         files::{FileExpiresAfter, FileStatus},
         uploads::{
-            UploadCompleteParams, UploadCreateParams, UploadPartInput, UploadPurpose, UploadStatus,
+            UploadCompleteParams, UploadCreateParams, UploadPartCreateParams, UploadPartInput,
+            UploadPurpose, UploadStatus,
         },
     },
 };
@@ -66,11 +67,11 @@ fn lifecycle_and_chunking() {
         .parts()
         .create(
             "upload-123",
-            UploadPartInput::new(
+            UploadPartCreateParams::new(UploadPartInput::new(
                 "part-1.bin",
                 "application/octet-stream",
                 b"hello world!".to_vec(),
-            ),
+            )),
         )
         .unwrap();
     assert_eq!(part.output.id, "part-1");
