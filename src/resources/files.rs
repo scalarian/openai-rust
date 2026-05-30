@@ -113,6 +113,11 @@ impl Files {
         execute_bytes(&request, &options)
     }
 
+    /// Alias for upstream's `retrieve_content` helper.
+    pub fn retrieve_content(&self, file_id: &str) -> Result<ApiResponse<Vec<u8>>, OpenAIError> {
+        self.content(file_id)
+    }
+
     /// Polls retrieve until the file reaches a terminal processing state or times out.
     pub fn wait_for_processing(
         &self,

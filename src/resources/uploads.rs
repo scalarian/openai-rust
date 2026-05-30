@@ -25,6 +25,11 @@ impl Uploads {
         Self { runtime }
     }
 
+    /// Returns the nested upload parts surface.
+    pub fn parts(&self) -> UploadParts {
+        UploadParts::new(self.runtime.clone())
+    }
+
     /// Creates a pending upload resource.
     pub fn create(&self, params: UploadCreateParams) -> Result<ApiResponse<Upload>, OpenAIError> {
         self.runtime
@@ -37,25 +42,7 @@ impl Uploads {
         upload_id: &str,
         part: UploadPartInput,
     ) -> Result<ApiResponse<UploadPart>, OpenAIError> {
-        let upload_id = encode_path_id(validate_path_id("upload_id", upload_id)?);
-        let multipart = part.into_multipart();
-        let content_type = multipart.content_type();
-        let mut request = self.runtime.prepare_request_with_body(
-            "POST",
-            format!("/uploads/{upload_id}/parts"),
-            Some(multipart.into_body()),
-        )?;
-        request
-            .headers
-            .insert(String::from("content-type"), content_type);
-        request
-            .headers
-            .insert(String::from("accept"), String::from("application/json"));
-        let options = self
-            .runtime
-            .resolve_request_options(&RequestOptions::default())?;
-        let response = crate::core::transport::execute_bytes(&request, &options)?;
-        parse_json_bytes_response(response)
+        self.parts().create(upload_id, part)
     }
 
     /// Completes an upload using the caller-supplied part ordering.
@@ -121,6 +108,45 @@ impl Uploads {
                 md5: params.md5,
             },
         )
+    }
+}
+
+/// Nested upload parts API family.
+#[derive(Clone, Debug)]
+pub struct UploadParts {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl UploadParts {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Adds one multipart part to an upload.
+    pub fn create(
+        &self,
+        upload_id: &str,
+        part: UploadPartInput,
+    ) -> Result<ApiResponse<UploadPart>, OpenAIError> {
+        let upload_id = encode_path_id(validate_path_id("upload_id", upload_id)?);
+        let multipart = part.into_multipart();
+        let content_type = multipart.content_type();
+        let mut request = self.runtime.prepare_request_with_body(
+            "POST",
+            format!("/uploads/{upload_id}/parts"),
+            Some(multipart.into_body()),
+        )?;
+        request
+            .headers
+            .insert(String::from("content-type"), content_type);
+        request
+            .headers
+            .insert(String::from("accept"), String::from("application/json"));
+        let options = self
+            .runtime
+            .resolve_request_options(&RequestOptions::default())?;
+        let response = crate::core::transport::execute_bytes(&request, &options)?;
+        parse_json_bytes_response(response)
     }
 }
 

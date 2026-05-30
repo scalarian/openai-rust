@@ -63,7 +63,8 @@ fn lifecycle_and_chunking() {
 
     let part = client
         .uploads()
-        .add_part(
+        .parts()
+        .create(
             "upload-123",
             UploadPartInput::new(
                 "part-1.bin",
@@ -128,7 +129,8 @@ fn lifecycle_and_chunking() {
 
     let error = client
         .uploads()
-        .add_part(" ", UploadPartInput::default())
+        .parts()
+        .create(" ", UploadPartInput::default())
         .unwrap_err();
     assert!(matches!(error.kind, ErrorKind::Validation));
 

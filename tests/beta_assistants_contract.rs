@@ -401,7 +401,7 @@ fn beta_assistants_stream_helpers_preserve_routes_headers_and_stream_bodies() {
     let runs = threads.runs();
 
     let mut run_stream = runs
-        .create_stream("thread_123", json!({"assistant_id": "asst_123"}))
+        .create_and_stream("thread_123", json!({"assistant_id": "asst_123"}))
         .expect("run stream");
     assert_eq!(run_stream.metadata().request_id(), Some("req_run_stream"));
     assert_eq!(

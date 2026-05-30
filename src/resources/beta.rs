@@ -333,6 +333,15 @@ impl BetaThreadRuns {
         self.create_stream_with_query(thread_id, params, BetaQueryParams::default())
     }
 
+    /// Alias for upstream's `create_and_stream` helper.
+    pub fn create_and_stream<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<BetaAssistantStream, OpenAIError> {
+        self.create_stream(thread_id, params)
+    }
+
     /// Creates a streamed run within a thread with additional query parameters.
     pub fn create_stream_with_query<B: Serialize>(
         &self,

@@ -151,6 +151,7 @@ fn retrieve_and_delete() {
 fn content_and_wait_for_processing() {
     let server = mock_http::MockHttpServer::spawn_sequence(vec![
         binary_response(b"file-bytes"),
+        binary_response(b"file-bytes-alias"),
         json_response(file_payload("file-pending", "uploaded")),
         json_response(file_payload("file-pending", "processed")),
     ])
@@ -159,6 +160,8 @@ fn content_and_wait_for_processing() {
 
     let content = client.files().content("file-pending").unwrap();
     assert_eq!(content.output, b"file-bytes");
+    let retrieved_content = client.files().retrieve_content("file-pending").unwrap();
+    assert_eq!(retrieved_content.output, b"file-bytes-alias");
 
     let processed = client
         .files()
@@ -172,10 +175,11 @@ fn content_and_wait_for_processing() {
         .unwrap();
     assert_eq!(processed.output.status, Some(FileStatus::Processed));
 
-    let requests = server.captured_requests(3).unwrap();
+    let requests = server.captured_requests(4).unwrap();
     assert_eq!(requests[0].path, "/v1/files/file-pending/content");
-    assert_eq!(requests[1].path, "/v1/files/file-pending");
+    assert_eq!(requests[1].path, "/v1/files/file-pending/content");
     assert_eq!(requests[2].path, "/v1/files/file-pending");
+    assert_eq!(requests[3].path, "/v1/files/file-pending");
 }
 
 #[test]
