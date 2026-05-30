@@ -1132,7 +1132,7 @@ pub struct ResponseOutputItem {
     pub operation: Option<Value>,
     pub environment: Option<Value>,
     pub execution: Option<String>,
-    pub output: Option<Value>,
+    pub output: Option<ResponseItemOutput>,
     pub result: Option<String>,
     pub queries: Vec<String>,
     pub results: Option<Vec<Value>>,
@@ -1197,6 +1197,45 @@ pub enum ResponseComputerAction {
         extra: BTreeMap<String, Value>,
     },
     Raw(Value),
+}
+
+/// Output payload used by output items with a generic `output` field.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseItemOutput {
+    Text(String),
+    ComputerScreenshot(ResponseComputerScreenshotOutput),
+    Json(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseItemOutput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) => Ok(Self::Text(value)),
+            Value::Object(object)
+                if object.get("type").and_then(Value::as_str) == Some("computer_screenshot") =>
+            {
+                serde_json::from_value(Value::Object(object))
+                    .map(Self::ComputerScreenshot)
+                    .map_err(serde::de::Error::custom)
+            }
+            other => Ok(Self::Json(other)),
+        }
+    }
+}
+
+/// Computer screenshot output payload.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerScreenshotOutput {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub image_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 impl<'de> Deserialize<'de> for ResponseComputerAction {
@@ -1372,7 +1411,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     execution: Option<String>,
     #[serde(default)]
-    output: Option<Value>,
+    output: Option<ResponseItemOutput>,
     #[serde(default)]
     result: Option<String>,
     #[serde(default)]

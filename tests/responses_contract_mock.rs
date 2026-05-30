@@ -4,8 +4,8 @@ use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
         ResponseCodeInterpreterTool, ResponseComputerAction, ResponseConversation,
-        ResponseConversationObject, ResponseFormatTextConfig, ResponsePrompt, ResponseReasoning,
-        ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+        ResponseConversationObject, ResponseFormatTextConfig, ResponseItemOutput, ResponsePrompt,
+        ResponseReasoning, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -257,6 +257,11 @@ fn create_populates_output_text_helper() {
             .as_deref(),
         Some("Acknowledged")
     );
+    assert!(matches!(
+        computer_output.output.as_ref(),
+        Some(ResponseItemOutput::ComputerScreenshot(screenshot))
+            if screenshot.image_url.as_deref() == Some("data:image/png;base64,AA==")
+    ));
     assert_eq!(response.output().top_logprobs, Some(2));
     assert_eq!(response.output().top_p, Some(0.8));
     assert_eq!(response.output().truncation.as_deref(), Some("auto"));
@@ -531,7 +536,10 @@ fn tool_and_refusal_fields_round_trip() {
             mcp_call.approval_request_id.as_deref(),
             Some("approval_123")
         );
-        assert_eq!(mcp_call.output, Some(json!("sunny")));
+        assert_eq!(
+            mcp_call.output,
+            Some(ResponseItemOutput::Text(String::from("sunny")))
+        );
 
         let image_call = response
             .output

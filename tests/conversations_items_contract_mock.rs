@@ -1,4 +1,7 @@
-use openai_rust::{ErrorKind, OpenAI, resources::responses::ResponseComputerAction};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::responses::{ResponseComputerAction, ResponseItemOutput},
+};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -334,6 +337,11 @@ fn typed_known_fields_are_not_lost() {
             .as_deref(),
         Some("Acknowledged")
     );
+    assert!(matches!(
+        computer_output.output.as_ref(),
+        Some(ResponseItemOutput::ComputerScreenshot(screenshot))
+            if screenshot.image_url.as_deref() == Some("data:image/png;base64,AA==")
+    ));
 
     let retrieved_function_call = retrieved.output();
     assert_eq!(
