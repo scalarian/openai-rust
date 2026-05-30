@@ -441,6 +441,365 @@ impl From<AdminSpendAlertListParams> for AdminQueryParams {
     }
 }
 
+/// Organization project creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectCreateParams {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_key_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geography: Option<String>,
+}
+
+/// Organization project update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_key_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geography: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Organization project list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectListParams {
+    pub after: Option<String>,
+    pub include_archived: Option<bool>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminProjectListParams> for AdminQueryParams {
+    fn from(value: AdminProjectListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("include_archived", value.include_archived)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Project user creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectUserCreateParams {
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+}
+
+/// Project user update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectUserUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+/// Project user list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectUserListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminProjectUserListParams> for AdminQueryParams {
+    fn from(value: AdminProjectUserListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Project user-role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectUserRoleCreateParams {
+    pub role_id: String,
+}
+
+/// Project user-role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectUserRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectUserRoleListParams> for AdminQueryParams {
+    fn from(value: AdminProjectUserRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Project service-account creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectServiceAccountCreateParams {
+    pub name: String,
+}
+
+/// Project service-account update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectServiceAccountUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+/// Project service-account list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectServiceAccountListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminProjectServiceAccountListParams> for AdminQueryParams {
+    fn from(value: AdminProjectServiceAccountListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Project API key list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectApiKeyListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminProjectApiKeyListParams> for AdminQueryParams {
+    fn from(value: AdminProjectApiKeyListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Project rate-limit list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectRateLimitListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminProjectRateLimitListParams> for AdminQueryParams {
+    fn from(value: AdminProjectRateLimitListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Project rate-limit update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectRateLimitUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_1_day_max_input_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_audio_megabytes_per_1_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_images_per_1_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_requests_per_1_day: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_requests_per_1_minute: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens_per_1_minute: Option<u64>,
+}
+
+/// Project model-permission update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectModelPermissionUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_ids: Option<Vec<String>>,
+}
+
+/// Project hosted-tool permission update body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminProjectHostedToolPermissionUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_interpreter: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_search: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_generation: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mcp: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search: Option<Value>,
+}
+
+/// Project group creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectGroupCreateParams {
+    pub group_id: String,
+    pub role: String,
+}
+
+/// Project group retrieve query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectGroupRetrieveParams {
+    pub group_type: Option<String>,
+}
+
+impl From<AdminProjectGroupRetrieveParams> for AdminQueryParams {
+    fn from(value: AdminProjectGroupRetrieveParams) -> Self {
+        AdminQueryParams::new().push_opt("group_type", value.group_type)
+    }
+}
+
+/// Project group list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectGroupListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectGroupListParams> for AdminQueryParams {
+    fn from(value: AdminProjectGroupListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Project group-role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectGroupRoleCreateParams {
+    pub role_id: String,
+}
+
+/// Project group-role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectGroupRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectGroupRoleListParams> for AdminQueryParams {
+    fn from(value: AdminProjectGroupRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Project role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectRoleCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub permissions: Vec<String>,
+    pub role_name: String,
+}
+
+/// Project role update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectRoleUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub permissions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role_name: Option<String>,
+}
+
+/// Project role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectRoleListParams> for AdminQueryParams {
+    fn from(value: AdminProjectRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Project data-retention update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectDataRetentionUpdateParams {
+    pub retention_type: String,
+}
+
+/// Project spend-alert creation body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminProjectSpendAlertCreateParams {
+    pub currency: String,
+    pub interval: String,
+    pub notification_channel: Value,
+    pub threshold_amount: i64,
+}
+
+/// Project spend-alert update body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminProjectSpendAlertUpdateParams {
+    pub currency: String,
+    pub interval: String,
+    pub notification_channel: Value,
+    pub threshold_amount: i64,
+}
+
+/// Project spend-alert list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectSpendAlertListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectSpendAlertListParams> for AdminQueryParams {
+    fn from(value: AdminProjectSpendAlertListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Project certificate activation/deactivation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminProjectCertificateIdsParams {
+    pub certificate_ids: Vec<String>,
+}
+
+/// Project certificate list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminProjectCertificateListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminProjectCertificateListParams> for AdminQueryParams {
+    fn from(value: AdminProjectCertificateListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
 /// Admin API family.
 #[derive(Clone, Debug)]
 pub struct Admin {

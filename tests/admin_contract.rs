@@ -1,21 +1,7 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use openai_rust::{
-    ErrorKind, OpenAI,
-    resources::admin::{
-        AdminApiKeyCreateParams, AdminApiKeyListParams, AdminAuditLogEffectiveAtParams,
-        AdminAuditLogListParams, AdminCertificateCreateParams, AdminCertificateIdsParams,
-        AdminCertificateListParams, AdminCertificateRetrieveParams, AdminCertificateUpdateParams,
-        AdminDataRetentionUpdateParams, AdminGroupCreateParams, AdminGroupListParams,
-        AdminGroupRoleCreateParams, AdminGroupRoleListParams, AdminGroupUpdateParams,
-        AdminGroupUserCreateParams, AdminGroupUserListParams, AdminInviteCreateParams,
-        AdminInviteListParams, AdminQueryParams, AdminRoleCreateParams, AdminRoleListParams,
-        AdminRoleUpdateParams, AdminSpendAlertCreateParams, AdminSpendAlertListParams,
-        AdminSpendAlertUpdateParams, AdminUserListParams, AdminUserRoleCreateParams,
-        AdminUserRoleListParams, AdminUserUpdateParams, AdminValue,
-    },
-};
+use openai_rust::{ErrorKind, OpenAI, resources::admin::*};
 use serde_json::json;
 
 #[test]
@@ -89,24 +75,39 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .unwrap();
 
     let projects = org.projects();
-    projects.create(json!({"name": "research"})).unwrap();
     projects
-        .update("proj_research", json!({"name": "research-prod"}))
+        .create(AdminProjectCreateParams {
+            name: String::from("research"),
+            external_key_id: Some(String::from("key_ext")),
+            geography: Some(String::from("us")),
+        })
         .unwrap();
     projects
-        .list(
-            AdminQueryParams::new()
-                .push("after", "proj_prev")
-                .push("include_archived", true)
-                .push("limit", 10),
+        .update(
+            "proj_research",
+            AdminProjectUpdateParams {
+                name: Some(String::from("research-prod")),
+                ..Default::default()
+            },
         )
+        .unwrap();
+    projects
+        .list(AdminProjectListParams {
+            after: Some(String::from("proj_prev")),
+            include_archived: Some(true),
+            limit: Some(10),
+        })
         .unwrap();
     projects.archive("proj_research").unwrap();
     projects
         .users()
         .create(
             "proj_research",
-            json!({"user_id": "user_admin", "role": "owner"}),
+            AdminProjectUserCreateParams {
+                role: String::from("owner"),
+                email: None,
+                user_id: Some(String::from("user_admin")),
+            },
         )
         .unwrap();
     projects
@@ -118,7 +119,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .roles()
         .create(
             "proj_research",
-            json!({"role_name": "auditor", "permissions": ["logs.read"]}),
+            AdminProjectRoleCreateParams {
+                description: None,
+                permissions: vec![String::from("logs.read")],
+                role_name: String::from("auditor"),
+            },
         )
         .unwrap();
     projects
@@ -127,7 +132,10 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .list(
             "proj_research",
             "grp_eng",
-            AdminQueryParams::new().push("limit", 3),
+            AdminProjectGroupRoleListParams {
+                limit: Some(3),
+                ..Default::default()
+            },
         )
         .unwrap();
     projects
@@ -139,7 +147,10 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .update_rate_limit(
             "proj_research",
             "rl_gpt_5",
-            json!({"max_requests_per_1_minute": 120}),
+            AdminProjectRateLimitUpdateParams {
+                max_requests_per_1_minute: Some(120),
+                ..Default::default()
+            },
         )
         .unwrap();
     projects
@@ -148,21 +159,31 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .unwrap();
     projects
         .hosted_tool_permissions()
-        .update("proj_research", json!({"web_search": {"mode": "enabled"}}))
+        .update(
+            "proj_research",
+            AdminProjectHostedToolPermissionUpdateParams {
+                web_search: Some(json!({"mode": "enabled"})),
+                ..Default::default()
+            },
+        )
         .unwrap();
     projects
         .groups()
         .retrieve(
             "proj_research",
             "grp_eng",
-            AdminQueryParams::new().push("group_type", "group"),
+            AdminProjectGroupRetrieveParams {
+                group_type: Some(String::from("group")),
+            },
         )
         .unwrap();
     projects
         .certificates()
         .deactivate(
             "proj_research",
-            json!({"certificate_ids": ["cert_project"]}),
+            AdminProjectCertificateIdsParams {
+                certificate_ids: vec![String::from("cert_project")],
+            },
         )
         .unwrap();
 
@@ -522,6 +543,300 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     assert_eq!(role_body["permissions"], json!(["logs.read"]));
     let spend_alert_body: AdminValue = serde_json::from_slice(&requests[21].body).unwrap();
     assert_eq!(spend_alert_body["threshold_amount"], json!(10_000));
+}
+
+#[test]
+fn admin_project_typed_params_preserve_queries_and_bodies() {
+    let server = mock_http::MockHttpServer::spawn_sequence(
+        (0..21)
+            .map(|index| json_response(json!({"id": format!("typed_project_{index}")}).to_string()))
+            .collect(),
+    )
+    .unwrap();
+    let client = client(&server.url());
+    let projects = client.admin().organization().projects();
+
+    projects
+        .users()
+        .list(
+            "proj_research",
+            AdminProjectUserListParams {
+                after: Some(String::from("project_user_after")),
+                limit: Some(2),
+            },
+        )
+        .unwrap();
+    projects
+        .users()
+        .update(
+            "proj_research",
+            "user_admin",
+            AdminProjectUserUpdateParams {
+                role: Some(String::from("member")),
+            },
+        )
+        .unwrap();
+    projects
+        .users()
+        .roles()
+        .create(
+            "proj_research",
+            "user_admin",
+            AdminProjectUserRoleCreateParams {
+                role_id: String::from("role_project_viewer"),
+            },
+        )
+        .unwrap();
+    projects
+        .users()
+        .roles()
+        .list(
+            "proj_research",
+            "user_admin",
+            AdminProjectUserRoleListParams {
+                after: Some(String::from("project_user_role_after")),
+                limit: Some(3),
+                order: Some(String::from("asc")),
+            },
+        )
+        .unwrap();
+
+    projects
+        .service_accounts()
+        .create(
+            "proj_research",
+            AdminProjectServiceAccountCreateParams {
+                name: String::from("robot"),
+            },
+        )
+        .unwrap();
+    projects
+        .service_accounts()
+        .update(
+            "proj_research",
+            "svc_robot",
+            AdminProjectServiceAccountUpdateParams {
+                name: Some(String::from("robot-prod")),
+                role: Some(String::from("owner")),
+            },
+        )
+        .unwrap();
+    projects
+        .service_accounts()
+        .list(
+            "proj_research",
+            AdminProjectServiceAccountListParams {
+                after: Some(String::from("svc_after")),
+                limit: Some(4),
+            },
+        )
+        .unwrap();
+
+    projects
+        .api_keys()
+        .list(
+            "proj_research",
+            AdminProjectApiKeyListParams {
+                after: Some(String::from("key_after")),
+                limit: Some(5),
+            },
+        )
+        .unwrap();
+    projects
+        .rate_limits()
+        .list_rate_limits(
+            "proj_research",
+            AdminProjectRateLimitListParams {
+                after: Some(String::from("rate_after")),
+                before: Some(String::from("rate_before")),
+                limit: Some(6),
+            },
+        )
+        .unwrap();
+    projects
+        .model_permissions()
+        .update(
+            "proj_research",
+            AdminProjectModelPermissionUpdateParams {
+                mode: Some(String::from("allow")),
+                model_ids: Some(vec![String::from("gpt-5")]),
+            },
+        )
+        .unwrap();
+
+    projects
+        .groups()
+        .create(
+            "proj_research",
+            AdminProjectGroupCreateParams {
+                group_id: String::from("grp_eng"),
+                role: String::from("member"),
+            },
+        )
+        .unwrap();
+    projects
+        .groups()
+        .list(
+            "proj_research",
+            AdminProjectGroupListParams {
+                after: Some(String::from("project_group_after")),
+                limit: Some(7),
+                order: Some(String::from("desc")),
+            },
+        )
+        .unwrap();
+    projects
+        .groups()
+        .roles()
+        .create(
+            "proj_research",
+            "grp_eng",
+            AdminProjectGroupRoleCreateParams {
+                role_id: String::from("role_group_viewer"),
+            },
+        )
+        .unwrap();
+
+    projects
+        .roles()
+        .update(
+            "proj_research",
+            "role_audit",
+            AdminProjectRoleUpdateParams {
+                description: Some(String::from("Project audit reader")),
+                permissions: vec![String::from("logs.read")],
+                role_name: Some(String::from("project_audit_reader")),
+            },
+        )
+        .unwrap();
+    projects
+        .roles()
+        .list(
+            "proj_research",
+            AdminProjectRoleListParams {
+                after: Some(String::from("project_role_after")),
+                limit: Some(8),
+                order: Some(String::from("asc")),
+            },
+        )
+        .unwrap();
+
+    projects
+        .data_retention()
+        .update(
+            "proj_research",
+            AdminProjectDataRetentionUpdateParams {
+                retention_type: String::from("default"),
+            },
+        )
+        .unwrap();
+    projects
+        .spend_alerts()
+        .create(
+            "proj_research",
+            AdminProjectSpendAlertCreateParams {
+                currency: String::from("USD"),
+                interval: String::from("month"),
+                notification_channel: json!({
+                    "type": "email",
+                    "recipients": ["ops@example.com"]
+                }),
+                threshold_amount: 30_000,
+            },
+        )
+        .unwrap();
+    projects
+        .spend_alerts()
+        .list(
+            "proj_research",
+            AdminProjectSpendAlertListParams {
+                after: Some(String::from("project_alert_after")),
+                before: Some(String::from("project_alert_before")),
+                limit: Some(9),
+                order: Some(String::from("desc")),
+            },
+        )
+        .unwrap();
+    projects
+        .spend_alerts()
+        .update(
+            "proj_research",
+            "alert_project",
+            AdminProjectSpendAlertUpdateParams {
+                currency: String::from("USD"),
+                interval: String::from("month"),
+                notification_channel: json!({
+                    "type": "email",
+                    "recipients": ["sec@example.com"]
+                }),
+                threshold_amount: 40_000,
+            },
+        )
+        .unwrap();
+
+    projects
+        .certificates()
+        .list(
+            "proj_research",
+            AdminProjectCertificateListParams {
+                after: Some(String::from("project_cert_after")),
+                limit: Some(10),
+                order: Some(String::from("asc")),
+            },
+        )
+        .unwrap();
+    projects
+        .certificates()
+        .activate(
+            "proj_research",
+            AdminProjectCertificateIdsParams {
+                certificate_ids: vec![String::from("cert_project")],
+            },
+        )
+        .unwrap();
+
+    let requests = server.captured_requests(21).unwrap();
+    let paths = requests
+        .iter()
+        .map(|request| request.path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        paths,
+        vec![
+            "/v1/organization/projects/proj_research/users?after=project_user_after&limit=2",
+            "/v1/organization/projects/proj_research/users/user_admin",
+            "/v1/projects/proj_research/users/user_admin/roles",
+            "/v1/projects/proj_research/users/user_admin/roles?after=project_user_role_after&limit=3&order=asc",
+            "/v1/organization/projects/proj_research/service_accounts",
+            "/v1/organization/projects/proj_research/service_accounts/svc_robot",
+            "/v1/organization/projects/proj_research/service_accounts?after=svc_after&limit=4",
+            "/v1/organization/projects/proj_research/api_keys?after=key_after&limit=5",
+            "/v1/organization/projects/proj_research/rate_limits?after=rate_after&before=rate_before&limit=6",
+            "/v1/organization/projects/proj_research/model_permissions",
+            "/v1/organization/projects/proj_research/groups",
+            "/v1/organization/projects/proj_research/groups?after=project_group_after&limit=7&order=desc",
+            "/v1/projects/proj_research/groups/grp_eng/roles",
+            "/v1/projects/proj_research/roles/role_audit",
+            "/v1/projects/proj_research/roles?after=project_role_after&limit=8&order=asc",
+            "/v1/organization/projects/proj_research/data_retention",
+            "/v1/organization/projects/proj_research/spend_alerts",
+            "/v1/organization/projects/proj_research/spend_alerts?after=project_alert_after&before=project_alert_before&limit=9&order=desc",
+            "/v1/organization/projects/proj_research/spend_alerts/alert_project",
+            "/v1/organization/projects/proj_research/certificates?after=project_cert_after&limit=10&order=asc",
+            "/v1/organization/projects/proj_research/certificates/activate",
+        ]
+    );
+
+    let user_role_body: AdminValue = serde_json::from_slice(&requests[2].body).unwrap();
+    assert_eq!(user_role_body["role_id"], json!("role_project_viewer"));
+    let service_account_body: AdminValue = serde_json::from_slice(&requests[4].body).unwrap();
+    assert_eq!(service_account_body["name"], json!("robot"));
+    let model_permissions_body: AdminValue = serde_json::from_slice(&requests[9].body).unwrap();
+    assert_eq!(model_permissions_body["model_ids"], json!(["gpt-5"]));
+    let group_body: AdminValue = serde_json::from_slice(&requests[10].body).unwrap();
+    assert_eq!(group_body["group_id"], json!("grp_eng"));
+    let project_alert_body: AdminValue = serde_json::from_slice(&requests[16].body).unwrap();
+    assert_eq!(project_alert_body["threshold_amount"], json!(30_000));
 }
 
 #[test]
