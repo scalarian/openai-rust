@@ -9,8 +9,9 @@ use openai_rust::{
         common::ListOrder,
         vector_stores::{
             VectorStoreAttributeValue, VectorStoreFileContentPage, VectorStoreFileCreateParams,
-            VectorStoreFileDeleteResponse, VectorStoreFileListFilter, VectorStoreFileListParams,
-            VectorStoreFilePollOptions, VectorStoreFileStatus, VectorStoreFileUpdateParams,
+            VectorStoreFileDeleteResponse, VectorStoreFileLastErrorCode, VectorStoreFileListFilter,
+            VectorStoreFileListParams, VectorStoreFilePollOptions, VectorStoreFileStatus,
+            VectorStoreFileUpdateParams,
         },
     },
 };
@@ -178,7 +179,7 @@ fn polling_helpers_respect_explicit_and_server_intervals() {
         json_response(vector_store_file_payload("vsf_header", "completed")),
         json_response(vector_store_file_failed_payload(
             "vsf_failed",
-            "file_too_large",
+            "invalid_file",
             "The file exceeded the processing limit.",
         )),
         json_response(vector_store_file_payload("vsf_cancelled", "in_progress")),
@@ -241,7 +242,7 @@ fn polling_helpers_respect_explicit_and_server_intervals() {
         failed.output.last_error,
         Some(
             openai_rust::resources::vector_stores::VectorStoreFileLastError {
-                code: Some(String::from("file_too_large")),
+                code: Some(VectorStoreFileLastErrorCode::InvalidFile),
                 message: Some(String::from("The file exceeded the processing limit.")),
                 extra: Default::default(),
             }

@@ -162,6 +162,15 @@ vector_store_string_literal_enum! {
     }
 }
 
+vector_store_string_literal_enum! {
+    /// Error codes returned when vector-store file processing fails.
+    pub enum VectorStoreFileLastErrorCode {
+        ServerError => "server_error",
+        UnsupportedFile => "unsupported_file",
+        InvalidFile => "invalid_file",
+    }
+}
+
 /// Top-level vector stores API family.
 #[derive(Clone, Debug)]
 pub struct VectorStores {
@@ -1295,7 +1304,7 @@ pub struct VectorStoreFile {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct VectorStoreFileLastError {
     #[serde(default)]
-    pub code: Option<String>,
+    pub code: Option<VectorStoreFileLastErrorCode>,
     #[serde(default)]
     pub message: Option<String>,
     #[serde(flatten)]
