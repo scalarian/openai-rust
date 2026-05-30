@@ -9,7 +9,7 @@ use crate::{
     resources::{
         common::ReasoningEffort,
         files::{encode_path_id, validate_path_id},
-        graders::GraderMessageContent,
+        graders::{GraderMessageContent, GraderMessageRole, GraderMessageType},
     },
 };
 
@@ -1046,10 +1046,10 @@ pub enum FineTuningGrader {
 /// Grader input message for model-based graders.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FineTuningGraderMessage {
-    pub role: String,
+    pub role: GraderMessageRole,
     pub content: GraderMessageContent,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub message_type: Option<String>,
+    pub message_type: Option<GraderMessageType>,
 }
 
 /// Sampling params for score-model graders.

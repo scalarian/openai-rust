@@ -1,5 +1,134 @@
 use serde::{Deserialize, Serialize};
 
+macro_rules! grader_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
+grader_string_literal_enum! {
+    /// Role accepted by model-based grader input messages.
+    pub enum GraderMessageRole {
+        User => "user",
+        Assistant => "assistant",
+        System => "system",
+        Developer => "developer",
+    }
+}
+
+grader_string_literal_enum! {
+    /// Optional discriminator for model-based grader input messages.
+    pub enum GraderMessageType {
+        Message => "message",
+    }
+}
+
 /// Message content accepted by eval and fine-tuning model graders.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]

@@ -9,7 +9,7 @@ use openai_rust::{
             EvalRunDataSource, EvalRunDeleteResponse, EvalRunInputMessages, EvalRunListParams,
             EvalRunOutputTextFormat, EvalRunSamplingParams, EvalRunStatus, EvalRunTextConfig,
         },
-        graders::GraderMessageContent,
+        graders::{GraderMessageContent, GraderMessageRole},
         responses::{FunctionTool, ResponseTool},
     },
 };
@@ -53,7 +53,7 @@ fn eval_runs_cover_routes_cancel_semantics_and_datasource_families() {
                 },
                 input_messages: Some(EvalRunInputMessages::Template {
                     template: vec![openai_rust::resources::evals::EvalMessageTemplate {
-                        role: String::from("user"),
+                        role: GraderMessageRole::User,
                         content: GraderMessageContent::from("{{item.question}}"),
                         message_type: None,
                     }],

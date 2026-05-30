@@ -9,7 +9,7 @@ use crate::{
     resources::{
         common::ReasoningEffort,
         files::{encode_path_id, validate_path_id},
-        graders::GraderMessageContent,
+        graders::{GraderMessageContent, GraderMessageRole, GraderMessageType},
         responses::ResponseTool,
     },
 };
@@ -319,10 +319,10 @@ pub enum EvalDataSourceConfig {
 /// A message/template item reused by eval graders and runs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EvalMessageTemplate {
-    pub role: String,
+    pub role: GraderMessageRole,
     pub content: GraderMessageContent,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub message_type: Option<String>,
+    pub message_type: Option<GraderMessageType>,
 }
 
 /// Eval grader definitions.

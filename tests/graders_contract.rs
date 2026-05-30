@@ -10,7 +10,7 @@ use openai_rust::{
             FineTuningGrader, FineTuningGraderMessage, FineTuningGraderRunParams,
             FineTuningGraderValidateParams,
         },
-        graders::GraderMessageContent,
+        graders::{GraderMessageContent, GraderMessageRole, GraderMessageType},
     },
 };
 use serde_json::json;
@@ -29,11 +29,11 @@ fn graders_validate_configs_and_run_tiny_samples() {
     let score_model = FineTuningGrader::ScoreModel {
         input: vec![
             openai_rust::resources::fine_tuning::FineTuningGraderMessage {
-                role: String::from("system"),
+                role: GraderMessageRole::System,
                 content: GraderMessageContent::from(
                     "Judge whether the answer matches the reference exactly.",
                 ),
-                message_type: Some(String::from("message")),
+                message_type: Some(GraderMessageType::Message),
             },
         ],
         model: String::from("gpt-4o-mini"),
@@ -93,11 +93,11 @@ fn graders_validate_configs_and_run_tiny_samples() {
 
     let label_model = FineTuningGrader::LabelModel {
         input: vec![FineTuningGraderMessage {
-            role: String::from("system"),
+            role: GraderMessageRole::System,
             content: GraderMessageContent::from(
                 "Assign one of the provided labels to the sample output.",
             ),
-            message_type: Some(String::from("message")),
+            message_type: Some(GraderMessageType::Message),
         }],
         labels: vec![String::from("pass"), String::from("fail")],
         model: String::from("gpt-4o-mini"),
