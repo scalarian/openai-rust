@@ -150,6 +150,59 @@ fn organization_group_user_create_json(group_id: &str, user_id: &str) -> Value {
     })
 }
 
+fn organization_role_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "description": "Read audit logs",
+        "name": "audit_reader",
+        "object": "role",
+        "permissions": ["logs.read"],
+        "predefined_role": false,
+        "resource_type": "api.organization"
+    })
+}
+
+fn organization_group_role_create_json(group_id: &str, role_id: &str) -> Value {
+    json!({
+        "group": {
+            "id": group_id,
+            "created_at": 1_717_172_100u64,
+            "name": "Engineering",
+            "object": "group",
+            "scim_managed": false
+        },
+        "object": "group.role",
+        "role": organization_role_json(role_id)
+    })
+}
+
+fn organization_role_assignment_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "assignment_sources": [
+            {
+                "principal_id": "grp_eng",
+                "principal_type": "group"
+            }
+        ],
+        "created_at": 1_717_172_200u64,
+        "created_by": "user_admin",
+        "created_by_user_obj": {
+            "id": "user_admin",
+            "name": "Admin User"
+        },
+        "description": "Read audit logs",
+        "metadata": {
+            "scope": "audit"
+        },
+        "name": "audit_reader",
+        "permissions": ["logs.read"],
+        "predefined_role": false,
+        "resource_type": "api.organization",
+        "updated_at": 1_717_172_300u64
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -559,6 +612,16 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     );
     responses[9] =
         json_response(organization_group_user_create_json("grp_eng", "user_admin").to_string());
+    responses[10] =
+        json_response(organization_group_role_create_json("grp_eng", "role_viewer").to_string());
+    responses[11] = json_response(
+        json!({
+            "data": [organization_role_assignment_json("role_viewer")],
+            "has_more": true,
+            "next": "role_viewer"
+        })
+        .to_string(),
+    );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -696,7 +759,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     assert_eq!(group_user.output.group_id, "grp_eng");
     assert_eq!(group_user.output.object, AdminGroupUserObject::GroupUser);
     assert_eq!(group_user.output.user_id, "user_admin");
-    org.groups()
+    let group_role = org
+        .groups()
         .roles()
         .create(
             "grp_eng",
@@ -705,7 +769,11 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    org.groups()
+    assert_eq!(group_role.output.object, AdminGroupRoleObject::GroupRole);
+    assert_eq!(group_role.output.group.object, AdminGroupObject::Group);
+    assert_eq!(group_role.output.role.object, AdminRoleObject::Role);
+    let group_roles = org
+        .groups()
         .roles()
         .list(
             "grp_eng",
@@ -716,6 +784,9 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(group_roles.output.data[0].id, "role_viewer");
+    assert_eq!(group_roles.output.data[0].permissions, vec!["logs.read"]);
+    assert_eq!(group_roles.output.next_after(), Some("role_viewer"));
 
     org.roles()
         .create(AdminRoleCreateParams {
@@ -1413,6 +1484,70 @@ fn admin_group_user_retrieve_list_and_delete_return_typed_responses() {
     assert_eq!(
         requests[2].path,
         "/v1/organization/groups/grp_eng/users/user_admin"
+    );
+}
+
+#[test]
+fn admin_group_role_retrieve_list_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_role_assignment_json("role_viewer").to_string()),
+        json_response(
+            json!({
+                "data": [organization_role_assignment_json("role_viewer")],
+                "has_more": true,
+                "next": "role_viewer"
+            })
+            .to_string(),
+        ),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "group.role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let group_roles = client.admin().organization().groups().roles();
+
+    let role = group_roles.retrieve("grp_eng", "role_viewer").unwrap();
+    assert_eq!(role.output.name, "audit_reader");
+    assert_eq!(
+        role.output.assignment_sources.as_ref().unwrap()[0].principal_id,
+        "grp_eng"
+    );
+
+    let roles = group_roles
+        .list(
+            "grp_eng",
+            AdminGroupRoleListParams {
+                limit: Some(2),
+                order: Some(ListOrder::Desc),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(roles.output.data[0].resource_type, "api.organization");
+    assert_eq!(roles.output.next_after(), Some("role_viewer"));
+
+    let deleted = group_roles.delete("grp_eng", "role_viewer").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, "group.role.deleted");
+
+    let requests = server.captured_requests(3).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/groups/grp_eng/roles/role_viewer"
+    );
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/groups/grp_eng/roles?limit=2&order=desc"
+    );
+    assert_eq!(requests[2].method, "DELETE");
+    assert_eq!(
+        requests[2].path,
+        "/v1/organization/groups/grp_eng/roles/role_viewer"
     );
 }
 

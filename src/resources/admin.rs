@@ -318,6 +318,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization group object type.
+    pub enum AdminGroupObject {
+        Group => "group",
+    }
+}
+
+admin_string_literal_enum! {
     /// Organization group-user membership object type.
     pub enum AdminGroupUserObject {
         GroupUser => "group.user",
@@ -336,6 +343,20 @@ admin_string_literal_enum! {
     pub enum AdminGroupUserType {
         User => "user",
         TenantUser => "tenant_user",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization role object type.
+    pub enum AdminRoleObject {
+        Role => "role",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization group-role assignment object type.
+    pub enum AdminGroupRoleObject {
+        GroupRole => "group.role",
     }
 }
 
@@ -1044,6 +1065,21 @@ impl From<AdminRoleListParams> for AdminQueryParams {
     }
 }
 
+/// Details about a role that can be assigned through the public Roles API.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminRole {
+    pub id: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub name: String,
+    pub object: AdminRoleObject,
+    pub permissions: Vec<String>,
+    pub predefined_role: bool,
+    pub resource_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Organization user-role creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminUserRoleCreateParams {
@@ -1224,6 +1260,75 @@ impl From<AdminGroupRoleListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+/// Summary information about a group returned in role assignment responses.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminGroupRoleGroup {
+    pub id: String,
+    pub created_at: u64,
+    pub name: String,
+    pub object: AdminGroupObject,
+    pub scim_managed: bool,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Role assignment linking a group to a role.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminGroupRoleCreateResponse {
+    pub group: AdminGroupRoleGroup,
+    pub object: AdminGroupRoleObject,
+    pub role: AdminRole,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Principal from which a role assignment is inherited.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminRoleAssignmentSource {
+    pub principal_id: String,
+    pub principal_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Detailed information about a role assignment entry returned when listing assignments.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminRoleAssignment {
+    pub id: String,
+    #[serde(default)]
+    pub assignment_sources: Option<Vec<AdminRoleAssignmentSource>>,
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    #[serde(default)]
+    pub created_by: Option<String>,
+    #[serde(default)]
+    pub created_by_user_obj: Option<BTreeMap<String, Value>>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, Value>>,
+    pub name: String,
+    pub permissions: Vec<String>,
+    pub predefined_role: bool,
+    pub resource_type: String,
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after unassigning a role.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminRoleAssignmentDeleteResponse {
+    pub deleted: bool,
+    pub object: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminGroupRoleRetrieveResponse = AdminRoleAssignment;
+pub type AdminGroupRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
 
 /// Organization certificate creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -2738,12 +2843,13 @@ impl OrganizationGroupRoles {
         &self,
         group_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminGroupRoleCreateResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/groups/{group_id}/roles"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -2751,12 +2857,13 @@ impl OrganizationGroupRoles {
         &self,
         group_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminGroupRoleRetrieveResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
         let role_id = path_id("role_id", role_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/groups/{group_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -2764,12 +2871,12 @@ impl OrganizationGroupRoles {
         &self,
         group_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminGroupRoleListResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/groups/{group_id}/roles"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(format!("/organization/groups/{group_id}/roles"), params),
+            RequestOptions::default(),
         )
     }
 
@@ -2777,12 +2884,13 @@ impl OrganizationGroupRoles {
         &self,
         group_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminRoleAssignmentDeleteResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
         let role_id = path_id("role_id", role_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/groups/{group_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 }
