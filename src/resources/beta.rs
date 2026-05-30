@@ -158,6 +158,14 @@ beta_string_literal_enum! {
 }
 
 beta_string_literal_enum! {
+    /// Ranker identifiers accepted by deprecated beta assistant file-search tools.
+    pub enum BetaAssistantFileSearchRanker {
+        Auto => "auto",
+        Default2024_08_21 => "default_2024_08_21",
+    }
+}
+
+beta_string_literal_enum! {
     /// ChatKit attachment discriminator.
     pub enum ChatKitAttachmentType {
         Image => "image",
@@ -536,7 +544,7 @@ pub struct BetaAssistantFileSearchTool {
 pub struct BetaAssistantFileSearchRankingOptions {
     pub score_threshold: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ranker: Option<String>,
+    pub ranker: Option<BetaAssistantFileSearchRanker>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

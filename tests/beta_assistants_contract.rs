@@ -8,7 +8,9 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::{
         beta::{
-            BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantResponseFormat,
+            BetaAssistantCreateParams, BetaAssistantFileSearchRanker,
+            BetaAssistantFileSearchRankingOptions, BetaAssistantFileSearchTool,
+            BetaAssistantListParams, BetaAssistantResponseFormat,
             BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
             BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
             BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
@@ -66,7 +68,18 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             name: Some(String::from("Support analyst")),
             instructions: Some(String::from("Answer succinctly.")),
             reasoning_effort: Some(ReasoningEffort::Low),
-            tools: Some(vec![BetaAssistantTool::code_interpreter()]),
+            tools: Some(vec![
+                BetaAssistantTool::code_interpreter(),
+                BetaAssistantTool::file_search(Some(BetaAssistantFileSearchTool {
+                    max_num_results: Some(4),
+                    ranking_options: Some(BetaAssistantFileSearchRankingOptions {
+                        score_threshold: 0.35,
+                        ranker: Some(BetaAssistantFileSearchRanker::Default2024_08_21),
+                        extra: BTreeMap::new(),
+                    }),
+                    ..Default::default()
+                })),
+            ]),
             ..Default::default()
         })
         .unwrap();
@@ -464,6 +477,11 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(
         assistant_body["tools"][0]["type"],
         json!("code_interpreter")
+    );
+    assert_eq!(assistant_body["tools"][1]["type"], json!("file_search"));
+    assert_eq!(
+        assistant_body["tools"][1]["file_search"]["ranking_options"]["ranker"],
+        json!("default_2024_08_21")
     );
     let assistant_update_body: serde_json::Value =
         serde_json::from_slice(&requests[2].body).unwrap();
