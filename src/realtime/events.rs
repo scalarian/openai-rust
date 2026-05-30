@@ -1419,7 +1419,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<RealtimeMaxOutputTokens>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_modalities: Option<Vec<RealtimeOutputModality>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

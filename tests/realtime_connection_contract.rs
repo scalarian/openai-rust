@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex, mpsc};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex, mpsc},
+};
 
 use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
@@ -540,7 +543,10 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
                     RealtimeConversationMessageContentPart::input_text("Context only"),
                 ])]),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
-                metadata: Some(json!({"source": "test"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("source"),
+                    String::from("test"),
+                )])),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 prompt: Some(ResponsePrompt {
                     id: String::from("pmpt_response"),
