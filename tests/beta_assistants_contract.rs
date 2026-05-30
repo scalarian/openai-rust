@@ -14,7 +14,7 @@ use openai_rust::{
             BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
             BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
             BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
-            BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
+            BetaThreadMessageRole, BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
             BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
             BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
             BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
@@ -119,7 +119,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         threads
             .create(BetaThreadCreateParams {
                 messages: Some(vec![BetaThreadMessageCreateParams {
-                    role: String::from("user"),
+                    role: BetaThreadMessageRole::User,
                     content: BetaThreadMessageContent::from("Hello"),
                     attachments: None,
                     metadata: Some(BTreeMap::from([(
@@ -189,7 +189,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 truncation_strategy: Some(BetaTruncationStrategy::last_messages(4)),
                 thread: Some(BetaThreadCreateParams {
                     messages: Some(vec![BetaThreadMessageCreateParams {
-                        role: String::from("user"),
+                        role: BetaThreadMessageRole::User,
                         content: BetaThreadMessageContent::from("Hello"),
                         attachments: None,
                         metadata: None,
@@ -209,7 +209,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .create(
                 "thread_123",
                 BetaThreadMessageCreateParams {
-                    role: String::from("user"),
+                    role: BetaThreadMessageRole::User,
                     content: BetaThreadMessageContent::from("What is the status?"),
                     attachments: Some(vec![BetaThreadMessageAttachment {
                         file_id: Some(String::from("file_123")),
@@ -274,7 +274,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 assistant_id: String::from("asst_123"),
                 additional_instructions: Some(String::from("Use the support playbook.")),
                 additional_messages: Some(vec![BetaThreadRunAdditionalMessage {
-                    role: String::from("user"),
+                    role: BetaThreadMessageRole::User,
                     content: BetaThreadMessageContent::from("Any update?"),
                     attachments: None,
                     metadata: None,
@@ -476,6 +476,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     let empty_thread_body: serde_json::Value = serde_json::from_slice(&requests[5].body).unwrap();
     assert_eq!(empty_thread_body, json!({}));
     let thread_body: serde_json::Value = serde_json::from_slice(&requests[6].body).unwrap();
+    assert_eq!(thread_body["messages"][0]["role"], json!("user"));
     assert_eq!(thread_body["messages"][0]["content"], json!("Hello"));
     assert_eq!(
         thread_body["tool_resources"]["code_interpreter"]["file_ids"][0],
@@ -509,6 +510,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         thread_run_body["thread"]["messages"][0]["content"],
         json!("Hello")
     );
+    assert_eq!(
+        thread_run_body["thread"]["messages"][0]["role"],
+        json!("user")
+    );
     let message_body: serde_json::Value = serde_json::from_slice(&requests[11].body).unwrap();
     assert_eq!(message_body["role"], json!("user"));
     assert_eq!(message_body["attachments"][0]["file_id"], json!("file_123"));
@@ -527,6 +532,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(run_body["tool_choice"]["type"], json!("code_interpreter"));
     assert_eq!(run_body["tools"][0]["type"], json!("code_interpreter"));
     assert_eq!(run_body["truncation_strategy"]["type"], json!("auto"));
+    assert_eq!(run_body["additional_messages"][0]["role"], json!("user"));
     let run_update_body: serde_json::Value = serde_json::from_slice(&requests[18].body).unwrap();
     assert_eq!(run_update_body["metadata"]["owner"], json!("support"));
     let tool_outputs_body: serde_json::Value = serde_json::from_slice(&requests[21].body).unwrap();

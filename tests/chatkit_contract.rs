@@ -6,12 +6,13 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::beta::{
-        ChatKitAutomaticThreadTitlingParam, ChatKitConfigurationParam, ChatKitFileUploadParam,
-        ChatKitHistoryParam, ChatKitOrder, ChatKitSessionCreateParams,
-        ChatKitSessionExpiresAfterParam, ChatKitSessionExpiryAnchor, ChatKitSessionRateLimitsParam,
-        ChatKitSessionStatus, ChatKitSessionWorkflowParam, ChatKitStateValue, ChatKitThreadItem,
-        ChatKitThreadItemListParams, ChatKitThreadListParams, ChatKitThreadStatus,
-        ChatKitUserMessageContent, ChatKitWorkflowTracingParam,
+        ChatKitAttachmentType, ChatKitAutomaticThreadTitlingParam, ChatKitClientToolCallStatus,
+        ChatKitConfigurationParam, ChatKitFileUploadParam, ChatKitHistoryParam, ChatKitOrder,
+        ChatKitSessionCreateParams, ChatKitSessionExpiresAfterParam, ChatKitSessionExpiryAnchor,
+        ChatKitSessionRateLimitsParam, ChatKitSessionStatus, ChatKitSessionWorkflowParam,
+        ChatKitStateValue, ChatKitTaskType, ChatKitThreadItem, ChatKitThreadItemListParams,
+        ChatKitThreadListParams, ChatKitThreadStatus, ChatKitUserMessageContent,
+        ChatKitWorkflowTracingParam,
     },
 };
 use serde_json::json;
@@ -124,6 +125,36 @@ fn chatkit_beta_sessions_and_threads_preserve_routes_headers_and_shapes() {
         Some(ChatKitThreadItem::UserMessage { content, .. })
             if matches!(content.first(), Some(ChatKitUserMessageContent::InputText { text }) if text == "hello")
     ));
+    assert_eq!(items.output.data.len(), 4);
+    match &items.output.data[0] {
+        ChatKitThreadItem::UserMessage { attachments, .. } => {
+            assert_eq!(
+                attachments
+                    .first()
+                    .map(|attachment| &attachment.attachment_type),
+                Some(&ChatKitAttachmentType::File)
+            );
+        }
+        other => panic!("expected ChatKit user message, got {other:?}"),
+    }
+    assert!(matches!(
+        items.output.data.get(1),
+        Some(ChatKitThreadItem::ClientToolCall { status, .. })
+            if status == &ChatKitClientToolCallStatus::Completed
+    ));
+    assert!(matches!(
+        items.output.data.get(2),
+        Some(ChatKitThreadItem::Task { task_type, .. }) if task_type == &ChatKitTaskType::Thought
+    ));
+    match items.output.data.get(3) {
+        Some(ChatKitThreadItem::TaskGroup { tasks, .. }) => {
+            assert_eq!(
+                tasks.first().map(|task| &task.task_type),
+                Some(&ChatKitTaskType::Custom)
+            );
+        }
+        other => panic!("expected ChatKit task group, got {other:?}"),
+    }
 
     let requests = server.captured_requests(6).unwrap();
     assert_eq!(requests[0].method, "POST");
@@ -232,16 +263,51 @@ fn delete_payload(id: &str) -> String {
 fn thread_items_payload() -> String {
     json!({
         "object": "list",
-        "data": [{
-            "id": "item_1",
-            "object": "chatkit.thread_item",
-            "created_at": 1_717_171_818u64,
-            "thread_id": "thread_123",
-            "type": "chatkit.user_message",
-            "content": [{"type": "input_text", "text": "hello"}]
-        }],
+        "data": [
+            {
+                "id": "item_1",
+                "object": "chatkit.thread_item",
+                "created_at": 1_717_171_818u64,
+                "thread_id": "thread_123",
+                "type": "chatkit.user_message",
+                "content": [{"type": "input_text", "text": "hello"}],
+                "attachments": [{
+                    "id": "att_1",
+                    "mime_type": "text/plain",
+                    "name": "notes.txt",
+                    "type": "file"
+                }]
+            },
+            {
+                "id": "item_2",
+                "object": "chatkit.thread_item",
+                "created_at": 1_717_171_819u64,
+                "thread_id": "thread_123",
+                "type": "chatkit.client_tool_call",
+                "arguments": "{}",
+                "call_id": "call_123",
+                "name": "lookup_case",
+                "status": "completed"
+            },
+            {
+                "id": "item_3",
+                "object": "chatkit.thread_item",
+                "created_at": 1_717_171_820u64,
+                "thread_id": "thread_123",
+                "type": "chatkit.task",
+                "task_type": "thought"
+            },
+            {
+                "id": "item_4",
+                "object": "chatkit.thread_item",
+                "created_at": 1_717_171_821u64,
+                "thread_id": "thread_123",
+                "type": "chatkit.task_group",
+                "tasks": [{"type": "custom", "heading": "Lookup"}]
+            }
+        ],
         "first_id": "item_1",
-        "last_id": "item_1",
+        "last_id": "item_4",
         "has_more": false
     })
     .to_string()

@@ -29,6 +29,158 @@ use crate::{
 const CHATKIT_BETA_HEADER: &str = "chatkit_beta=v1";
 const ASSISTANTS_BETA_HEADER: &str = "assistants=v2";
 
+macro_rules! beta_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
+beta_string_literal_enum! {
+    /// Role accepted when creating deprecated beta thread messages.
+    pub enum BetaThreadMessageRole {
+        User => "user",
+        Assistant => "assistant",
+    }
+}
+
+beta_string_literal_enum! {
+    /// Truncation strategy type for deprecated beta thread runs.
+    pub enum BetaTruncationStrategyType {
+        Auto => "auto",
+        LastMessages => "last_messages",
+    }
+}
+
+beta_string_literal_enum! {
+    /// ChatKit attachment discriminator.
+    pub enum ChatKitAttachmentType {
+        Image => "image",
+        File => "file",
+    }
+}
+
+beta_string_literal_enum! {
+    /// ChatKit client tool-call status.
+    pub enum ChatKitClientToolCallStatus {
+        InProgress => "in_progress",
+        Completed => "completed",
+    }
+}
+
+beta_string_literal_enum! {
+    /// ChatKit task subtype.
+    pub enum ChatKitTaskType {
+        Custom => "custom",
+        Thought => "thought",
+    }
+}
+
 /// Beta API family.
 #[derive(Clone, Debug)]
 pub struct Beta {
@@ -315,7 +467,7 @@ pub struct BetaAssistantToolChoiceFunction {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaTruncationStrategy {
     #[serde(rename = "type")]
-    pub strategy_type: String,
+    pub strategy_type: BetaTruncationStrategyType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_messages: Option<u32>,
     #[serde(flatten)]
@@ -325,7 +477,7 @@ pub struct BetaTruncationStrategy {
 impl BetaTruncationStrategy {
     pub fn auto() -> Self {
         Self {
-            strategy_type: String::from("auto"),
+            strategy_type: BetaTruncationStrategyType::Auto,
             last_messages: None,
             extra: BTreeMap::new(),
         }
@@ -333,7 +485,7 @@ impl BetaTruncationStrategy {
 
     pub fn last_messages(last_messages: u32) -> Self {
         Self {
-            strategy_type: String::from("last_messages"),
+            strategy_type: BetaTruncationStrategyType::LastMessages,
             last_messages: Some(last_messages),
             extra: BTreeMap::new(),
         }
@@ -726,7 +878,7 @@ impl BetaThreadMessages {
 /// Deprecated beta thread message creation parameters.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BetaThreadMessageCreateParams {
-    pub role: String,
+    pub role: BetaThreadMessageRole,
     pub content: BetaThreadMessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<BetaThreadMessageAttachment>>,
@@ -1134,7 +1286,7 @@ pub struct BetaThreadRunCreateParams {
 /// Additional message to add before creating a deprecated beta thread run.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BetaThreadRunAdditionalMessage {
-    pub role: String,
+    pub role: BetaThreadMessageRole,
     pub content: BetaThreadMessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<BetaThreadMessageAttachment>>,
@@ -2389,7 +2541,7 @@ pub enum ChatKitThreadItem {
         name: String,
         #[serde(default)]
         output: Option<String>,
-        status: String,
+        status: ChatKitClientToolCallStatus,
         #[serde(flatten)]
         extra: BTreeMap<String, Value>,
     },
@@ -2403,7 +2555,7 @@ pub enum ChatKitThreadItem {
         heading: Option<String>,
         #[serde(default)]
         summary: Option<String>,
-        task_type: String,
+        task_type: ChatKitTaskType,
         #[serde(flatten)]
         extra: BTreeMap<String, Value>,
     },
@@ -2428,7 +2580,7 @@ pub struct ChatKitAttachment {
     #[serde(default)]
     pub preview_url: Option<String>,
     #[serde(rename = "type")]
-    pub attachment_type: String,
+    pub attachment_type: ChatKitAttachmentType,
 }
 
 /// User-authored ChatKit message content.
@@ -2494,7 +2646,7 @@ pub struct ChatKitTaskGroupTask {
     #[serde(default)]
     pub summary: Option<String>,
     #[serde(rename = "type")]
-    pub task_type: String,
+    pub task_type: ChatKitTaskType,
 }
 
 /// ChatKit thread item list page.
