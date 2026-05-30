@@ -1,9 +1,11 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
-    resources::completions::{Completion, CompletionStream},
+    resources::completions::{
+        Completion, CompletionPrompt, CompletionStream, CompletionStreamOptions,
+    },
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -142,7 +144,11 @@ fn stream_posts_to_legacy_completions_endpoint() {
         .stream(
             openai_rust::resources::completions::CompletionCreateParams {
                 model: String::from("gpt-3.5-turbo-instruct"),
-                prompt: Some(json!("Say hello")),
+                prompt: Some(CompletionPrompt::from("Say hello")),
+                stream_options: Some(CompletionStreamOptions {
+                    include_usage: Some(true),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         )
@@ -155,4 +161,5 @@ fn stream_posts_to_legacy_completions_endpoint() {
     assert_eq!(request.path, "/v1/completions");
     let request_body: Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(request_body["stream"], true);
+    assert_eq!(request_body["stream_options"]["include_usage"], true);
 }

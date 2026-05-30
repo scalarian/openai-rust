@@ -37,13 +37,12 @@ let _ = (compatibility, preferred);
 ## Legacy Completions to Responses
 
 ```rust
-use openai_rust::resources::completions::CompletionCreateParams;
+use openai_rust::resources::completions::{CompletionCreateParams, CompletionPrompt};
 use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
-use serde_json::json;
 
 let legacy = CompletionCreateParams {
     model: "gpt-3.5-turbo-instruct".into(),
-    prompt: Some(json!("Say hello")),
+    prompt: Some(CompletionPrompt::from("Say hello")),
     ..Default::default()
 };
 

@@ -1,5 +1,9 @@
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::completions::{CompletionPrompt, CompletionStop},
+};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -23,8 +27,10 @@ fn legacy_completions_create_preserves_text_completion_shape() {
         .create(
             openai_rust::resources::completions::CompletionCreateParams {
                 model: String::from("gpt-3.5-turbo-instruct"),
-                prompt: Some(json!("Say hello")),
+                prompt: Some(CompletionPrompt::from("Say hello")),
+                logit_bias: Some(BTreeMap::from([(String::from("50256"), -100)])),
                 max_tokens: Some(8),
+                stop: Some(CompletionStop::from(vec![String::from("END")])),
                 stream: Some(false),
                 ..Default::default()
             },
@@ -84,7 +90,9 @@ fn legacy_completions_create_preserves_text_completion_shape() {
     let body: Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(body["model"], "gpt-3.5-turbo-instruct");
     assert_eq!(body["prompt"], "Say hello");
+    assert_eq!(body["logit_bias"]["50256"], -100);
     assert_eq!(body["max_tokens"], 8);
+    assert_eq!(body["stop"], json!(["END"]));
     assert_eq!(body["stream"], false);
 }
 
@@ -97,7 +105,7 @@ fn streaming_best_of_is_rejected_locally() {
         .create(
             openai_rust::resources::completions::CompletionCreateParams {
                 model: String::from("gpt-3.5-turbo-instruct"),
-                prompt: Some(json!("Say hello")),
+                prompt: Some(CompletionPrompt::from("Say hello")),
                 best_of: Some(2),
                 stream: Some(true),
                 ..Default::default()

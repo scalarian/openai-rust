@@ -1,9 +1,8 @@
 use openai_rust::resources::{
     chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
-    completions::CompletionCreateParams,
+    completions::{CompletionCreateParams, CompletionPrompt},
     responses::{ResponseCreateParams, ResponseInput},
 };
-use serde_json::json;
 
 fn main() {
     let chat = ChatCompletionCreateParams {
@@ -14,7 +13,7 @@ fn main() {
 
     let legacy = CompletionCreateParams {
         model: "gpt-3.5-turbo-instruct".into(),
-        prompt: Some(json!("Say hello")),
+        prompt: Some(CompletionPrompt::from("Say hello")),
         ..Default::default()
     };
 

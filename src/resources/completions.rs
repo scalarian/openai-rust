@@ -92,7 +92,7 @@ impl Completions {
 pub struct CompletionCreateParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<CompletionPrompt>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub best_of: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -100,7 +100,7 @@ pub struct CompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub logit_bias: Option<Value>,
+    pub logit_bias: Option<BTreeMap<String, i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logprobs: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -112,11 +112,11 @@ pub struct CompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stop: Option<Value>,
+    pub stop: Option<CompletionStop>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_options: Option<Value>,
+    pub stream_options: Option<CompletionStreamOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suffix: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -164,6 +164,84 @@ impl CompletionCreateParams {
         }
         value
     }
+}
+
+/// Prompt forms accepted by legacy text completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum CompletionPrompt {
+    Text(String),
+    Texts(Vec<String>),
+    Tokens(Vec<i64>),
+    TokenArrays(Vec<Vec<i64>>),
+    Null,
+}
+
+impl From<String> for CompletionPrompt {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for CompletionPrompt {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<String>> for CompletionPrompt {
+    fn from(value: Vec<String>) -> Self {
+        Self::Texts(value)
+    }
+}
+
+impl From<Vec<i64>> for CompletionPrompt {
+    fn from(value: Vec<i64>) -> Self {
+        Self::Tokens(value)
+    }
+}
+
+impl From<Vec<Vec<i64>>> for CompletionPrompt {
+    fn from(value: Vec<Vec<i64>>) -> Self {
+        Self::TokenArrays(value)
+    }
+}
+
+/// Stop sequence configuration for legacy text completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum CompletionStop {
+    String(String),
+    Strings(Vec<String>),
+}
+
+impl From<String> for CompletionStop {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for CompletionStop {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Vec<String>> for CompletionStop {
+    fn from(value: Vec<String>) -> Self {
+        Self::Strings(value)
+    }
+}
+
+/// Streaming options for legacy text completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct CompletionStreamOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_obfuscation: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_usage: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Typed legacy text-completion object.
