@@ -3,7 +3,18 @@ mod mock_http;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::admin::{AdminQueryParams, AdminValue},
+    resources::admin::{
+        AdminApiKeyCreateParams, AdminApiKeyListParams, AdminAuditLogEffectiveAtParams,
+        AdminAuditLogListParams, AdminCertificateCreateParams, AdminCertificateIdsParams,
+        AdminCertificateListParams, AdminCertificateRetrieveParams, AdminCertificateUpdateParams,
+        AdminDataRetentionUpdateParams, AdminGroupCreateParams, AdminGroupListParams,
+        AdminGroupRoleCreateParams, AdminGroupRoleListParams, AdminGroupUpdateParams,
+        AdminGroupUserCreateParams, AdminGroupUserListParams, AdminInviteCreateParams,
+        AdminInviteListParams, AdminQueryParams, AdminRoleCreateParams, AdminRoleListParams,
+        AdminRoleUpdateParams, AdminSpendAlertCreateParams, AdminSpendAlertListParams,
+        AdminSpendAlertUpdateParams, AdminUserListParams, AdminUserRoleCreateParams,
+        AdminUserRoleListParams, AdminUserUpdateParams, AdminValue,
+    },
 };
 use serde_json::json;
 
@@ -20,16 +31,18 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
 
     let created_key = org
         .admin_api_keys()
-        .create(json!({"name": "ops-key"}))
+        .create(AdminApiKeyCreateParams {
+            name: String::from("ops-key"),
+        })
         .unwrap();
     assert_eq!(created_key.output["id"], json!("admin_0"));
     org.admin_api_keys().retrieve("key_ops").unwrap();
     org.admin_api_keys()
-        .list(
-            AdminQueryParams::new()
-                .push("after", "key_prev")
-                .push("limit", 2),
-        )
+        .list(AdminApiKeyListParams {
+            after: Some(String::from("key_prev")),
+            limit: Some(2),
+            order: Some(String::from("asc")),
+        })
         .unwrap();
     org.admin_api_keys().delete("key_ops").unwrap();
 
@@ -52,14 +65,27 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
 
     org.users()
         .roles()
-        .create("user_admin", json!({"role_id": "role_viewer"}))
+        .create(
+            "user_admin",
+            AdminUserRoleCreateParams {
+                role_id: String::from("role_viewer"),
+            },
+        )
         .unwrap();
     org.groups()
         .users()
-        .list("grp_eng", AdminQueryParams::new().push("limit", 100))
+        .list(
+            "grp_eng",
+            AdminGroupUserListParams {
+                limit: Some(100),
+                ..Default::default()
+            },
+        )
         .unwrap();
     org.certificates()
-        .activate(json!({"certificate_ids": ["cert_org"]}))
+        .activate(AdminCertificateIdsParams {
+            certificate_ids: vec![String::from("cert_org")],
+        })
         .unwrap();
 
     let projects = org.projects();
@@ -146,7 +172,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     assert_eq!(requests[1].path, "/v1/organization/admin_api_keys/key_ops");
     assert_eq!(
         requests[2].path,
-        "/v1/organization/admin_api_keys?after=key_prev&limit=2"
+        "/v1/organization/admin_api_keys?after=key_prev&limit=2&order=asc"
     );
     assert_eq!(requests[3].method, "DELETE");
     assert_eq!(requests[3].path, "/v1/organization/admin_api_keys/key_ops");
@@ -225,6 +251,277 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
 
     let blank_project = projects.retrieve(" ").unwrap_err();
     assert!(matches!(blank_project.kind, ErrorKind::Validation));
+}
+
+#[test]
+fn admin_organization_typed_params_preserve_queries_and_bodies() {
+    let server = mock_http::MockHttpServer::spawn_sequence(
+        (0..24)
+            .map(|index| json_response(json!({"id": format!("typed_admin_{index}")}).to_string()))
+            .collect(),
+    )
+    .unwrap();
+    let client = client(&server.url());
+    let org = client.admin().organization();
+
+    org.audit_logs()
+        .list(AdminAuditLogListParams {
+            actor_emails: Some(vec![
+                String::from("ops@example.com"),
+                String::from("sec@example.com"),
+            ]),
+            actor_ids: Some(vec![String::from("actor_1")]),
+            after: Some(String::from("audit_after")),
+            before: Some(String::from("audit_before")),
+            effective_at: Some(AdminAuditLogEffectiveAtParams {
+                gte: Some(100),
+                lte: Some(200),
+                ..Default::default()
+            }),
+            event_types: Some(vec![String::from("project.created")]),
+            limit: Some(5),
+            project_ids: Some(vec![String::from("proj_1")]),
+            resource_ids: Some(vec![String::from("res_1")]),
+        })
+        .unwrap();
+
+    org.invites()
+        .create(AdminInviteCreateParams {
+            email: String::from("new@example.com"),
+            role: String::from("reader"),
+            projects: Some(vec![json!({"id": "proj_1", "role": "member"})]),
+        })
+        .unwrap();
+    org.invites()
+        .list(AdminInviteListParams {
+            after: Some(String::from("invite_after")),
+            limit: Some(6),
+        })
+        .unwrap();
+
+    org.users()
+        .list(AdminUserListParams {
+            after: Some(String::from("user_after")),
+            emails: Some(vec![String::from("ops@example.com")]),
+            limit: Some(7),
+        })
+        .unwrap();
+    org.users()
+        .update(
+            "user_admin",
+            AdminUserUpdateParams {
+                role_id: Some(String::from("role_owner")),
+                technical_level: Some(String::from("advanced")),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    org.users()
+        .roles()
+        .list(
+            "user_admin",
+            AdminUserRoleListParams {
+                after: Some(String::from("user_role_after")),
+                limit: Some(8),
+                order: Some(String::from("desc")),
+            },
+        )
+        .unwrap();
+
+    org.groups()
+        .create(AdminGroupCreateParams {
+            name: String::from("Engineering"),
+        })
+        .unwrap();
+    org.groups()
+        .update(
+            "grp_eng",
+            AdminGroupUpdateParams {
+                name: String::from("Product Engineering"),
+            },
+        )
+        .unwrap();
+    org.groups()
+        .list(AdminGroupListParams {
+            after: Some(String::from("group_after")),
+            limit: Some(9),
+            order: Some(String::from("asc")),
+        })
+        .unwrap();
+    org.groups()
+        .users()
+        .create(
+            "grp_eng",
+            AdminGroupUserCreateParams {
+                user_id: String::from("user_admin"),
+            },
+        )
+        .unwrap();
+    org.groups()
+        .roles()
+        .create(
+            "grp_eng",
+            AdminGroupRoleCreateParams {
+                role_id: String::from("role_viewer"),
+            },
+        )
+        .unwrap();
+    org.groups()
+        .roles()
+        .list(
+            "grp_eng",
+            AdminGroupRoleListParams {
+                limit: Some(10),
+                order: Some(String::from("asc")),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    org.roles()
+        .create(AdminRoleCreateParams {
+            description: Some(String::from("Read audit logs")),
+            permissions: vec![String::from("logs.read")],
+            role_name: String::from("audit_reader"),
+        })
+        .unwrap();
+    org.roles()
+        .update(
+            "role_audit",
+            AdminRoleUpdateParams {
+                description: Some(String::from("Read security audit logs")),
+                permissions: vec![String::from("logs.read")],
+                role_name: Some(String::from("audit_reader")),
+            },
+        )
+        .unwrap();
+    org.roles()
+        .list(AdminRoleListParams {
+            after: Some(String::from("role_after")),
+            limit: Some(11),
+            order: Some(String::from("desc")),
+        })
+        .unwrap();
+
+    org.data_retention()
+        .update(AdminDataRetentionUpdateParams {
+            retention_type: String::from("default"),
+        })
+        .unwrap();
+
+    org.certificates()
+        .create(AdminCertificateCreateParams {
+            certificate: String::from("-----BEGIN CERTIFICATE-----"),
+            name: String::from("org-cert"),
+        })
+        .unwrap();
+    org.certificates()
+        .retrieve(
+            "cert_org",
+            AdminCertificateRetrieveParams {
+                include: Some(vec![String::from("content")]),
+            },
+        )
+        .unwrap();
+    org.certificates()
+        .list(AdminCertificateListParams {
+            after: Some(String::from("cert_after")),
+            limit: Some(12),
+            order: Some(String::from("asc")),
+        })
+        .unwrap();
+    org.certificates()
+        .update(
+            "cert_org",
+            AdminCertificateUpdateParams {
+                name: String::from("org-cert-renamed"),
+            },
+        )
+        .unwrap();
+    org.certificates()
+        .deactivate(AdminCertificateIdsParams {
+            certificate_ids: vec![String::from("cert_org")],
+        })
+        .unwrap();
+
+    org.spend_alerts()
+        .create(AdminSpendAlertCreateParams {
+            currency: String::from("USD"),
+            interval: String::from("month"),
+            notification_channel: json!({
+                "type": "email",
+                "recipients": ["ops@example.com"]
+            }),
+            threshold_amount: 10_000,
+        })
+        .unwrap();
+    org.spend_alerts()
+        .list(AdminSpendAlertListParams {
+            after: Some(String::from("alert_after")),
+            before: Some(String::from("alert_before")),
+            limit: Some(13),
+            order: Some(String::from("desc")),
+        })
+        .unwrap();
+    org.spend_alerts()
+        .update(
+            "alert_ops",
+            AdminSpendAlertUpdateParams {
+                currency: String::from("USD"),
+                interval: String::from("month"),
+                notification_channel: json!({
+                    "type": "email",
+                    "recipients": ["sec@example.com"]
+                }),
+                threshold_amount: 20_000,
+            },
+        )
+        .unwrap();
+
+    let requests = server.captured_requests(24).unwrap();
+    let paths = requests
+        .iter()
+        .map(|request| request.path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        paths,
+        vec![
+            "/v1/organization/audit_logs?actor_emails=ops%40example.com&actor_emails=sec%40example.com&actor_ids=actor_1&after=audit_after&before=audit_before&event_types=project.created&limit=5&project_ids=proj_1&resource_ids=res_1&effective_at%5Bgte%5D=100&effective_at%5Blte%5D=200",
+            "/v1/organization/invites",
+            "/v1/organization/invites?after=invite_after&limit=6",
+            "/v1/organization/users?after=user_after&emails=ops%40example.com&limit=7",
+            "/v1/organization/users/user_admin",
+            "/v1/organization/users/user_admin/roles?after=user_role_after&limit=8&order=desc",
+            "/v1/organization/groups",
+            "/v1/organization/groups/grp_eng",
+            "/v1/organization/groups?after=group_after&limit=9&order=asc",
+            "/v1/organization/groups/grp_eng/users",
+            "/v1/organization/groups/grp_eng/roles",
+            "/v1/organization/groups/grp_eng/roles?limit=10&order=asc",
+            "/v1/organization/roles",
+            "/v1/organization/roles/role_audit",
+            "/v1/organization/roles?after=role_after&limit=11&order=desc",
+            "/v1/organization/data_retention",
+            "/v1/organization/certificates",
+            "/v1/organization/certificates/cert_org?include=content",
+            "/v1/organization/certificates?after=cert_after&limit=12&order=asc",
+            "/v1/organization/certificates/cert_org",
+            "/v1/organization/certificates/deactivate",
+            "/v1/organization/spend_alerts",
+            "/v1/organization/spend_alerts?after=alert_after&before=alert_before&limit=13&order=desc",
+            "/v1/organization/spend_alerts/alert_ops",
+        ]
+    );
+
+    let invite_body: AdminValue = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(invite_body["email"], json!("new@example.com"));
+    assert_eq!(invite_body["projects"][0]["role"], json!("member"));
+    let user_update_body: AdminValue = serde_json::from_slice(&requests[4].body).unwrap();
+    assert_eq!(user_update_body["role_id"], json!("role_owner"));
+    let role_body: AdminValue = serde_json::from_slice(&requests[12].body).unwrap();
+    assert_eq!(role_body["permissions"], json!(["logs.read"]));
+    let spend_alert_body: AdminValue = serde_json::from_slice(&requests[21].body).unwrap();
+    assert_eq!(spend_alert_body["threshold_amount"], json!(10_000));
 }
 
 #[test]

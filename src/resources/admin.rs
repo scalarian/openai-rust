@@ -28,6 +28,13 @@ impl AdminQueryParams {
         self
     }
 
+    pub fn push_opt<T: ToString>(mut self, key: impl Into<String>, value: Option<T>) -> Self {
+        if let Some(value) = value {
+            self.append(key, value);
+        }
+        self
+    }
+
     pub fn append(&mut self, key: impl Into<String>, value: impl ToString) {
         self.pairs.push((key.into(), value.to_string()));
     }
@@ -42,6 +49,17 @@ impl AdminQueryParams {
             self.pairs.push((key.clone(), value.to_string()));
         }
         self
+    }
+
+    pub fn push_repeated_opt<I, V>(self, key: impl Into<String>, values: Option<I>) -> Self
+    where
+        I: IntoIterator<Item = V>,
+        V: ToString,
+    {
+        match values {
+            Some(values) => self.push_repeated(key, values),
+            None => self,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -71,6 +89,355 @@ where
 impl From<Vec<(String, String)>> for AdminQueryParams {
     fn from(pairs: Vec<(String, String)>) -> Self {
         Self { pairs }
+    }
+}
+
+/// Organization audit-log effective-time filter.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminAuditLogEffectiveAtParams {
+    pub gt: Option<i64>,
+    pub gte: Option<i64>,
+    pub lt: Option<i64>,
+    pub lte: Option<i64>,
+}
+
+/// Organization audit-log list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminAuditLogListParams {
+    pub actor_emails: Option<Vec<String>>,
+    pub actor_ids: Option<Vec<String>>,
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub effective_at: Option<AdminAuditLogEffectiveAtParams>,
+    pub event_types: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub project_ids: Option<Vec<String>>,
+    pub resource_ids: Option<Vec<String>>,
+}
+
+impl From<AdminAuditLogListParams> for AdminQueryParams {
+    fn from(value: AdminAuditLogListParams) -> Self {
+        let mut params = AdminQueryParams::new()
+            .push_repeated_opt("actor_emails", value.actor_emails)
+            .push_repeated_opt("actor_ids", value.actor_ids)
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_repeated_opt("event_types", value.event_types)
+            .push_opt("limit", value.limit)
+            .push_repeated_opt("project_ids", value.project_ids)
+            .push_repeated_opt("resource_ids", value.resource_ids);
+        if let Some(effective_at) = value.effective_at {
+            params = params
+                .push_opt("effective_at[gt]", effective_at.gt)
+                .push_opt("effective_at[gte]", effective_at.gte)
+                .push_opt("effective_at[lt]", effective_at.lt)
+                .push_opt("effective_at[lte]", effective_at.lte);
+        }
+        params
+    }
+}
+
+/// Organization admin API key creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminApiKeyCreateParams {
+    pub name: String,
+}
+
+/// Organization admin API key list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminApiKeyListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminApiKeyListParams> for AdminQueryParams {
+    fn from(value: AdminApiKeyListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization invite creation body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminInviteCreateParams {
+    pub email: String,
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projects: Option<Vec<Value>>,
+}
+
+/// Organization invite list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminInviteListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminInviteListParams> for AdminQueryParams {
+    fn from(value: AdminInviteListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Organization user list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUserListParams {
+    pub after: Option<String>,
+    pub emails: Option<Vec<String>>,
+    pub limit: Option<u32>,
+}
+
+impl From<AdminUserListParams> for AdminQueryParams {
+    fn from(value: AdminUserListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_repeated_opt("emails", value.emails)
+            .push_opt("limit", value.limit)
+    }
+}
+
+/// Organization user update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminUserUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub developer_persona: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub technical_level: Option<String>,
+}
+
+/// Organization role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminRoleCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub permissions: Vec<String>,
+    pub role_name: String,
+}
+
+/// Organization role update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminRoleUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub permissions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role_name: Option<String>,
+}
+
+/// Organization role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminRoleListParams> for AdminQueryParams {
+    fn from(value: AdminRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization user-role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminUserRoleCreateParams {
+    pub role_id: String,
+}
+
+/// Organization user-role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminUserRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminUserRoleListParams> for AdminQueryParams {
+    fn from(value: AdminUserRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization group creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminGroupCreateParams {
+    pub name: String,
+}
+
+/// Organization group update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminGroupUpdateParams {
+    pub name: String,
+}
+
+/// Organization group list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminGroupListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminGroupListParams> for AdminQueryParams {
+    fn from(value: AdminGroupListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization group-user creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminGroupUserCreateParams {
+    pub user_id: String,
+}
+
+/// Organization group-user list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminGroupUserListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminGroupUserListParams> for AdminQueryParams {
+    fn from(value: AdminGroupUserListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization group-role creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminGroupRoleCreateParams {
+    pub role_id: String,
+}
+
+/// Organization group-role list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminGroupRoleListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminGroupRoleListParams> for AdminQueryParams {
+    fn from(value: AdminGroupRoleListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization certificate creation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminCertificateCreateParams {
+    pub certificate: String,
+    pub name: String,
+}
+
+/// Organization certificate update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminCertificateUpdateParams {
+    pub name: String,
+}
+
+/// Organization certificate activation/deactivation body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminCertificateIdsParams {
+    pub certificate_ids: Vec<String>,
+}
+
+/// Organization certificate retrieve query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminCertificateRetrieveParams {
+    pub include: Option<Vec<String>>,
+}
+
+impl From<AdminCertificateRetrieveParams> for AdminQueryParams {
+    fn from(value: AdminCertificateRetrieveParams) -> Self {
+        AdminQueryParams::new().push_repeated_opt("include", value.include)
+    }
+}
+
+/// Organization certificate list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminCertificateListParams {
+    pub after: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminCertificateListParams> for AdminQueryParams {
+    fn from(value: AdminCertificateListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+    }
+}
+
+/// Organization data-retention update body.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct AdminDataRetentionUpdateParams {
+    pub retention_type: String,
+}
+
+/// Organization spend-alert creation body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminSpendAlertCreateParams {
+    pub currency: String,
+    pub interval: String,
+    pub notification_channel: Value,
+    pub threshold_amount: i64,
+}
+
+/// Organization spend-alert update body.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct AdminSpendAlertUpdateParams {
+    pub currency: String,
+    pub interval: String,
+    pub notification_channel: Value,
+    pub threshold_amount: i64,
+}
+
+/// Organization spend-alert list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdminSpendAlertListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+}
+
+impl From<AdminSpendAlertListParams> for AdminQueryParams {
+    fn from(value: AdminSpendAlertListParams) -> Self {
+        AdminQueryParams::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
     }
 }
 
