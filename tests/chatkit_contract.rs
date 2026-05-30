@@ -9,8 +9,9 @@ use openai_rust::{
         ChatKitAutomaticThreadTitlingParam, ChatKitConfigurationParam, ChatKitFileUploadParam,
         ChatKitHistoryParam, ChatKitOrder, ChatKitSessionCreateParams,
         ChatKitSessionExpiresAfterParam, ChatKitSessionExpiryAnchor, ChatKitSessionRateLimitsParam,
-        ChatKitSessionStatus, ChatKitSessionWorkflowParam, ChatKitThreadItemListParams,
-        ChatKitThreadListParams, ChatKitThreadStatus, ChatKitWorkflowTracingParam,
+        ChatKitSessionStatus, ChatKitSessionWorkflowParam, ChatKitStateValue,
+        ChatKitThreadItemListParams, ChatKitThreadListParams, ChatKitThreadStatus,
+        ChatKitWorkflowTracingParam,
     },
 };
 use serde_json::json;
@@ -36,8 +37,11 @@ fn chatkit_beta_sessions_and_threads_preserve_routes_headers_and_shapes() {
             workflow: ChatKitSessionWorkflowParam {
                 id: String::from("workflow_support"),
                 state_variables: Some(BTreeMap::from([
-                    (String::from("tier"), json!("pro")),
-                    (String::from("entitled"), json!(true)),
+                    (
+                        String::from("tier"),
+                        ChatKitStateValue::String(String::from("pro")),
+                    ),
+                    (String::from("entitled"), ChatKitStateValue::Bool(true)),
                 ])),
                 tracing: Some(ChatKitWorkflowTracingParam {
                     enabled: Some(false),
@@ -69,13 +73,15 @@ fn chatkit_beta_sessions_and_threads_preserve_routes_headers_and_shapes() {
         .unwrap();
     assert_eq!(created.output.id, "sess_created");
     assert_eq!(created.output.status, ChatKitSessionStatus::Active);
+    assert_eq!(created.output.rate_limits.max_requests_per_1_minute, 12);
     assert_eq!(
-        created
-            .output
-            .rate_limits
-            .unwrap()
-            .max_requests_per_1_minute,
-        12
+        created.output.workflow.version.as_deref(),
+        Some("2026-05-30")
+    );
+    assert!(created.output.workflow.tracing.enabled);
+    assert_eq!(
+        created.output.chatkit_configuration.file_upload.max_files,
+        Some(3)
     );
 
     let cancelled = chatkit.sessions().cancel("sess_created").unwrap();
@@ -171,7 +177,12 @@ fn session_payload(id: &str, status: &str) -> String {
         "max_requests_per_1_minute": 12,
         "status": status,
         "user": "end-user-123",
-        "workflow": {"id": "workflow_support", "version": "2026-05-30"},
+        "workflow": {
+            "id": "workflow_support",
+            "version": "2026-05-30",
+            "state_variables": {"tier": "pro", "entitled": true},
+            "tracing": {"enabled": true}
+        },
         "chatkit_configuration": {
             "automatic_thread_titling": {"enabled": true},
             "file_upload": {"enabled": true, "max_file_size": 64, "max_files": 3},

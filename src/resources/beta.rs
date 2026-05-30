@@ -1393,11 +1393,20 @@ pub struct ChatKitSessionCreateParams {
 pub struct ChatKitSessionWorkflowParam {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub state_variables: Option<BTreeMap<String, Value>>,
+    pub state_variables: Option<BTreeMap<String, ChatKitStateValue>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tracing: Option<ChatKitWorkflowTracingParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+}
+
+/// Primitive ChatKit workflow state variable value.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ChatKitStateValue {
+    String(String),
+    Bool(bool),
+    Number(f64),
 }
 
 /// Per-session workflow tracing override.
@@ -1466,6 +1475,57 @@ pub struct ChatKitHistoryParam {
     pub recent_threads: Option<u32>,
 }
 
+/// Workflow metadata returned for a ChatKit session.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ChatKitWorkflow {
+    pub id: String,
+    #[serde(default)]
+    pub state_variables: Option<BTreeMap<String, ChatKitStateValue>>,
+    pub tracing: ChatKitWorkflowTracing,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Resolved workflow tracing settings.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct ChatKitWorkflowTracing {
+    pub enabled: bool,
+}
+
+/// Resolved ChatKit feature configuration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct ChatKitConfiguration {
+    pub automatic_thread_titling: ChatKitAutomaticThreadTitling,
+    pub file_upload: ChatKitFileUpload,
+    pub history: ChatKitHistory,
+}
+
+/// Resolved automatic thread-title generation configuration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct ChatKitAutomaticThreadTitling {
+    pub enabled: bool,
+}
+
+/// Resolved ChatKit upload configuration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct ChatKitFileUpload {
+    pub enabled: bool,
+    #[serde(default)]
+    pub max_file_size: Option<u64>,
+    #[serde(default)]
+    pub max_files: Option<u32>,
+}
+
+/// Resolved ChatKit history-retention configuration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct ChatKitHistory {
+    pub enabled: bool,
+    #[serde(default)]
+    pub recent_threads: Option<u32>,
+}
+
 /// ChatKit session resource.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ChatKitSession {
@@ -1476,11 +1536,9 @@ pub struct ChatKitSession {
     pub max_requests_per_1_minute: u32,
     pub status: ChatKitSessionStatus,
     pub user: String,
-    pub workflow: Value,
-    #[serde(default)]
-    pub chatkit_configuration: Option<Value>,
-    #[serde(default)]
-    pub rate_limits: Option<ChatKitSessionRateLimits>,
+    pub workflow: ChatKitWorkflow,
+    pub chatkit_configuration: ChatKitConfiguration,
+    pub rate_limits: ChatKitSessionRateLimits,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
