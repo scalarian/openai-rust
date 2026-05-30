@@ -148,6 +148,22 @@ fn create_populates_output_text_helper() {
         response.output().metadata,
         Some(json!({"trace": "response_payload"}))
     );
+    let usage = response.output().usage.as_ref().unwrap();
+    assert_eq!(usage.input_tokens, Some(1));
+    assert_eq!(usage.output_tokens, Some(2));
+    assert_eq!(usage.total_tokens, Some(3));
+    assert_eq!(
+        usage.input_tokens_details.as_ref().unwrap().cached_tokens,
+        Some(1)
+    );
+    assert_eq!(
+        usage
+            .output_tokens_details
+            .as_ref()
+            .unwrap()
+            .reasoning_tokens,
+        Some(1)
+    );
     assert_eq!(response.output().output_text(), "Hello world!");
 }
 
@@ -488,7 +504,10 @@ fn compact_returns_compaction_object() {
     assert_eq!(response.output().output.len(), 2);
     assert_eq!(response.output().output[0].item_type, "message");
     assert_eq!(response.output().output[1].item_type, "compaction");
-    assert_eq!(response.output().usage["total_tokens"], 15);
+    assert_eq!(
+        response.output().usage.as_ref().unwrap().total_tokens,
+        Some(15)
+    );
 }
 
 #[test]
@@ -689,7 +708,13 @@ fn response_payload(
         "top_p": 0.8,
         "truncation": "auto",
         "user": "legacy-user",
-        "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}
+        "usage": {
+            "input_tokens": 1,
+            "input_tokens_details": {"cached_tokens": 1},
+            "output_tokens": 2,
+            "output_tokens_details": {"reasoning_tokens": 1},
+            "total_tokens": 3
+        }
     })
     .to_string()
 }

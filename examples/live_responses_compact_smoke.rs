@@ -39,7 +39,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "compaction total tokens: {}",
-        compacted.output().usage["total_tokens"]
+        compacted
+            .output()
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.total_tokens)
+            .map(|tokens| tokens.to_string())
+            .unwrap_or_else(|| String::from("<missing>"))
     );
 
     if compacted.output().object != "response.compaction" {

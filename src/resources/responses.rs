@@ -976,9 +976,9 @@ pub struct Response {
     pub top_p: Option<f64>,
     pub truncation: Option<String>,
     pub user: Option<String>,
-    pub usage: Value,
-    pub error: Option<Value>,
-    pub incomplete_details: Option<Value>,
+    pub usage: Option<ResponseUsage>,
+    pub error: Option<ResponseError>,
+    pub incomplete_details: Option<ResponseIncompleteDetails>,
     pub metadata: Option<Value>,
     pub extra: BTreeMap<String, Value>,
     output_text: String,
@@ -999,6 +999,61 @@ impl Response {
     }
 }
 
+/// Token usage details for a Responses API payload.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseUsage {
+    #[serde(default)]
+    pub input_tokens: Option<u64>,
+    #[serde(default)]
+    pub input_tokens_details: Option<ResponseInputTokensDetails>,
+    #[serde(default)]
+    pub output_tokens: Option<u64>,
+    #[serde(default)]
+    pub output_tokens_details: Option<ResponseOutputTokensDetails>,
+    #[serde(default)]
+    pub total_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Detailed breakdown of input tokens.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseInputTokensDetails {
+    #[serde(default)]
+    pub cached_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Detailed breakdown of output tokens.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseOutputTokensDetails {
+    #[serde(default)]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Error details returned on failed response objects.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseError {
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub message: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Details about why a response is incomplete.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ResponseIncompleteDetails {
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Public parsed response compaction object.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct CompactedResponse {
@@ -1008,7 +1063,7 @@ pub struct CompactedResponse {
     #[serde(default)]
     pub output: Vec<ResponseOutputItem>,
     #[serde(default)]
-    pub usage: Value,
+    pub usage: Option<ResponseUsage>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1275,9 +1330,9 @@ pub struct ParsedResponse<T> {
     pub top_p: Option<f64>,
     pub truncation: Option<String>,
     pub user: Option<String>,
-    pub usage: Value,
-    pub error: Option<Value>,
-    pub incomplete_details: Option<Value>,
+    pub usage: Option<ResponseUsage>,
+    pub error: Option<ResponseError>,
+    pub incomplete_details: Option<ResponseIncompleteDetails>,
     pub metadata: Option<Value>,
     pub extra: BTreeMap<String, Value>,
     output_text: String,
@@ -2065,11 +2120,11 @@ struct WireResponse {
     #[serde(default)]
     user: Option<String>,
     #[serde(default)]
-    usage: Value,
+    usage: Option<ResponseUsage>,
     #[serde(default)]
-    error: Option<Value>,
+    error: Option<ResponseError>,
     #[serde(default)]
-    incomplete_details: Option<Value>,
+    incomplete_details: Option<ResponseIncompleteDetails>,
     #[serde(default)]
     metadata: Option<Value>,
     #[serde(flatten)]
@@ -2127,7 +2182,7 @@ struct WireCompactedResponse {
     #[serde(default)]
     output: Vec<ResponseOutputItem>,
     #[serde(default)]
-    usage: Value,
+    usage: Option<ResponseUsage>,
     #[serde(flatten)]
     extra: BTreeMap<String, Value>,
 }

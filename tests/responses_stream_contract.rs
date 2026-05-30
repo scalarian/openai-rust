@@ -470,7 +470,11 @@ fn terminal_incomplete_state_remains_explicit() {
         incomplete.terminal_state(),
         Some(ResponseStreamTerminal::Incomplete(response))
             if response.status.as_deref() == Some("incomplete")
-                && response.incomplete_details.as_ref() == Some(&json!({"reason": "max_output_tokens"}))
+                && response
+                    .incomplete_details
+                    .as_ref()
+                    .and_then(|details| details.reason.as_deref())
+                    == Some("max_output_tokens")
     ));
 
     let response_error = incomplete
