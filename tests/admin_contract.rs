@@ -226,6 +226,21 @@ fn organization_spend_alert_json(id: &str, threshold_amount: i64) -> Value {
     })
 }
 
+fn project_spend_alert_json(id: &str, threshold_amount: i64) -> Value {
+    json!({
+        "id": id,
+        "currency": "USD",
+        "interval": "month",
+        "notification_channel": {
+            "type": "email",
+            "recipients": ["ops@example.com"],
+            "subject_prefix": null
+        },
+        "object": "project.spend_alert",
+        "threshold_amount": threshold_amount
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -1040,6 +1055,16 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     );
     responses[9] = json_response(project_model_permissions_json().to_string());
     responses[15] = json_response(project_data_retention_json("organization_default").to_string());
+    responses[16] = json_response(project_spend_alert_json("alert_project", 30_000).to_string());
+    responses[17] = json_response(
+        json!({
+            "data": [project_spend_alert_json("alert_project", 30_000)],
+            "has_more": true,
+            "last_id": "alert_project"
+        })
+        .to_string(),
+    );
+    responses[18] = json_response(project_spend_alert_json("alert_project", 40_000).to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let projects = client.admin().organization().projects();
@@ -1240,7 +1265,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         project_retention.output.retention_type,
         AdminProjectDataRetentionType::OrganizationDefault
     );
-    projects
+    let created_alert = projects
         .spend_alerts()
         .create(
             "proj_research",
@@ -1256,7 +1281,12 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        created_alert.output.object,
+        AdminProjectSpendAlertObject::ProjectSpendAlert
+    );
+    assert_eq!(created_alert.output.threshold_amount, 30_000);
+    let spend_alerts = projects
         .spend_alerts()
         .list(
             "proj_research",
@@ -1268,7 +1298,9 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(spend_alerts.output.data[0].id, "alert_project");
+    assert_eq!(spend_alerts.output.next_after(), Some("alert_project"));
+    let updated_alert = projects
         .spend_alerts()
         .update(
             "proj_research",
@@ -1285,6 +1317,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(updated_alert.output.threshold_amount, 40_000);
 
     projects
         .certificates()
@@ -1783,6 +1816,40 @@ fn admin_spend_alert_delete_returns_typed_response() {
     let requests = server.captured_requests(1).unwrap();
     assert_eq!(requests[0].method, "DELETE");
     assert_eq!(requests[0].path, "/v1/organization/spend_alerts/alert_ops");
+}
+
+#[test]
+fn admin_project_spend_alert_delete_returns_typed_response() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(
+        json!({
+            "id": "alert_project",
+            "deleted": true,
+            "object": "project.spend_alert.deleted"
+        })
+        .to_string(),
+    )])
+    .unwrap();
+    let client = client(&server.url());
+
+    let deleted = client
+        .admin()
+        .organization()
+        .projects()
+        .spend_alerts()
+        .delete("proj_research", "alert_project")
+        .unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminProjectSpendAlertDeletedObject::ProjectSpendAlertDeleted
+    );
+
+    let requests = server.captured_requests(1).unwrap();
+    assert_eq!(requests[0].method, "DELETE");
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/projects/proj_research/spend_alerts/alert_project"
+    );
 }
 
 #[test]

@@ -295,6 +295,20 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project spend-alert object type.
+    pub enum AdminProjectSpendAlertObject {
+        ProjectSpendAlert => "project.spend_alert",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project spend-alert deletion object type.
+    pub enum AdminProjectSpendAlertDeletedObject {
+        ProjectSpendAlertDeleted => "project.spend_alert.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1973,6 +1987,31 @@ impl From<AdminProjectSpendAlertListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+/// Represents a spend alert configured at the project level.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectSpendAlert {
+    pub id: String,
+    pub currency: AdminSpendAlertCurrency,
+    pub interval: AdminSpendAlertInterval,
+    pub notification_channel: AdminSpendAlertNotificationChannel,
+    pub object: AdminProjectSpendAlertObject,
+    pub threshold_amount: i64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting a project spend alert.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectSpendAlertDeleted {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminProjectSpendAlertDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectSpendAlertListResponse = AdminConversationCursorPage<AdminProjectSpendAlert>;
 
 /// Project certificate activation/deactivation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -4000,12 +4039,13 @@ impl ProjectSpendAlerts {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectSpendAlert>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/spend_alerts"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4014,13 +4054,14 @@ impl ProjectSpendAlerts {
         project_id: &str,
         alert_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectSpendAlert>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let alert_id = path_id("alert_id", alert_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/spend_alerts/{alert_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4028,12 +4069,15 @@ impl ProjectSpendAlerts {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectSpendAlertListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/spend_alerts"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/spend_alerts"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -4041,12 +4085,13 @@ impl ProjectSpendAlerts {
         &self,
         project_id: &str,
         alert_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectSpendAlertDeleted>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let alert_id = path_id("alert_id", alert_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/spend_alerts/{alert_id}"),
+            RequestOptions::default(),
         )
     }
 }
