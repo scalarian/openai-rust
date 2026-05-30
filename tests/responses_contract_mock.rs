@@ -14,12 +14,14 @@ use openai_rust::{
             ResponseConversationObject, ResponseCustomTool, ResponseCustomToolGrammar,
             ResponseCustomToolInputFormat, ResponseFileSearchAttributeValue,
             ResponseFileSearchFilter, ResponseFileSearchFilterValue, ResponseFormatTextConfig,
-            ResponseIncludable, ResponseInput, ResponseInstructions, ResponseItemAction,
-            ResponseItemEnvironment, ResponseItemOutput, ResponseMcpAllowedTools,
-            ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
-            ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning, ResponseShellEnvironment,
-            ResponseShellOutputOutcome, ResponseShellTool, ResponseStreamOptions,
-            ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseIncludable, ResponseInput, ResponseInputContentPart, ResponseInputItem,
+            ResponseInputText, ResponseInstructions, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseItemRole, ResponseItemStatus, ResponseItemType,
+            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
+            ResponseMcpTool, ResponseMcpToolFilter, ResponseMessagePhase, ResponsePrompt,
+            ResponseReasoning, ResponseShellEnvironment, ResponseShellOutputOutcome,
+            ResponseShellTool, ResponseStreamOptions, ResponseTextAnnotation, ResponseTool,
+            ResponseToolChoice, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -595,6 +597,30 @@ fn response_instructions_decode_input_items() {
     assert_eq!(items[0].role.as_deref(), Some("developer"));
     assert_eq!(items[0].content[0].content_type, "input_text");
     assert_eq!(items[0].content[0].text.as_deref(), Some("Use plain text."));
+}
+
+#[test]
+fn response_input_item_literals_serialize_as_typed_values() {
+    let value = serde_json::to_value(ResponseInputItem {
+        item_type: Some(ResponseItemType::Message),
+        role: Some(ResponseItemRole::Developer),
+        content: Some(
+            vec![ResponseInputContentPart::Text(ResponseInputText::new(
+                "Use terse answers.",
+            ))]
+            .into(),
+        ),
+        status: Some(ResponseItemStatus::InProgress),
+        phase: Some(ResponseMessagePhase::Commentary),
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert_eq!(value["type"], "message");
+    assert_eq!(value["role"], "developer");
+    assert_eq!(value["status"], "in_progress");
+    assert_eq!(value["phase"], "commentary");
+    assert_eq!(value["content"][0]["type"], "input_text");
 }
 
 #[test]

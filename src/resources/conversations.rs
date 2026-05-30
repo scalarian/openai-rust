@@ -11,10 +11,11 @@ use crate::{
         common::ListOrder,
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
-            ResponseFileSearchResult, ResponseIncludable, ResponseInputAudioData,
-            ResponseInputItem, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-            ResponseItemRole, ResponseItemStatus, ResponseItemTool, ResponseMessagePhase,
-            ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
+            ResponseContentType, ResponseFileSearchResult, ResponseIncludable,
+            ResponseInputAudioData, ResponseInputItem, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseItemRole, ResponseItemStatus, ResponseItemTool,
+            ResponseItemType, ResponseMessagePhase, ResponseReasoningSummaryPart,
+            ResponseTextAnnotation, ResponseTextLogprob,
         },
     },
 };
@@ -319,7 +320,7 @@ impl ConversationItemList {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConversationItem {
     pub id: Option<String>,
-    pub item_type: String,
+    pub item_type: ResponseItemType,
     pub role: Option<ResponseItemRole>,
     pub name: Option<String>,
     pub arguments: Option<String>,
@@ -387,7 +388,7 @@ struct WireConversationItem {
     #[serde(default)]
     id: Option<String>,
     #[serde(rename = "type")]
-    item_type: String,
+    item_type: ResponseItemType,
     #[serde(default)]
     role: Option<ResponseItemRole>,
     #[serde(default)]
@@ -519,7 +520,7 @@ impl From<WireConversationItem> for ConversationItem {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ConversationItemContent {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ResponseContentType,
     #[serde(default)]
     pub text: Option<String>,
     #[serde(default)]

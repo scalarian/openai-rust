@@ -44,6 +44,103 @@ use crate::{
     },
 };
 
+macro_rules! response_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                })
+            }
+        }
+    };
+}
+
 /// Primary Responses API family.
 #[derive(Clone, Debug)]
 pub struct Responses {
@@ -1046,17 +1143,17 @@ impl From<Vec<ResponseInputItem>> for ResponseInput {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ResponseInputItem {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub item_type: Option<String>,
+    pub item_type: Option<ResponseItemType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
+    pub role: Option<ResponseItemRole>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<ResponseInputMessageContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<ResponseItemStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub phase: Option<String>,
+    pub phase: Option<ResponseMessagePhase>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1073,11 +1170,11 @@ pub struct ResponseInputItem {
 
 impl ResponseInputItem {
     pub fn message(
-        role: impl Into<String>,
+        role: impl Into<ResponseItemRole>,
         content: impl Into<ResponseInputMessageContent>,
     ) -> Self {
         Self {
-            item_type: Some(String::from("message")),
+            item_type: Some(ResponseItemType::Message),
             role: Some(role.into()),
             content: Some(content.into()),
             ..Default::default()
@@ -1134,7 +1231,7 @@ pub enum ResponseInputContentPart {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ResponseInputText {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ResponseContentType,
     pub text: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -1143,7 +1240,7 @@ pub struct ResponseInputText {
 impl ResponseInputText {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
-            content_type: String::from("input_text"),
+            content_type: ResponseContentType::InputText,
             text: text.into(),
             extra: BTreeMap::new(),
         }
@@ -1154,7 +1251,7 @@ impl ResponseInputText {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ResponseInputImage {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ResponseContentType,
     pub detail: ImageDetail,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
@@ -1167,7 +1264,7 @@ pub struct ResponseInputImage {
 impl ResponseInputImage {
     pub fn url(image_url: impl Into<String>, detail: ImageDetail) -> Self {
         Self {
-            content_type: String::from("input_image"),
+            content_type: ResponseContentType::InputImage,
             detail,
             file_id: None,
             image_url: Some(image_url.into()),
@@ -1180,7 +1277,7 @@ impl ResponseInputImage {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ResponseInputFile {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ResponseContentType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<ResponseInputFileDetail>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1220,7 +1317,7 @@ impl AsRef<str> for ResponseInputFileDetail {
 impl ResponseInputFile {
     pub fn file_id(file_id: impl Into<String>) -> Self {
         Self {
-            content_type: String::from("input_file"),
+            content_type: ResponseContentType::InputFile,
             detail: None,
             file_data: None,
             file_id: Some(file_id.into()),
@@ -1405,6 +1502,59 @@ impl std::fmt::Display for ResponseIncludable {
     }
 }
 
+response_string_literal_enum! {
+    /// Discriminator used by Responses and Conversations input/output items.
+    pub enum ResponseItemType {
+        Message => "message",
+        FunctionCall => "function_call",
+        FunctionCallOutput => "function_call_output",
+        FileSearchCall => "file_search_call",
+        WebSearchCall => "web_search_call",
+        ComputerCall => "computer_call",
+        ComputerCallOutput => "computer_call_output",
+        Reasoning => "reasoning",
+        ImageGenerationCall => "image_generation_call",
+        CodeInterpreterCall => "code_interpreter_call",
+        McpCall => "mcp_call",
+        McpListTools => "mcp_list_tools",
+        McpApprovalRequest => "mcp_approval_request",
+        McpApprovalResponse => "mcp_approval_response",
+        CustomToolCall => "custom_tool_call",
+        CustomToolCallOutput => "custom_tool_call_output",
+        LocalShellCall => "local_shell_call",
+        LocalShellCallOutput => "local_shell_call_output",
+        ShellCall => "shell_call",
+        ShellCallOutput => "shell_call_output",
+        ApplyPatchCall => "apply_patch_call",
+        ApplyPatchCallOutput => "apply_patch_call_output",
+        ToolSearchCall => "tool_search_call",
+        ToolSearchOutput => "tool_search_output",
+        Exec => "exec",
+        Compaction => "compaction",
+        CompactionTrigger => "compaction_trigger",
+        ItemReference => "item_reference",
+        CreateFile => "create_file",
+        DeleteFile => "delete_file",
+        UpdateFile => "update_file",
+    }
+}
+
+response_string_literal_enum! {
+    /// Discriminator used by Responses and Conversations content parts.
+    pub enum ResponseContentType {
+        InputText => "input_text",
+        InputImage => "input_image",
+        InputFile => "input_file",
+        InputAudio => "input_audio",
+        OutputText => "output_text",
+        Refusal => "refusal",
+        OutputAudio => "output_audio",
+        ReasoningText => "reasoning_text",
+        SummaryText => "summary_text",
+        ComputerScreenshot => "computer_screenshot",
+    }
+}
+
 /// Role attached to message-like response and conversation items.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponseItemRole {
@@ -1431,6 +1581,38 @@ impl ResponseItemRole {
             Self::Developer => "developer",
             Self::Tool => "tool",
             Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for ResponseItemRole {
+    fn from(value: &str) -> Self {
+        match value {
+            "unknown" => Self::UnknownRole,
+            "user" => Self::User,
+            "assistant" => Self::Assistant,
+            "system" => Self::System,
+            "critic" => Self::Critic,
+            "discriminator" => Self::Discriminator,
+            "developer" => Self::Developer,
+            "tool" => Self::Tool,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for ResponseItemRole {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "unknown" => Self::UnknownRole,
+            "user" => Self::User,
+            "assistant" => Self::Assistant,
+            "system" => Self::System,
+            "critic" => Self::Critic,
+            "discriminator" => Self::Discriminator,
+            "developer" => Self::Developer,
+            "tool" => Self::Tool,
+            _ => Self::Unknown(value),
         }
     }
 }
@@ -1470,17 +1652,7 @@ impl<'de> Deserialize<'de> for ResponseItemRole {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "unknown" => Self::UnknownRole,
-            "user" => Self::User,
-            "assistant" => Self::Assistant,
-            "system" => Self::System,
-            "critic" => Self::Critic,
-            "discriminator" => Self::Discriminator,
-            "developer" => Self::Developer,
-            "tool" => Self::Tool,
-            _ => Self::Unknown(value),
-        })
+        Ok(Self::from(value))
     }
 }
 
@@ -1774,7 +1946,7 @@ pub struct CompactedResponse {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResponseOutputItem {
     pub id: Option<String>,
-    pub item_type: String,
+    pub item_type: ResponseItemType,
     pub role: Option<ResponseItemRole>,
     pub name: Option<String>,
     pub arguments: Option<String>,
@@ -2540,7 +2712,7 @@ struct WireResponseOutputItem {
     #[serde(default)]
     id: Option<String>,
     #[serde(rename = "type")]
-    item_type: String,
+    item_type: ResponseItemType,
     #[serde(default)]
     role: Option<ResponseItemRole>,
     #[serde(default)]
@@ -2669,7 +2841,7 @@ fn argument_value_to_string(value: &Value) -> String {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ResponseContentPart {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ResponseContentType,
     #[serde(default)]
     pub text: Option<String>,
     #[serde(default)]
@@ -2699,7 +2871,7 @@ pub struct ResponseContentPart {
 impl ResponseContentPart {
     fn input_text(text: String) -> Self {
         Self {
-            content_type: String::from("input_text"),
+            content_type: ResponseContentType::InputText,
             text: Some(text),
             refusal: None,
             annotations: Vec::new(),

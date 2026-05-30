@@ -5,7 +5,8 @@ use openai_rust::{
         responses::{
             ResponseApplyPatchOperation, ResponseComputerAction, ResponseIncludable,
             ResponseInputContentPart, ResponseInputItem, ResponseInputText, ResponseItemAction,
-            ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
+            ResponseItemEnvironment, ResponseItemOutput, ResponseItemType,
+            ResponseShellOutputOutcome, ResponseTool,
         },
     },
 };
@@ -56,7 +57,7 @@ fn routes_and_pagination() {
                         ))],
                     ),
                     ResponseInputItem {
-                        item_type: Some(String::from("reasoning")),
+                        item_type: Some(ResponseItemType::Reasoning),
                         extra: BTreeMap::from([(String::from("summary"), json!([]))]),
                         ..Default::default()
                     },
