@@ -353,6 +353,102 @@ async fn bootstrap_and_clean_close() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn upstream_raw_realtime_aliases_round_trip() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (captured_tx, captured_rx) = mpsc::channel();
+
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+
+        socket
+            .send(Message::Text(
+                json!({
+                    "type": "session.created",
+                    "event_id": "evt_raw_created",
+                    "session": {
+                        "id": "sess_raw",
+                        "type": "realtime",
+                        "model": "gpt-realtime-mini"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+
+        let raw = socket.next().await.unwrap().unwrap();
+        captured_tx
+            .send(raw.into_text().unwrap().to_string())
+            .unwrap();
+
+        socket
+            .send(Message::Text(
+                json!({
+                    "type": "session.updated",
+                    "event_id": "evt_raw_updated",
+                    "session": {
+                        "id": "sess_raw",
+                        "type": "realtime",
+                        "model": "gpt-realtime-mini",
+                        "instructions": "raw"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+
+        match socket.next().await.unwrap().unwrap() {
+            Message::Close(_) => {}
+            other => panic!("expected close frame, got {other:?}"),
+        }
+    });
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(format!("http://{addr}/v1"))
+        .build();
+
+    let mut connection = client
+        .realtime()
+        .connect(RealtimeConnectOptions {
+            model: Some(String::from("gpt-realtime-mini")),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let bootstrap_bytes = connection.recv_bytes().await.unwrap().unwrap();
+    let bootstrap = String::from_utf8(bootstrap_bytes).unwrap();
+    assert!(bootstrap.contains("\"session.created\""));
+
+    connection
+        .send_raw(r#"{"type":"session.update","session":{"type":"realtime","instructions":"raw"}}"#)
+        .await
+        .unwrap();
+
+    let updated = connection.recv().await.unwrap().unwrap();
+    assert!(matches!(
+        updated,
+        RealtimeServerEvent::SessionUpdated { ref session, .. }
+            if session.instructions.as_deref() == Some("raw")
+    ));
+
+    connection.close().await.unwrap();
+    server.await.unwrap();
+
+    let captured = captured_rx.recv().unwrap();
+    assert_eq!(
+        captured,
+        r#"{"type":"session.update","session":{"type":"realtime","instructions":"raw"}}"#
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn connection_convenience_resources_emit_upstream_client_events() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
     let addr = listener.local_addr().unwrap();

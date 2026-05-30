@@ -629,11 +629,16 @@ impl Calls {
 /// Minimal async Realtime websocket connection.
 pub struct RealtimeConnection {
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    buffered_events: VecDeque<Result<RealtimeServerEvent, OpenAIError>>,
+    buffered_frames: VecDeque<BufferedRealtimeFrame>,
     event_handlers: RealtimeEventHandlerRegistry,
     session_id: Option<String>,
     current_session: Option<RealtimeSessionConfig>,
     closed: bool,
+}
+
+struct BufferedRealtimeFrame {
+    raw: Vec<u8>,
+    event: Result<RealtimeServerEvent, OpenAIError>,
 }
 
 /// Registered Realtime websocket event handler identifier.
@@ -751,7 +756,7 @@ impl RealtimeConnection {
 
         let mut connection = Self {
             socket,
-            buffered_events: VecDeque::new(),
+            buffered_frames: VecDeque::new(),
             event_handlers: RealtimeEventHandlerRegistry::default(),
             session_id: None,
             current_session: None,
@@ -800,12 +805,6 @@ impl RealtimeConnection {
 
     /// Sends a caller-built Realtime client event JSON object.
     pub async fn send_json_value(&mut self, event: Value) -> Result<(), OpenAIError> {
-        if self.closed {
-            return Err(OpenAIError::new(
-                ErrorKind::Validation,
-                "cannot send a Realtime event after the websocket has been closed",
-            ));
-        }
         let payload = serde_json::to_string(&event).map_err(|error| {
             OpenAIError::new(
                 ErrorKind::Validation,
@@ -813,8 +812,19 @@ impl RealtimeConnection {
             )
             .with_source(error)
         })?;
+        self.send_raw(payload).await
+    }
+
+    /// Sends a raw JSON Realtime client event text frame.
+    pub async fn send_raw(&mut self, payload: impl Into<String>) -> Result<(), OpenAIError> {
+        if self.closed {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                "cannot send a Realtime event after the websocket has been closed",
+            ));
+        }
         self.socket
-            .send(Message::Text(payload.into()))
+            .send(Message::Text(payload.into().into()))
             .await
             .map_err(|error| {
                 OpenAIError::new(
@@ -825,9 +835,60 @@ impl RealtimeConnection {
             })
     }
 
+    /// Receives the next typed Realtime server event.
+    pub async fn recv(&mut self) -> Option<Result<RealtimeServerEvent, OpenAIError>> {
+        self.next_event().await
+    }
+
+    /// Receives the next raw Realtime websocket frame payload as bytes.
+    pub async fn recv_bytes(&mut self) -> Option<Result<Vec<u8>, OpenAIError>> {
+        if let Some(buffered) = self.buffered_frames.pop_front() {
+            return Some(Ok(buffered.raw));
+        }
+        if self.closed {
+            return None;
+        }
+
+        loop {
+            let message = match self.socket.next().await {
+                Some(Ok(message)) => message,
+                Some(Err(error)) => {
+                    return Some(Err(OpenAIError::new(
+                        ErrorKind::Transport,
+                        format!("failed to read Realtime websocket frame: {error}"),
+                    )
+                    .with_source(error)));
+                }
+                None => {
+                    self.closed = true;
+                    return None;
+                }
+            };
+
+            match message {
+                Message::Text(text) => return Some(Ok(text.as_bytes().to_vec())),
+                Message::Binary(bytes) => return Some(Ok(bytes.to_vec())),
+                Message::Close(_) => {
+                    self.closed = true;
+                    return None;
+                }
+                Message::Ping(payload) => {
+                    if let Err(error) = self.socket.send(Message::Pong(payload)).await {
+                        return Some(Err(OpenAIError::new(
+                            ErrorKind::Transport,
+                            format!("failed to reply to Realtime websocket ping: {error}"),
+                        )
+                        .with_source(error)));
+                    }
+                }
+                Message::Pong(_) | Message::Frame(_) => {}
+            }
+        }
+    }
+
     pub async fn next_event(&mut self) -> Option<Result<RealtimeServerEvent, OpenAIError>> {
-        if let Some(buffered) = self.buffered_events.pop_front() {
-            return Some(buffered);
+        if let Some(buffered) = self.buffered_frames.pop_front() {
+            return Some(buffered.event);
         }
         if self.closed {
             return None;
@@ -967,7 +1028,10 @@ impl RealtimeConnection {
                 Message::Text(text) => {
                     let event = decode_server_event_text(&text)?;
                     self.observe_server_event(&event);
-                    self.buffered_events.push_back(Ok(event));
+                    self.buffered_frames.push_back(BufferedRealtimeFrame {
+                        raw: text.as_bytes().to_vec(),
+                        event: Ok(event),
+                    });
                 }
                 Message::Close(_) => {
                     return Err(OpenAIError::new(
