@@ -32,14 +32,15 @@ use crate::{
     helpers::sse::{SseFrame, SseParser},
     resources::{
         common::{
-            PromptCacheRetention, ReasoningEffort, ReasoningSummary, ServiceTier, Truncation,
-            Verbosity,
+            PromptCacheRetention, ReasoningEffort, ReasoningSummary, SearchContextSize,
+            ServiceTier, Truncation, Verbosity,
         },
         containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
         images::{
             ImageBackground, ImageGenerateSize, ImageInputFidelity, ImageModeration,
             ImageOutputFormat, ImageStreamQuality,
         },
+        multimodal::ImageDetail,
     },
 };
 
@@ -1154,7 +1155,7 @@ impl ResponseInputText {
 pub struct ResponseInputImage {
     #[serde(rename = "type")]
     pub content_type: String,
-    pub detail: String,
+    pub detail: ImageDetail,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1164,10 +1165,10 @@ pub struct ResponseInputImage {
 }
 
 impl ResponseInputImage {
-    pub fn url(image_url: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub fn url(image_url: impl Into<String>, detail: ImageDetail) -> Self {
         Self {
             content_type: String::from("input_image"),
-            detail: detail.into(),
+            detail,
             file_id: None,
             image_url: Some(image_url.into()),
             extra: BTreeMap::new(),
@@ -1181,7 +1182,7 @@ pub struct ResponseInputFile {
     #[serde(rename = "type")]
     pub content_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
+    pub detail: Option<ResponseInputFileDetail>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1192,6 +1193,28 @@ pub struct ResponseInputFile {
     pub filename: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseInputFileDetail {
+    Low,
+    High,
+}
+
+impl ResponseInputFileDetail {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::High => "high",
+        }
+    }
+}
+
+impl AsRef<str> for ResponseInputFileDetail {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 impl ResponseInputFile {
@@ -3781,7 +3804,7 @@ pub struct ResponseWebSearchTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<ResponseWebSearchFilters>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub search_context_size: Option<String>,
+    pub search_context_size: Option<SearchContextSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<ResponseWebSearchUserLocation>,
     #[serde(flatten)]
@@ -3793,7 +3816,7 @@ pub struct ResponseWebSearchPreviewTool {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub search_content_types: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub search_context_size: Option<String>,
+    pub search_context_size: Option<SearchContextSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<ResponseWebSearchUserLocation>,
     #[serde(flatten)]

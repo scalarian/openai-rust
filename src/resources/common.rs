@@ -161,3 +161,28 @@ impl AsRef<str> for ReasoningSummary {
         self.as_str()
     }
 }
+
+/// Web-search context-size literal.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchContextSize {
+    Low,
+    Medium,
+    High,
+}
+
+impl SearchContextSize {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+impl AsRef<str> for SearchContextSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}

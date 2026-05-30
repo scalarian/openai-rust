@@ -18,7 +18,12 @@ use crate::{
     },
     error::ErrorKind,
     helpers::sse::{SseFrame, SseParser},
-    resources::common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Verbosity},
+    resources::{
+        common::{
+            PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier, Verbosity,
+        },
+        multimodal::{ChatImageDetail, InputAudioFormat},
+    },
 };
 
 /// Chat namespace for compatibility surfaces.
@@ -189,7 +194,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub modalities: Option<Vec<String>>,
+    pub modalities: Option<Vec<ChatCompletionModality>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -650,7 +655,7 @@ pub struct ChatCompletionContentPartImage {
 }
 
 impl ChatCompletionContentPartImage {
-    pub fn url(url: impl Into<String>, detail: Option<String>) -> Self {
+    pub fn url(url: impl Into<String>, detail: Option<ChatImageDetail>) -> Self {
         Self {
             image_url: ChatCompletionImageUrlParam {
                 url: url.into(),
@@ -663,12 +668,35 @@ impl ChatCompletionContentPartImage {
     }
 }
 
+/// Chat-completions output modalities.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatCompletionModality {
+    Text,
+    Audio,
+}
+
+impl ChatCompletionModality {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Audio => "audio",
+        }
+    }
+}
+
+impl AsRef<str> for ChatCompletionModality {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 /// Image URL descriptor for chat message content.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ChatCompletionImageUrlParam {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
+    pub detail: Option<ChatImageDetail>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -697,7 +725,7 @@ impl ChatCompletionContentPartInputAudio {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatCompletionInputAudioParam {
     pub data: String,
-    pub format: String,
+    pub format: InputAudioFormat,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -863,10 +891,42 @@ pub struct ChatCompletionMessageCustomToolCallCustomParam {
 /// Parameters for audio output from chat completions.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatCompletionAudioParams {
-    pub format: String,
+    pub format: ChatCompletionAudioFormat,
     pub voice: ChatCompletionVoice,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Output audio format for chat completions.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatCompletionAudioFormat {
+    #[default]
+    Wav,
+    Aac,
+    Mp3,
+    Flac,
+    Opus,
+    Pcm16,
+}
+
+impl ChatCompletionAudioFormat {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Wav => "wav",
+            Self::Aac => "aac",
+            Self::Mp3 => "mp3",
+            Self::Flac => "flac",
+            Self::Opus => "opus",
+            Self::Pcm16 => "pcm16",
+        }
+    }
+}
+
+impl AsRef<str> for ChatCompletionAudioFormat {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 /// Built-in voice name or custom voice object.
@@ -1087,7 +1147,7 @@ pub struct ChatCompletionResponseFormatJsonSchema {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatWebSearchOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub search_context_size: Option<String>,
+    pub search_context_size: Option<SearchContextSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_location: Option<ChatWebSearchUserLocation>,
     #[serde(flatten)]

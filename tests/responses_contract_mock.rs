@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::{
-        common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Truncation},
+        common::{
+            PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier, Truncation,
+        },
         containers::{ContainerMemoryLimit, ContainerNetworkPolicy},
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
@@ -94,7 +96,7 @@ fn create_populates_output_text_helper() {
             tools: vec![
                 ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
                     search_content_types: Vec::new(),
-                    search_context_size: Some(String::from("low")),
+                    search_context_size: Some(SearchContextSize::Low),
                     user_location: None,
                     extra: BTreeMap::new(),
                 }),
@@ -430,7 +432,7 @@ fn create_populates_output_text_helper() {
     assert!(matches!(
         tool_search.tools[1].as_definition(),
         Some(ResponseTool::WebSearchPreview(tool))
-            if tool.search_context_size.as_deref() == Some("low")
+            if tool.search_context_size.as_ref().map(SearchContextSize::as_str) == Some("low")
     ));
     let computer_call = response
         .output()

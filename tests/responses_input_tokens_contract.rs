@@ -4,6 +4,7 @@ use openai_rust::{
     OpenAI,
     resources::{
         common::{Truncation, Verbosity},
+        multimodal::ImageDetail,
         responses::{
             FunctionTool, ResponseFileSearchFilter, ResponseFileSearchFilterArrayValue,
             ResponseFileSearchFilterValue, ResponseFileSearchTool, ResponseFormatTextConfig,
@@ -48,7 +49,7 @@ fn input_tokens_count_forwards_modalities_and_tools() {
                     ResponseInputContentPart::Text(ResponseInputText::new("describe this")),
                     ResponseInputContentPart::Image(ResponseInputImage::url(
                         "https://example.com/cat.png",
-                        "auto",
+                        ImageDetail::Auto,
                     )),
                 ],
             )])),

@@ -2,13 +2,16 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
         chat::{
-            ChatCompletionAudioParams, ChatCompletionFunction, ChatCompletionFunctionCall,
-            ChatCompletionFunctionDefinition, ChatCompletionFunctionTool,
-            ChatCompletionMessageParam, ChatCompletionPredictionContent,
-            ChatCompletionResponseFormat, ChatCompletionStreamOptions, ChatCompletionTool,
-            ChatCompletionToolChoice, ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
+            ChatCompletionAudioFormat, ChatCompletionAudioParams, ChatCompletionFunction,
+            ChatCompletionFunctionCall, ChatCompletionFunctionDefinition,
+            ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletionModality,
+            ChatCompletionPredictionContent, ChatCompletionResponseFormat,
+            ChatCompletionStreamOptions, ChatCompletionTool, ChatCompletionToolChoice,
+            ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
         },
-        common::{PromptCacheRetention, ReasoningEffort, ServiceTier, Verbosity},
+        common::{
+            PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier, Verbosity,
+        },
     },
 };
 use serde_json::{Value, json};
@@ -41,7 +44,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             model: String::from("gpt-4.1-mini"),
             messages: vec![ChatCompletionMessageParam::user("Say hello")],
             audio: Some(ChatCompletionAudioParams {
-                format: String::from("wav"),
+                format: ChatCompletionAudioFormat::Wav,
                 voice: ChatCompletionVoice::from("alloy"),
                 extra: BTreeMap::new(),
             }),
@@ -61,7 +64,10 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 String::from("tenant"),
                 String::from("acme"),
             )])),
-            modalities: Some(vec![String::from("text"), String::from("audio")]),
+            modalities: Some(vec![
+                ChatCompletionModality::Text,
+                ChatCompletionModality::Audio,
+            ]),
             n: Some(1),
             parallel_tool_calls: Some(true),
             prediction: Some(ChatCompletionPredictionContent::text("stored hello")),
@@ -93,7 +99,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             user: Some(String::from("legacy-user")),
             verbosity: Some(Verbosity::Medium),
             web_search_options: Some(ChatWebSearchOptions {
-                search_context_size: Some(String::from("low")),
+                search_context_size: Some(SearchContextSize::Low),
                 ..Default::default()
             }),
             ..Default::default()

@@ -1,9 +1,12 @@
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::responses::{
-        ResponseApplyPatchOperation, ResponseComputerAction, ResponseInputContentPart,
-        ResponseInputItem, ResponseInputText, ResponseItemAction, ResponseItemEnvironment,
-        ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
+    resources::{
+        common::SearchContextSize,
+        responses::{
+            ResponseApplyPatchOperation, ResponseComputerAction, ResponseInputContentPart,
+            ResponseInputItem, ResponseInputText, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
+        },
     },
 };
 use serde_json::{Value, json};
@@ -425,7 +428,7 @@ fn typed_known_fields_are_not_lost() {
     assert!(matches!(
         tool_search.tools[1].as_definition(),
         Some(ResponseTool::WebSearchPreview(tool))
-            if tool.search_context_size.as_deref() == Some("low")
+            if tool.search_context_size.as_ref().map(SearchContextSize::as_str) == Some("low")
     ));
 
     let retrieved_function_call = retrieved.output();
