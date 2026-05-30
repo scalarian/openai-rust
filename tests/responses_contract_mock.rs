@@ -2,14 +2,18 @@ use std::collections::BTreeMap;
 
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
-    resources::responses::{
-        ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool,
-        ResponseComputerAction, ResponseConversation, ResponseConversationObject,
-        ResponseFileSearchAttributeValue, ResponseFormatTextConfig, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponseMcpAllowedTools,
-        ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
-        ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome,
-        ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+    resources::{
+        containers::{ContainerMemoryLimit, ContainerNetworkPolicy},
+        responses::{
+            ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
+            ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
+            ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
+            ResponseFormatTextConfig, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseMcpAllowedTools, ResponseMcpApprovalFilter,
+            ResponseMcpRequireApproval, ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt,
+            ResponseReasoning, ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool,
+            ResponseToolChoice, ResponseWebSearchPreviewTool,
+        },
     },
 };
 use serde_json::{Value, json};
@@ -80,7 +84,12 @@ fn create_populates_output_text_helper() {
                     extra: BTreeMap::new(),
                 }),
                 ResponseTool::CodeInterpreter(ResponseCodeInterpreterTool {
-                    container: json!("auto"),
+                    container: ResponseCodeInterpreterContainer::Auto {
+                        file_ids: vec![String::from("file_code")],
+                        memory_limit: Some(ContainerMemoryLimit::G4),
+                        network_policy: Some(ContainerNetworkPolicy::Disabled),
+                        extra: BTreeMap::new(),
+                    },
                     extra: BTreeMap::new(),
                 }),
                 ResponseTool::Mcp(ResponseMcpTool {
@@ -157,7 +166,16 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["tools"][0]["type"], "web_search_preview");
     assert_eq!(body["tools"][0]["search_context_size"], "low");
     assert_eq!(body["tools"][1]["type"], "code_interpreter");
-    assert_eq!(body["tools"][1]["container"], "auto");
+    assert_eq!(body["tools"][1]["container"]["type"], "auto");
+    assert_eq!(
+        body["tools"][1]["container"]["file_ids"],
+        json!(["file_code"])
+    );
+    assert_eq!(body["tools"][1]["container"]["memory_limit"], "4g");
+    assert_eq!(
+        body["tools"][1]["container"]["network_policy"]["type"],
+        "disabled"
+    );
     assert_eq!(body["tools"][2]["type"], "mcp");
     assert_eq!(body["tools"][2]["server_label"], "deepwiki");
     assert_eq!(body["tools"][2]["server_url"], "https://mcp.example.test");
@@ -237,7 +255,7 @@ fn create_populates_output_text_helper() {
         response.output().tool_choice,
         Some(ResponseToolChoice::Auto)
     );
-    assert_eq!(response.output().tools.len(), 2);
+    assert_eq!(response.output().tools.len(), 3);
     assert_eq!(
         response.output().tools[0],
         ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
@@ -247,7 +265,14 @@ fn create_populates_output_text_helper() {
             extra: BTreeMap::new(),
         })
     );
-    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[1] else {
+    let ResponseTool::CodeInterpreter(response_code_tool) = &response.output().tools[1] else {
+        panic!("expected response code interpreter tool");
+    };
+    assert!(matches!(
+        &response_code_tool.container,
+        ResponseCodeInterpreterContainer::Id(id) if id == "cntr_response"
+    ));
+    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[2] else {
         panic!("expected response mcp tool");
     };
     assert_eq!(response_mcp_tool.server_label, "deepwiki");
@@ -1064,6 +1089,10 @@ fn response_payload(
         "tool_choice": "auto",
         "tools": [
             {"type": "web_search_preview"},
+            {
+                "type": "code_interpreter",
+                "container": "cntr_response"
+            },
             {
                 "type": "mcp",
                 "server_label": "deepwiki",

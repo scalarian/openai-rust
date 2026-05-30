@@ -30,6 +30,7 @@ use crate::{
     },
     error::{ApiErrorKind, ErrorKind},
     helpers::sse::{SseFrame, SseParser},
+    resources::containers::{ContainerMemoryLimit, ContainerNetworkPolicy},
 };
 
 /// Primary Responses API family.
@@ -3592,9 +3593,134 @@ pub type ResponseMcpApprovalToolFilter = ResponseMcpToolFilter;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseCodeInterpreterTool {
-    pub container: Value,
+    pub container: ResponseCodeInterpreterContainer,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseCodeInterpreterContainer {
+    Id(String),
+    Auto {
+        file_ids: Vec<String>,
+        memory_limit: Option<ContainerMemoryLimit>,
+        network_policy: Option<ContainerNetworkPolicy>,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl ResponseCodeInterpreterContainer {
+    pub fn id(id: impl Into<String>) -> Self {
+        Self::Id(id.into())
+    }
+
+    pub fn auto() -> Self {
+        Self::Auto {
+            file_ids: Vec::new(),
+            memory_limit: None,
+            network_policy: None,
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+impl Serialize for ResponseCodeInterpreterContainer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Id(id) => serializer.serialize_str(id),
+            Self::Auto {
+                file_ids,
+                memory_limit,
+                network_policy,
+                extra,
+            } => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(String::from("type"), Value::String(String::from("auto")));
+                if !file_ids.is_empty() {
+                    object.insert(
+                        String::from("file_ids"),
+                        serde_json::to_value(file_ids).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                if let Some(memory_limit) = memory_limit {
+                    object.insert(
+                        String::from("memory_limit"),
+                        serde_json::to_value(memory_limit).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                if let Some(network_policy) = network_policy {
+                    object.insert(
+                        String::from("network_policy"),
+                        serde_json::to_value(network_policy).map_err(serde::ser::Error::custom)?,
+                    );
+                }
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Json(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseCodeInterpreterContainer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(id) => Ok(Self::Id(id)),
+            Value::Object(mut object) => {
+                let container_type = object.remove("type").and_then(|value| match value {
+                    Value::String(value) => Some(value),
+                    _ => None,
+                });
+                match container_type.as_deref() {
+                    Some("auto") => {
+                        let file_ids = match object.remove("file_ids") {
+                            Some(Value::Null) | None => Vec::new(),
+                            Some(value) => {
+                                serde_json::from_value(value).map_err(serde::de::Error::custom)?
+                            }
+                        };
+                        let memory_limit = match object.remove("memory_limit") {
+                            Some(Value::Null) | None => None,
+                            Some(value) => Some(
+                                serde_json::from_value(value).map_err(serde::de::Error::custom)?,
+                            ),
+                        };
+                        let network_policy = match object.remove("network_policy") {
+                            Some(Value::Null) | None => None,
+                            Some(value) => Some(
+                                serde_json::from_value(value).map_err(serde::de::Error::custom)?,
+                            ),
+                        };
+                        Ok(Self::Auto {
+                            file_ids,
+                            memory_limit,
+                            network_policy,
+                            extra: object.into_iter().collect(),
+                        })
+                    }
+                    Some(container_type) => {
+                        object.insert(
+                            String::from("type"),
+                            Value::String(String::from(container_type)),
+                        );
+                        Ok(Self::Json(Value::Object(object)))
+                    }
+                    None => Ok(Self::Json(Value::Object(object))),
+                }
+            }
+            value => Ok(Self::Json(value)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
