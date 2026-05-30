@@ -9,7 +9,7 @@ use openai_rust::resources::responses::ResponseCreateParams;
 use serde_json::json;
 
 let params = ResponseCreateParams {
-    model: "gpt-4.1-mini".into(),
+    model: "gpt-5.5".into(),
     input: Some(json!("Summarize the Rust ownership rules.")),
     ..Default::default()
 };

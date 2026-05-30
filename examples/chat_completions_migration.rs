@@ -6,7 +6,7 @@ use serde_json::json;
 
 fn main() {
     let chat = ChatCompletionCreateParams {
-        model: "gpt-4.1-mini".into(),
+        model: "gpt-5.5".into(),
         messages: vec![json!({"role":"user","content":"Say hello"})],
         ..Default::default()
     };
@@ -18,7 +18,7 @@ fn main() {
     };
 
     let responses = ResponseCreateParams {
-        model: "gpt-4.1-mini".into(),
+        model: "gpt-5.5".into(),
         input: Some(json!("Say hello")),
         ..Default::default()
     };

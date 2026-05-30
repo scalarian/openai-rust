@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let response = client.responses().create(ResponseCreateParams {
-        model: "gpt-4.1-mini".into(),
+        model: "gpt-5.5".into(),
         input: Some(json!("Say hello from Rust.")),
         ..Default::default()
     })?;

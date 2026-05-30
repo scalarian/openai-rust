@@ -6,7 +6,7 @@ use serde_json::json;
 
 fn main() {
     let params = ResponseParseParams {
-        model: "gpt-4.1-mini".into(),
+        model: "gpt-5.5".into(),
         input: Some(json!("Return {\"language\":\"rust\"}")),
         text: Some(ResponseTextConfig {
             format: Some(ResponseFormatTextConfig::JsonSchema(

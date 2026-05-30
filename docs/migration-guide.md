@@ -19,13 +19,13 @@ use openai_rust::resources::responses::ResponseCreateParams;
 use serde_json::json;
 
 let compatibility = ChatCompletionCreateParams {
-    model: "gpt-4.1-mini".into(),
+    model: "gpt-5.5".into(),
     messages: vec![json!({"role":"user","content":"Say hello"})],
     ..Default::default()
 };
 
 let preferred = ResponseCreateParams {
-    model: "gpt-4.1-mini".into(),
+    model: "gpt-5.5".into(),
     input: Some(json!("Say hello")),
     ..Default::default()
 };
@@ -49,7 +49,7 @@ let legacy = CompletionCreateParams {
 };
 
 let preferred = ResponseCreateParams {
-    model: "gpt-4.1-mini".into(),
+    model: "gpt-5.5".into(),
     input: Some(json!("Say hello")),
     ..Default::default()
 };

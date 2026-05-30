@@ -35,7 +35,7 @@ use serde_json::json;
 
 let client = OpenAI::builder().build();
 let params = ResponseCreateParams {
-    model: "gpt-4.1-mini".into(),
+    model: "gpt-5.5".into(),
     input: Some(json!("Say hello from Rust.")),
     ..Default::default()
 };
