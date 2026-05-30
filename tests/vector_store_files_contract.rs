@@ -5,10 +5,13 @@ use std::{collections::BTreeMap, time::Duration};
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::vector_stores::{
-        VectorStoreAttributeValue, VectorStoreFileContentPage, VectorStoreFileCreateParams,
-        VectorStoreFileDeleteResponse, VectorStoreFileListParams, VectorStoreFilePollOptions,
-        VectorStoreFileStatus, VectorStoreFileUpdateParams,
+    resources::{
+        common::ListOrder,
+        vector_stores::{
+            VectorStoreAttributeValue, VectorStoreFileContentPage, VectorStoreFileCreateParams,
+            VectorStoreFileDeleteResponse, VectorStoreFileListParams, VectorStoreFilePollOptions,
+            VectorStoreFileStatus, VectorStoreFileUpdateParams,
+        },
     },
 };
 use serde_json::json;
@@ -95,7 +98,7 @@ fn crud_and_content_flows() {
                 before: Some(String::from("vsf_999")),
                 filter: Some(String::from("completed")),
                 limit: Some(2),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();

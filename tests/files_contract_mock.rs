@@ -7,9 +7,12 @@ use std::time::Duration;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::files::{
-        FileCreateParams, FileCreatePurpose, FileDeleteResponse, FileExpiresAfter, FileListParams,
-        FileStatus, FileUpload, WaitForProcessingOptions,
+    resources::{
+        common::ListOrder,
+        files::{
+            FileCreateParams, FileCreatePurpose, FileDeleteResponse, FileExpiresAfter,
+            FileListParams, FileStatus, FileUpload, WaitForProcessingOptions,
+        },
     },
 };
 use serde_json::json;
@@ -76,7 +79,7 @@ fn list_preserves_cursor_pagination_and_filters() {
         .list(FileListParams {
             after: Some(String::from("file-0")),
             limit: Some(2),
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
             purpose: Some(String::from("batch")),
         })
         .unwrap();
@@ -89,7 +92,7 @@ fn list_preserves_cursor_pagination_and_filters() {
         .list(FileListParams {
             after: first.output.next_after().map(String::from),
             limit: Some(2),
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
             purpose: Some(String::from("batch")),
         })
         .unwrap();

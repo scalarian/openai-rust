@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use serde::{Deserialize, Serialize, Serializer, de::Error as _};
 use serde_json::{Map, Value};
@@ -272,7 +272,7 @@ impl FineTuningCheckpointPermissions {
             serializer.append_pair("limit", &limit.to_string());
         }
         if let Some(order) = params.order {
-            serializer.append_pair("order", &order);
+            serializer.append_pair("order", order.as_str());
         }
         if let Some(project_id) = params.project_id {
             serializer.append_pair("project_id", &project_id);
@@ -641,8 +641,37 @@ pub struct FineTuningCheckpointPermissionCreateParams {
 pub struct FineTuningCheckpointPermissionListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<FineTuningCheckpointPermissionOrder>,
     pub project_id: Option<String>,
+}
+
+/// Sort order for fine-tuning checkpoint permissions.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FineTuningCheckpointPermissionOrder {
+    Ascending,
+    Descending,
+}
+
+impl FineTuningCheckpointPermissionOrder {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ascending => "ascending",
+            Self::Descending => "descending",
+        }
+    }
+}
+
+impl AsRef<str> for FineTuningCheckpointPermissionOrder {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for FineTuningCheckpointPermissionOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Fine-tuning job resource.

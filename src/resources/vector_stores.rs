@@ -15,8 +15,12 @@ use crate::{
         transport::execute_json,
     },
     error::ErrorKind,
-    resources::files::{
-        FileCreateParams, FileCreatePurpose, FileUpload, Files, encode_path_id, validate_path_id,
+    resources::{
+        common::ListOrder,
+        files::{
+            FileCreateParams, FileCreatePurpose, FileUpload, Files, encode_path_id,
+            validate_path_id,
+        },
     },
 };
 
@@ -104,7 +108,7 @@ impl VectorStores {
             serializer.append_pair("limit", &limit.to_string());
         }
         if let Some(order) = params.order {
-            serializer.append_pair("order", &order);
+            serializer.append_pair("order", order.as_str());
         }
         let query = serializer.finish();
         let path = if query.is_empty() {
@@ -231,7 +235,7 @@ impl VectorStoreFiles {
             serializer.append_pair("limit", &limit.to_string());
         }
         if let Some(order) = params.order {
-            serializer.append_pair("order", &order);
+            serializer.append_pair("order", order.as_str());
         }
         let query = serializer.finish();
         let path = if query.is_empty() {
@@ -480,7 +484,7 @@ impl VectorStoreFileBatches {
             serializer.append_pair("limit", &limit.to_string());
         }
         if let Some(order) = params.order {
-            serializer.append_pair("order", &order);
+            serializer.append_pair("order", order.as_str());
         }
         let query = serializer.finish();
         let path = if query.is_empty() {
@@ -685,7 +689,7 @@ pub struct VectorStoreListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// POST-backed vector-store search parameters.
@@ -810,7 +814,7 @@ pub struct VectorStoreFileListParams {
     pub before: Option<String>,
     pub filter: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// File-batch create body.
@@ -843,7 +847,7 @@ pub struct VectorStoreFileBatchListFilesParams {
     pub before: Option<String>,
     pub filter: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// Polling options for vector-store file helpers.

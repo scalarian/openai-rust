@@ -6,6 +6,7 @@ use std::{
 use openai_rust::{
     OpenAI,
     resources::{
+        common::ListOrder,
         conversations::{
             ConversationCreateParams, ConversationItemCreateParams, ConversationItemListParams,
             ConversationItemRetrieveParams,
@@ -58,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listed_before_delete = client.conversations().items().list(
         &conversation_id,
         ConversationItemListParams {
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
             ..Default::default()
         },
     )?;
@@ -78,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listed_after_delete = client.conversations().items().list(
         &conversation_id,
         ConversationItemListParams {
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
             ..Default::default()
         },
     )?;

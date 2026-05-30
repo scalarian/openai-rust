@@ -1,7 +1,10 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use openai_rust::{ErrorKind, OpenAI, resources::admin::*};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::{admin::*, common::ListOrder},
+};
 use serde_json::json;
 
 #[test]
@@ -27,7 +30,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .list(AdminApiKeyListParams {
             after: Some(String::from("key_prev")),
             limit: Some(2),
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
         })
         .unwrap();
     org.admin_api_keys().delete("key_ops").unwrap();
@@ -349,7 +352,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             AdminUserRoleListParams {
                 after: Some(String::from("user_role_after")),
                 limit: Some(8),
-                order: Some(String::from("desc")),
+                order: Some(ListOrder::Desc),
             },
         )
         .unwrap();
@@ -371,7 +374,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .list(AdminGroupListParams {
             after: Some(String::from("group_after")),
             limit: Some(9),
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
         })
         .unwrap();
     org.groups()
@@ -398,7 +401,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             "grp_eng",
             AdminGroupRoleListParams {
                 limit: Some(10),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
                 ..Default::default()
             },
         )
@@ -425,7 +428,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .list(AdminRoleListParams {
             after: Some(String::from("role_after")),
             limit: Some(11),
-            order: Some(String::from("desc")),
+            order: Some(ListOrder::Desc),
         })
         .unwrap();
 
@@ -453,7 +456,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .list(AdminCertificateListParams {
             after: Some(String::from("cert_after")),
             limit: Some(12),
-            order: Some(String::from("asc")),
+            order: Some(ListOrder::Asc),
         })
         .unwrap();
     org.certificates()
@@ -487,7 +490,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             after: Some(String::from("alert_after")),
             before: Some(String::from("alert_before")),
             limit: Some(13),
-            order: Some(String::from("desc")),
+            order: Some(ListOrder::Desc),
         })
         .unwrap();
     org.spend_alerts()
@@ -607,7 +610,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectUserRoleListParams {
                 after: Some(String::from("project_user_role_after")),
                 limit: Some(3),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();
@@ -692,7 +695,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectGroupListParams {
                 after: Some(String::from("project_group_after")),
                 limit: Some(7),
-                order: Some(String::from("desc")),
+                order: Some(ListOrder::Desc),
             },
         )
         .unwrap();
@@ -727,7 +730,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectRoleListParams {
                 after: Some(String::from("project_role_after")),
                 limit: Some(8),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();
@@ -765,7 +768,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
                 after: Some(String::from("project_alert_after")),
                 before: Some(String::from("project_alert_before")),
                 limit: Some(9),
-                order: Some(String::from("desc")),
+                order: Some(ListOrder::Desc),
             },
         )
         .unwrap();
@@ -794,7 +797,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             AdminProjectCertificateListParams {
                 after: Some(String::from("project_cert_after")),
                 limit: Some(10),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();

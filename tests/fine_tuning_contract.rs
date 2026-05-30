@@ -5,9 +5,9 @@ use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::fine_tuning::{
         AutoOrNumber, FineTuningCheckpointListParams, FineTuningCheckpointPermissionCreateParams,
-        FineTuningCheckpointPermissionListParams, FineTuningJobCreateParams,
-        FineTuningJobIntegration, FineTuningJobListParams, FineTuningJobStatus, FineTuningMethod,
-        FineTuningWandbIntegration,
+        FineTuningCheckpointPermissionListParams, FineTuningCheckpointPermissionOrder,
+        FineTuningJobCreateParams, FineTuningJobIntegration, FineTuningJobListParams,
+        FineTuningJobStatus, FineTuningMethod, FineTuningWandbIntegration,
     },
 };
 use serde_json::json;
@@ -147,7 +147,7 @@ fn job_lifecycle_checkpoint_listing_and_permission_admin_semantics() {
             FineTuningCheckpointPermissionListParams {
                 after: Some(String::from("perm_000")),
                 limit: Some(2),
-                order: Some(String::from("descending")),
+                order: Some(FineTuningCheckpointPermissionOrder::Descending),
                 project_id: Some(String::from("proj_123")),
             },
         )

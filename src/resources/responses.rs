@@ -32,7 +32,7 @@ use crate::{
     helpers::sse::{SseFrame, SseParser},
     resources::{
         common::{
-            PromptCacheRetention, ReasoningEffort, ReasoningSummary, SearchContextSize,
+            ListOrder, PromptCacheRetention, ReasoningEffort, ReasoningSummary, SearchContextSize,
             ServiceTier, Truncation, Verbosity,
         },
         containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
@@ -907,7 +907,7 @@ pub struct ResponseInputItemsListParams {
     pub after: Option<String>,
     pub include: Vec<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl ResponseInputItemsListParams {
@@ -923,7 +923,7 @@ impl ResponseInputItemsListParams {
             pairs.push((String::from("limit"), limit.to_string()));
         }
         if let Some(order) = &self.order {
-            pairs.push((String::from("order"), order.clone()));
+            pairs.push((String::from("order"), order.as_str().to_string()));
         }
         pairs
     }

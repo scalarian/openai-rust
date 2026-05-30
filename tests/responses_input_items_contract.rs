@@ -1,4 +1,4 @@
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{ErrorKind, OpenAI, resources::common::ListOrder};
 use serde_json::json;
 
 #[path = "support/mock_http.rs"]
@@ -27,7 +27,7 @@ fn input_items_list_exposes_typed_items_and_cursor_termination() {
                 after: Some("item_0".into()),
                 include: vec!["message.input_image.image_url".into()],
                 limit: Some(2),
-                order: Some("asc".into()),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();
@@ -80,7 +80,7 @@ fn input_items_list_exposes_typed_items_and_cursor_termination() {
             openai_rust::resources::responses::ResponseInputItemsListParams {
                 after: first_page.output().next_after().map(str::to_string),
                 limit: Some(2),
-                order: Some("asc".into()),
+                order: Some(ListOrder::Asc),
                 ..Default::default()
             },
         )

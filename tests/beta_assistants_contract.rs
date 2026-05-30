@@ -21,7 +21,7 @@ use openai_rust::{
             BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
             BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
         },
-        common::ReasoningEffort,
+        common::{ListOrder, ReasoningEffort},
     },
 };
 use serde_json::json;
@@ -100,7 +100,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 after: Some(String::from("asst_after")),
                 before: Some(String::from("asst_before")),
                 limit: Some(2),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             })
             .unwrap()
             .output["data"][0]["id"],
@@ -253,7 +253,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                     after: Some(String::from("msg_after")),
                     before: Some(String::from("msg_before")),
                     limit: Some(3),
-                    order: Some(String::from("desc")),
+                    order: Some(ListOrder::Desc),
                     run_id: Some(String::from("run_123")),
                 }
             )
@@ -333,7 +333,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 after: Some(String::from("run_after")),
                 before: Some(String::from("run_before")),
                 limit: Some(4),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             }
         )
         .unwrap()
@@ -386,7 +386,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                     before: Some(String::from("step_before")),
                     include: Some(vec![String::from("step_details")]),
                     limit: Some(1),
-                    order: Some(String::from("asc")),
+                    order: Some(ListOrder::Asc),
                 },
             )
             .unwrap()

@@ -10,7 +10,8 @@ use openai_rust::{
             ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
         },
         common::{
-            PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier, Verbosity,
+            ListOrder, PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier,
+            Verbosity,
         },
     },
 };
@@ -198,7 +199,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 after: Some(String::from("chatcmpl_prev")),
                 limit: Some(1),
                 model: Some(String::from("gpt-4.1-mini/compat?preview=true")),
-                order: Some(String::from("desc+later")),
+                order: Some(ListOrder::Desc),
                 metadata,
             },
         )
@@ -270,7 +271,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
     assert_eq!(requests[3].method, "GET");
     assert_eq!(
         requests[3].path,
-        "/v1/chat/completions?after=chatcmpl_prev&limit=1&metadata%5Btenant%2Fid%5D=acme%20%26%20west%3Fx%3Dy&model=gpt-4.1-mini%2Fcompat%3Fpreview%3Dtrue&order=desc%2Blater"
+        "/v1/chat/completions?after=chatcmpl_prev&limit=1&metadata%5Btenant%2Fid%5D=acme%20%26%20west%3Fx%3Dy&model=gpt-4.1-mini%2Fcompat%3Fpreview%3Dtrue&order=desc"
     );
 
     assert_eq!(requests[4].method, "DELETE");

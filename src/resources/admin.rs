@@ -6,7 +6,10 @@ use serde_json::Value;
 use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
-    resources::files::{encode_path_id, validate_path_id},
+    resources::{
+        common::ListOrder,
+        files::{encode_path_id, validate_path_id},
+    },
 };
 
 /// JSON value returned by the flexible admin endpoint surface.
@@ -148,7 +151,7 @@ pub struct AdminApiKeyCreateParams {
 pub struct AdminApiKeyListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminApiKeyListParams> for AdminQueryParams {
@@ -247,7 +250,7 @@ pub struct AdminRoleUpdateParams {
 pub struct AdminRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminRoleListParams> for AdminQueryParams {
@@ -270,7 +273,7 @@ pub struct AdminUserRoleCreateParams {
 pub struct AdminUserRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminUserRoleListParams> for AdminQueryParams {
@@ -299,7 +302,7 @@ pub struct AdminGroupUpdateParams {
 pub struct AdminGroupListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminGroupListParams> for AdminQueryParams {
@@ -322,7 +325,7 @@ pub struct AdminGroupUserCreateParams {
 pub struct AdminGroupUserListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminGroupUserListParams> for AdminQueryParams {
@@ -345,7 +348,7 @@ pub struct AdminGroupRoleCreateParams {
 pub struct AdminGroupRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminGroupRoleListParams> for AdminQueryParams {
@@ -393,7 +396,7 @@ impl From<AdminCertificateRetrieveParams> for AdminQueryParams {
 pub struct AdminCertificateListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminCertificateListParams> for AdminQueryParams {
@@ -445,7 +448,7 @@ pub struct AdminSpendAlertListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminSpendAlertListParams> for AdminQueryParams {
@@ -539,7 +542,7 @@ pub struct AdminProjectUserRoleCreateParams {
 pub struct AdminProjectUserRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectUserRoleListParams> for AdminQueryParams {
@@ -684,7 +687,7 @@ impl From<AdminProjectGroupRetrieveParams> for AdminQueryParams {
 pub struct AdminProjectGroupListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectGroupListParams> for AdminQueryParams {
@@ -707,7 +710,7 @@ pub struct AdminProjectGroupRoleCreateParams {
 pub struct AdminProjectGroupRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectGroupRoleListParams> for AdminQueryParams {
@@ -745,7 +748,7 @@ pub struct AdminProjectRoleUpdateParams {
 pub struct AdminProjectRoleListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectRoleListParams> for AdminQueryParams {
@@ -787,7 +790,7 @@ pub struct AdminProjectSpendAlertListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectSpendAlertListParams> for AdminQueryParams {
@@ -811,7 +814,7 @@ pub struct AdminProjectCertificateIdsParams {
 pub struct AdminProjectCertificateListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl From<AdminProjectCertificateListParams> for AdminQueryParams {

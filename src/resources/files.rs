@@ -17,6 +17,7 @@ use crate::{
     },
     error::ErrorKind,
     helpers::multipart::{MultipartBuilder, MultipartFile},
+    resources::common::ListOrder,
 };
 
 /// Files API family.
@@ -62,7 +63,7 @@ impl Files {
             serializer.append_pair("limit", &limit.to_string());
         }
         if let Some(order) = params.order {
-            serializer.append_pair("order", &order);
+            serializer.append_pair("order", order.as_str());
         }
         if let Some(purpose) = params.purpose {
             serializer.append_pair("purpose", purpose.as_str());
@@ -209,7 +210,7 @@ pub struct FileExpiresAfter {
 pub struct FileListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
     pub purpose: Option<String>,
 }
 

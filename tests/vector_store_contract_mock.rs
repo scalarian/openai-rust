@@ -3,12 +3,15 @@ mod mock_http;
 
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
-    resources::vector_stores::{
-        StaticChunkingStrategy, VectorStoreAttributeValue, VectorStoreCreateParams,
-        VectorStoreDeleteResponse, VectorStoreExpiresAfter, VectorStoreListParams,
-        VectorStoreSearchFilter, VectorStoreSearchFilterValue, VectorStoreSearchParams,
-        VectorStoreSearchQuery, VectorStoreSearchRankingOptions, VectorStoreStatus,
-        VectorStoreUpdateParams,
+    resources::{
+        common::ListOrder,
+        vector_stores::{
+            StaticChunkingStrategy, VectorStoreAttributeValue, VectorStoreCreateParams,
+            VectorStoreDeleteResponse, VectorStoreExpiresAfter, VectorStoreListParams,
+            VectorStoreSearchFilter, VectorStoreSearchFilterValue, VectorStoreSearchParams,
+            VectorStoreSearchQuery, VectorStoreSearchRankingOptions, VectorStoreStatus,
+            VectorStoreUpdateParams,
+        },
     },
 };
 use serde_json::json;
@@ -143,7 +146,7 @@ fn list_and_search_preserve_distinct_page_contracts() {
             after: Some(String::from("vs_000")),
             before: Some(String::from("vs_999")),
             limit: Some(2),
-            order: Some(String::from("desc")),
+            order: Some(ListOrder::Desc),
         })
         .unwrap();
     assert_eq!(listed.output.data.len(), 2);

@@ -21,7 +21,7 @@ use crate::{
     error::ErrorKind,
     helpers::sse::{SseFrame, SseParser},
     resources::{
-        common::ReasoningEffort,
+        common::{ListOrder, ReasoningEffort},
         files::{encode_path_id, validate_path_id},
     },
 };
@@ -491,7 +491,7 @@ pub struct BetaAssistantListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// Deprecated beta Threads API family.
@@ -857,7 +857,7 @@ pub struct BetaThreadMessageListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
     pub run_id: Option<String>,
 }
 
@@ -1155,7 +1155,7 @@ pub struct BetaThreadRunListParams {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// Deprecated beta run tool output payload.
@@ -1244,7 +1244,7 @@ pub struct BetaThreadRunStepListParams {
     pub before: Option<String>,
     pub include: Option<Vec<String>>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 /// Flexible query parameters for deprecated beta endpoints.

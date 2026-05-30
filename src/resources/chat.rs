@@ -20,7 +20,8 @@ use crate::{
     helpers::sse::{SseFrame, SseParser},
     resources::{
         common::{
-            PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier, Verbosity,
+            ListOrder, PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier,
+            Verbosity,
         },
         multimodal::{ChatImageDetail, InputAudioFormat},
     },
@@ -1486,7 +1487,7 @@ pub struct StoredChatCompletionUpdateParams {
 pub struct StoredChatCompletionsListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
     pub model: Option<String>,
     pub metadata: BTreeMap<String, String>,
 }
@@ -1507,7 +1508,7 @@ impl StoredChatCompletionsListParams {
             pairs.push((String::from("model"), model.clone()));
         }
         if let Some(order) = &self.order {
-            pairs.push((String::from("order"), order.clone()));
+            pairs.push((String::from("order"), order.as_str().to_string()));
         }
         pairs
     }
@@ -1518,7 +1519,7 @@ impl StoredChatCompletionsListParams {
 pub struct StoredChatCompletionMessagesListParams {
     pub after: Option<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl StoredChatCompletionMessagesListParams {
@@ -1531,7 +1532,7 @@ impl StoredChatCompletionMessagesListParams {
             pairs.push((String::from("limit"), limit.to_string()));
         }
         if let Some(order) = &self.order {
-            pairs.push((String::from("order"), order.clone()));
+            pairs.push((String::from("order"), order.as_str().to_string()));
         }
         pairs
     }

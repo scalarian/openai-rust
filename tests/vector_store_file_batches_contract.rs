@@ -15,6 +15,7 @@ use std::{
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
+        common::ListOrder,
         files::FileUpload,
         vector_stores::{
             VectorStoreAttributeValue, VectorStoreFileBatchCreateParams, VectorStoreFileBatchFile,
@@ -129,7 +130,7 @@ fn create_retrieve_cancel_and_list_files_cover_batch_contract() {
                 before: Some(String::from("vsf_999")),
                 filter: Some(String::from("failed")),
                 limit: Some(2),
-                order: Some(String::from("desc")),
+                order: Some(ListOrder::Desc),
             },
         )
         .unwrap();

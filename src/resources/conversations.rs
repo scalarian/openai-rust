@@ -7,11 +7,14 @@ use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     error::ErrorKind,
-    resources::responses::{
-        ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
-        ResponseFileSearchResult, ResponseInputAudioData, ResponseInputItem, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponseItemTool,
-        ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
+    resources::{
+        common::ListOrder,
+        responses::{
+            ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
+            ResponseFileSearchResult, ResponseInputAudioData, ResponseInputItem,
+            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput, ResponseItemTool,
+            ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
+        },
     },
 };
 
@@ -236,7 +239,7 @@ pub struct ConversationItemListParams {
     pub after: Option<String>,
     pub include: Vec<String>,
     pub limit: Option<u32>,
-    pub order: Option<String>,
+    pub order: Option<ListOrder>,
 }
 
 impl ConversationItemListParams {
@@ -252,7 +255,7 @@ impl ConversationItemListParams {
             pairs.push((String::from("limit"), limit.to_string()));
         }
         if let Some(order) = &self.order {
-            pairs.push((String::from("order"), order.clone()));
+            pairs.push((String::from("order"), order.as_str().to_string()));
         }
         pairs
     }

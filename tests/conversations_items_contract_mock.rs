@@ -1,7 +1,7 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
-        common::SearchContextSize,
+        common::{ListOrder, SearchContextSize},
         responses::{
             ResponseApplyPatchOperation, ResponseComputerAction, ResponseInputContentPart,
             ResponseInputItem, ResponseInputText, ResponseItemAction, ResponseItemEnvironment,
@@ -104,7 +104,7 @@ fn routes_and_pagination() {
                 after: Some(String::from("item_1")),
                 include: vec![String::from("message.output_text.logprobs/with space")],
                 limit: Some(2),
-                order: Some(String::from("asc")),
+                order: Some(ListOrder::Asc),
             },
         )
         .unwrap();
