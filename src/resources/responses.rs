@@ -1601,6 +1601,14 @@ response_string_literal_enum! {
     }
 }
 
+response_string_literal_enum! {
+    /// Ranker identifiers accepted by Responses file-search tools.
+    pub enum ResponseFileSearchRanker {
+        Auto => "auto",
+        Default2024_11_15 => "default-2024-11-15",
+    }
+}
+
 /// Role attached to message-like response and conversation items.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponseItemRole {
@@ -2269,22 +2277,22 @@ pub struct ResponseApplyPatchDeleteOperation {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct ResponseReasoningSummaryPart {
     #[serde(rename = "type", default = "unknown_reasoning_summary_type")]
-    pub summary_type: String,
+    pub summary_type: ResponseContentType,
     #[serde(default)]
     pub text: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
-fn unknown_reasoning_summary_type() -> String {
-    String::from("unknown")
+fn unknown_reasoning_summary_type() -> ResponseContentType {
+    ResponseContentType::Unknown(String::from("unknown"))
 }
 
 pub(crate) fn response_reasoning_summary_part_from_value(
     value: Value,
 ) -> ResponseReasoningSummaryPart {
     serde_json::from_value(value.clone()).unwrap_or_else(|_| ResponseReasoningSummaryPart {
-        summary_type: String::from("unknown"),
+        summary_type: ResponseContentType::Unknown(String::from("unknown")),
         text: None,
         extra: BTreeMap::from([(String::from("value"), value)]),
     })
@@ -4366,7 +4374,7 @@ pub struct ResponseFileSearchRankingOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hybrid_search: Option<ResponseFileSearchHybridSearch>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ranker: Option<String>,
+    pub ranker: Option<ResponseFileSearchRanker>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_threshold: Option<f64>,
     #[serde(flatten)]

@@ -14,15 +14,15 @@ use openai_rust::{
             ResponseConversationObject, ResponseCustomTool, ResponseCustomToolGrammar,
             ResponseCustomToolGrammarSyntax, ResponseCustomToolInputFormat,
             ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
-            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseIncludable,
-            ResponseInput, ResponseInputContentPart, ResponseInputItem, ResponseInputText,
-            ResponseInstructions, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-            ResponseItemRole, ResponseItemStatus, ResponseItemType, ResponseMcpAllowedTools,
-            ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
-            ResponseMcpToolFilter, ResponseMessagePhase, ResponsePrompt, ResponseReasoning,
-            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
-            ResponseStreamOptions, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
-            ResponseWebSearchContentType, ResponseWebSearchPreviewTool,
+            ResponseFileSearchFilterValue, ResponseFileSearchRanker, ResponseFormatTextConfig,
+            ResponseIncludable, ResponseInput, ResponseInputContentPart, ResponseInputItem,
+            ResponseInputText, ResponseInstructions, ResponseItemAction, ResponseItemEnvironment,
+            ResponseItemOutput, ResponseItemRole, ResponseItemStatus, ResponseItemType,
+            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
+            ResponseMcpTool, ResponseMcpToolFilter, ResponseMessagePhase, ResponsePrompt,
+            ResponseReasoning, ResponseShellEnvironment, ResponseShellOutputOutcome,
+            ResponseShellTool, ResponseStreamOptions, ResponseTextAnnotation, ResponseTool,
+            ResponseToolChoice, ResponseWebSearchContentType, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -375,6 +375,13 @@ fn create_populates_output_text_helper() {
         ResponseFileSearchFilter::Gte { key, value: ResponseFileSearchFilterValue::Number(value) }
             if key == "score" && (*value - 0.7).abs() < f64::EPSILON
     ));
+    assert_eq!(
+        response_file_search_tool
+            .ranking_options
+            .as_ref()
+            .and_then(|options| options.ranker.as_ref()),
+        Some(&ResponseFileSearchRanker::Auto)
+    );
     let ResponseTool::CodeInterpreter(response_code_tool) = &response.output().tools[2] else {
         panic!("expected response code interpreter tool");
     };
