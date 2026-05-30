@@ -33,7 +33,7 @@ use super::events::{
     RealtimeClientEvent, RealtimeConversationItem, RealtimeInclude, RealtimeMaxOutputTokens,
     RealtimeNullable, RealtimeOutputModality, RealtimeReasoning, RealtimeResponseCreateParams,
     RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice,
-    RealtimeTracing, RealtimeTruncation, decode_server_event_text,
+    RealtimeToolsConfig, RealtimeTracing, RealtimeTruncation, decode_server_event_text,
 };
 
 /// Realtime client-secret expiration anchor.
@@ -242,7 +242,7 @@ pub struct RealtimeCallAcceptParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<RealtimeToolsConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracing: Option<RealtimeNullable<RealtimeTracing>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

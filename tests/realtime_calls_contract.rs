@@ -2,12 +2,14 @@ use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
-        RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
-        RealtimeMaxOutputTokens, RealtimeNullable, RealtimeOutputModality, RealtimeReasoning,
+        RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeFunctionTool,
+        RealtimeInclude, RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpConnectorId,
+        RealtimeMcpRequireApproval, RealtimeMcpRequireApprovalFilter, RealtimeMcpTool,
+        RealtimeMcpToolFilter, RealtimeNullable, RealtimeOutputModality, RealtimeReasoning,
         RealtimeReasoningEffort, RealtimeSessionConfig, RealtimeSessionTTL,
-        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice, RealtimeTracing,
-        RealtimeTracingConfiguration, RealtimeTruncation, RealtimeTruncationRetentionRatio,
-        RealtimeTruncationTokenLimits, ResponsePrompt,
+        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeTool, RealtimeToolChoice,
+        RealtimeTracing, RealtimeTracingConfiguration, RealtimeTruncation,
+        RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -34,6 +36,28 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "prompt": {"id": "pmpt_server", "version": "2", "variables": {"topic": "parity"}},
                     "reasoning": {"effort": "xhigh"},
                     "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
+                    "tools": [
+                        {
+                            "type": "function",
+                            "name": "server_lookup",
+                            "description": "Resolve server facts.",
+                            "parameters": {"type": "object"}
+                        },
+                        {
+                            "type": "mcp",
+                            "server_label": "remote",
+                            "connector_id": "connector_gmail",
+                            "allowed_tools": {"read_only": true, "tool_names": ["search"]},
+                            "require_approval": {
+                                "always": {"tool_names": ["send"]},
+                                "never": {"read_only": true}
+                            },
+                            "defer_loading": false,
+                            "headers": {"x-tenant": "realtime"},
+                            "server_description": "Remote tools",
+                            "server_url": "https://mcp.example.test"
+                        }
+                    ],
                     "tracing": {"group_id": "grp_1", "workflow_name": "wf", "metadata": {"env": "test"}},
                     "truncation": "auto",
                     "instructions": "Answer tersely."
@@ -82,6 +106,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     ..Default::default()
                 }),
                 tool_choice: Some(RealtimeToolChoice::Required),
+                tools: Some(vec![RealtimeTool::function("lookup_weather")]),
                 tracing: Some(RealtimeNullable::Value(RealtimeTracing::Auto)),
                 truncation: Some(RealtimeTruncation::Disabled),
                 ..Default::default()
@@ -130,6 +155,44 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         ))
     );
     assert_eq!(
+        secret.output().session.tools,
+        Some(vec![
+            RealtimeTool::Function(Box::new(RealtimeFunctionTool {
+                description: Some(String::from("Resolve server facts.")),
+                name: Some(String::from("server_lookup")),
+                parameters: Some(json!({"type": "object"})),
+                ..Default::default()
+            })),
+            RealtimeTool::Mcp(Box::new(RealtimeMcpTool {
+                server_label: String::from("remote"),
+                connector_id: Some(RealtimeMcpConnectorId::Gmail),
+                allowed_tools: Some(RealtimeMcpAllowedTools::Filter(RealtimeMcpToolFilter {
+                    read_only: Some(true),
+                    tool_names: Some(vec![String::from("search")]),
+                    ..Default::default()
+                })),
+                defer_loading: Some(false),
+                headers: Some([(String::from("x-tenant"), String::from("realtime"))].into()),
+                require_approval: Some(RealtimeMcpRequireApproval::Filter(Box::new(
+                    RealtimeMcpRequireApprovalFilter {
+                        always: Some(RealtimeMcpToolFilter {
+                            tool_names: Some(vec![String::from("send")]),
+                            ..Default::default()
+                        }),
+                        never: Some(RealtimeMcpToolFilter {
+                            read_only: Some(true),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }
+                ))),
+                server_description: Some(String::from("Remote tools")),
+                server_url: Some(String::from("https://mcp.example.test")),
+                ..Default::default()
+            })),
+        ])
+    );
+    assert_eq!(
         secret.output().session.tracing,
         Some(RealtimeNullable::Value(RealtimeTracing::configuration(
             RealtimeTracingConfiguration {
@@ -172,6 +235,15 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     ..Default::default()
                 }),
                 tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
+                tools: Some(vec![RealtimeTool::Mcp(Box::new(RealtimeMcpTool {
+                    server_label: String::from("docs"),
+                    allowed_tools: Some(RealtimeMcpAllowedTools::Names(vec![String::from(
+                        "search",
+                    )])),
+                    require_approval: Some(RealtimeMcpRequireApproval::Never),
+                    server_url: Some(String::from("https://mcp.example.test")),
+                    ..Default::default()
+                }))]),
                 tracing: Some(RealtimeNullable::Value(RealtimeTracing::configuration(
                     RealtimeTracingConfiguration {
                         group_id: Some(String::from("grp_2")),
@@ -218,6 +290,19 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     ..Default::default()
                 }),
                 tool_choice: Some(RealtimeToolChoice::mcp("remote", None)),
+                tools: Some(vec![
+                    RealtimeTool::Function(Box::new(RealtimeFunctionTool {
+                        name: Some(String::from("accept_lookup")),
+                        parameters: Some(json!({"type": "object"})),
+                        ..Default::default()
+                    })),
+                    RealtimeTool::Mcp(Box::new(RealtimeMcpTool {
+                        server_label: String::from("calendar"),
+                        connector_id: Some(RealtimeMcpConnectorId::GoogleCalendar),
+                        require_approval: Some(RealtimeMcpRequireApproval::Always),
+                        ..Default::default()
+                    })),
+                ]),
                 tracing: Some(RealtimeNullable::Null),
                 truncation: Some(RealtimeTruncation::Auto),
                 ..Default::default()
@@ -281,6 +366,14 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "medium"
     );
     assert_eq!(client_secret_body["session"]["tool_choice"], "required");
+    assert_eq!(
+        client_secret_body["session"]["tools"][0]["type"],
+        "function"
+    );
+    assert_eq!(
+        client_secret_body["session"]["tools"][0]["name"],
+        "lookup_weather"
+    );
     assert_eq!(client_secret_body["session"]["tracing"], "auto");
     assert_eq!(client_secret_body["session"]["truncation"], "disabled");
 
@@ -326,6 +419,17 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
     assert_eq!(multipart_session["tool_choice"]["type"], "function");
     assert_eq!(multipart_session["tool_choice"]["name"], "lookup_weather");
+    assert_eq!(multipart_session["tools"][0]["type"], "mcp");
+    assert_eq!(multipart_session["tools"][0]["server_label"], "docs");
+    assert_eq!(
+        multipart_session["tools"][0]["allowed_tools"],
+        json!(["search"])
+    );
+    assert_eq!(multipart_session["tools"][0]["require_approval"], "never");
+    assert_eq!(
+        multipart_session["tools"][0]["server_url"],
+        "https://mcp.example.test"
+    );
     assert_eq!(multipart_session["tracing"]["group_id"], "grp_2");
     assert_eq!(multipart_session["tracing"]["workflow_name"], "call-create");
     assert_eq!(multipart_session["truncation"]["type"], "retention_ratio");
@@ -354,6 +458,16 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(accept_body["tool_choice"]["type"], "mcp");
     assert_eq!(accept_body["tool_choice"]["server_label"], "remote");
     assert!(accept_body["tool_choice"].get("name").is_none());
+    assert_eq!(accept_body["tools"][0]["type"], "function");
+    assert_eq!(accept_body["tools"][0]["name"], "accept_lookup");
+    assert_eq!(accept_body["tools"][0]["parameters"]["type"], "object");
+    assert_eq!(accept_body["tools"][1]["type"], "mcp");
+    assert_eq!(accept_body["tools"][1]["server_label"], "calendar");
+    assert_eq!(
+        accept_body["tools"][1]["connector_id"],
+        "connector_googlecalendar"
+    );
+    assert_eq!(accept_body["tools"][1]["require_approval"], "always");
     assert!(accept_body["tracing"].is_null());
     assert_eq!(accept_body["truncation"], "auto");
     assert_eq!(accept_body["parallel_tool_calls"], true);

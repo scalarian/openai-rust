@@ -17,12 +17,15 @@ pub use client::{
 pub use events::{
     RealtimeClientEvent, RealtimeConversationContentType, RealtimeConversationItem,
     RealtimeConversationItemRole, RealtimeConversationItemStatus, RealtimeConversationItemType,
-    RealtimeConversationMessageContentPart, RealtimeErrorInfo, RealtimeInclude,
-    RealtimeMaxOutputTokens, RealtimeNullable, RealtimeOutputModality, RealtimeReasoning,
-    RealtimeReasoningEffort, RealtimeResponseCreateParams, RealtimeServerEvent,
-    RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice, RealtimeToolChoiceFunction,
-    RealtimeToolChoiceMcp, RealtimeToolChoiceOther, RealtimeTracing, RealtimeTracingConfiguration,
-    RealtimeTruncation, RealtimeTruncationRetentionRatio, RealtimeTruncationRetentionRatioType,
+    RealtimeConversationMessageContentPart, RealtimeErrorInfo, RealtimeFunctionTool,
+    RealtimeInclude, RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpConnectorId,
+    RealtimeMcpRequireApproval, RealtimeMcpRequireApprovalFilter, RealtimeMcpTool,
+    RealtimeMcpToolFilter, RealtimeNullable, RealtimeOtherTool, RealtimeOutputModality,
+    RealtimeReasoning, RealtimeReasoningEffort, RealtimeResponseCreateParams, RealtimeServerEvent,
+    RealtimeSessionConfig, RealtimeSessionType, RealtimeTool, RealtimeToolChoice,
+    RealtimeToolChoiceFunction, RealtimeToolChoiceMcp, RealtimeToolChoiceOther,
+    RealtimeToolsConfig, RealtimeTracing, RealtimeTracingConfiguration, RealtimeTruncation,
+    RealtimeTruncationRetentionRatio, RealtimeTruncationRetentionRatioType,
     RealtimeTruncationTokenLimits, decode_server_event, decode_server_event_text,
 };
 pub use state::{RealtimeAudioBufferState, RealtimeEventState, RealtimeResponseState};

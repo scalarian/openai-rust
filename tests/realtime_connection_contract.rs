@@ -5,10 +5,11 @@ use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
         RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
-        RealtimeConversationMessageContentPart, RealtimeMaxOutputTokens, RealtimeOutputModality,
-        RealtimeReasoning, RealtimeReasoningEffort, RealtimeResponseCreateParams,
-        RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice,
-        ResponsePrompt,
+        RealtimeConversationMessageContentPart, RealtimeFunctionTool, RealtimeMaxOutputTokens,
+        RealtimeMcpAllowedTools, RealtimeMcpRequireApproval, RealtimeMcpTool,
+        RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
+        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
+        RealtimeSessionType, RealtimeTool, RealtimeToolChoice, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -537,6 +538,23 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
                     ..Default::default()
                 }),
                 tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
+                tools: Some(vec![
+                    RealtimeTool::Function(Box::new(RealtimeFunctionTool {
+                        name: Some(String::from("lookup_weather")),
+                        description: Some(String::from("Look up weather.")),
+                        parameters: Some(json!({"type": "object"})),
+                        ..Default::default()
+                    })),
+                    RealtimeTool::Mcp(Box::new(RealtimeMcpTool {
+                        server_label: String::from("docs"),
+                        allowed_tools: Some(RealtimeMcpAllowedTools::Names(vec![String::from(
+                            "search",
+                        )])),
+                        require_approval: Some(RealtimeMcpRequireApproval::Never),
+                        server_url: Some(String::from("https://mcp.example.test")),
+                        ..Default::default()
+                    })),
+                ]),
                 ..Default::default()
             },
             Some(String::from("evt_response")),
@@ -647,6 +665,25 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
     assert_eq!(
         captured[1]["response"]["tool_choice"]["name"],
         "lookup_weather"
+    );
+    assert_eq!(captured[1]["response"]["tools"][0]["type"], "function");
+    assert_eq!(
+        captured[1]["response"]["tools"][0]["description"],
+        "Look up weather."
+    );
+    assert_eq!(
+        captured[1]["response"]["tools"][0]["parameters"]["type"],
+        "object"
+    );
+    assert_eq!(captured[1]["response"]["tools"][1]["type"], "mcp");
+    assert_eq!(captured[1]["response"]["tools"][1]["server_label"], "docs");
+    assert_eq!(
+        captured[1]["response"]["tools"][1]["allowed_tools"],
+        json!(["search"])
+    );
+    assert_eq!(
+        captured[1]["response"]["tools"][1]["require_approval"],
+        "never"
     );
     assert_eq!(captured[2]["response_id"], "resp_cancel");
     assert_eq!(captured[3]["audio"], "AQID");

@@ -326,6 +326,130 @@ pub struct RealtimeToolChoiceOther {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Tools available to a Realtime model.
+pub type RealtimeToolsConfig = Vec<RealtimeTool>;
+
+/// One Realtime tool configuration.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeTool {
+    Function(Box<RealtimeFunctionTool>),
+    Mcp(Box<RealtimeMcpTool>),
+    Other(Box<RealtimeOtherTool>),
+}
+
+impl RealtimeTool {
+    pub fn function(name: impl Into<String>) -> Self {
+        Self::Function(Box::new(RealtimeFunctionTool {
+            name: Some(name.into()),
+            ..Default::default()
+        }))
+    }
+
+    pub fn mcp(server_label: impl Into<String>) -> Self {
+        Self::Mcp(Box::new(RealtimeMcpTool {
+            server_label: server_label.into(),
+            ..Default::default()
+        }))
+    }
+}
+
+/// Realtime function tool configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeFunctionTool {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime MCP tool configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeMcpTool {
+    pub server_label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<RealtimeMcpAllowedTools>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connector_id: Option<RealtimeMcpConnectorId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub defer_loading: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headers: Option<BTreeMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub require_approval: Option<RealtimeMcpRequireApproval>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime MCP service connector IDs.
+    pub enum RealtimeMcpConnectorId {
+        Dropbox => "connector_dropbox",
+        Gmail => "connector_gmail",
+        GoogleCalendar => "connector_googlecalendar",
+        GoogleDrive => "connector_googledrive",
+        MicrosoftTeams => "connector_microsoftteams",
+        OutlookCalendar => "connector_outlookcalendar",
+        OutlookEmail => "connector_outlookemail",
+        SharePoint => "connector_sharepoint",
+    }
+}
+
+/// MCP tool-name filter used by Realtime MCP tool configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeMcpToolFilter {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_names: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Allowed MCP tools for a Realtime MCP server.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RealtimeMcpAllowedTools {
+    Names(Vec<String>),
+    Filter(RealtimeMcpToolFilter),
+}
+
+/// Realtime MCP tool approval requirement.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeMcpRequireApproval {
+    Always,
+    Never,
+    Filter(Box<RealtimeMcpRequireApprovalFilter>),
+    UnknownString(String),
+}
+
+/// Granular Realtime MCP approval filter.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeMcpRequireApprovalFilter {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub always: Option<RealtimeMcpToolFilter>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub never: Option<RealtimeMcpToolFilter>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Forward-compatible Realtime tool object.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeOtherTool {
+    pub tool_type: String,
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Nullable Realtime config slot, used when `null` disables an active config.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -415,6 +539,104 @@ realtime_string_literal_enum! {
         Medium => "medium",
         High => "high",
         XHigh => "xhigh",
+    }
+}
+
+impl Serialize for RealtimeTool {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Function(function) => {
+                serialize_realtime_tool_object(serializer, "function", function.as_ref())
+            }
+            Self::Mcp(mcp) => serialize_realtime_tool_object(serializer, "mcp", mcp.as_ref()),
+            Self::Other(other) => {
+                let mut object = Map::new();
+                object.insert(String::from("type"), Value::String(other.tool_type.clone()));
+                object.extend(other.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeTool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Err(serde::de::Error::custom("tool must be an object"));
+        };
+        let tool_type = remove_required_realtime_string(&mut object, "type", "tool")
+            .map_err(serde::de::Error::custom)?;
+        match tool_type.as_str() {
+            "function" => serde_json::from_value(Value::Object(object))
+                .map(|tool| Self::Function(Box::new(tool)))
+                .map_err(serde::de::Error::custom),
+            "mcp" => serde_json::from_value(Value::Object(object))
+                .map(|tool| Self::Mcp(Box::new(tool)))
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Other(Box::new(RealtimeOtherTool {
+                tool_type,
+                extra: object.into_iter().collect(),
+            }))),
+        }
+    }
+}
+
+fn serialize_realtime_tool_object<S, T>(
+    serializer: S,
+    tool_type: &str,
+    tool: &T,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+    T: Serialize,
+{
+    let mut value = serde_json::to_value(tool).map_err(serde::ser::Error::custom)?;
+    let Value::Object(ref mut object) = value else {
+        return Err(serde::ser::Error::custom(
+            "tool must serialize to an object",
+        ));
+    };
+    object.insert(String::from("type"), Value::String(tool_type.to_string()));
+    value.serialize(serializer)
+}
+
+impl Serialize for RealtimeMcpRequireApproval {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Always => serializer.serialize_str("always"),
+            Self::Never => serializer.serialize_str("never"),
+            Self::Filter(filter) => filter.serialize(serializer),
+            Self::UnknownString(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeMcpRequireApproval {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::String(value) if value == "always" => Ok(Self::Always),
+            Value::String(value) if value == "never" => Ok(Self::Never),
+            Value::String(value) => Ok(Self::UnknownString(value)),
+            Value::Object(object) => serde_json::from_value(Value::Object(object))
+                .map(|filter| Self::Filter(Box::new(filter)))
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom(
+                "require_approval must be a string or object",
+            )),
+        }
     }
 }
 
@@ -529,6 +751,20 @@ fn remove_optional_object_string(
     }
 }
 
+fn remove_required_realtime_string(
+    object: &mut Map<String, Value>,
+    field: &str,
+    context: &str,
+) -> Result<String, String> {
+    object
+        .remove(field)
+        .and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        })
+        .ok_or_else(|| format!("Realtime {context} missing string `{field}`"))
+}
+
 realtime_string_literal_enum! {
     /// Additional Realtime fields that can be requested in server outputs.
     pub enum RealtimeInclude {
@@ -610,7 +846,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<RealtimeToolsConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracing: Option<RealtimeNullable<RealtimeTracing>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -750,7 +986,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<RealtimeToolsConfig>,
 }
 
 /// Typed client event helpers for the text/bootstrap path.
