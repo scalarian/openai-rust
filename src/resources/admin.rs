@@ -351,6 +351,20 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project group membership object type.
+    pub enum AdminProjectGroupObject {
+        ProjectGroup => "project.group",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project group membership deletion object type.
+    pub enum AdminProjectGroupDeletedObject {
+        ProjectGroupDeleted => "project.group.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1837,6 +1851,30 @@ pub struct AdminProjectServiceAccountDeleteResponse {
 pub type AdminProjectServiceAccountListResponse =
     AdminConversationCursorPage<AdminProjectServiceAccount>;
 
+/// Details about a group's membership in a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectGroup {
+    pub created_at: u64,
+    pub group_id: String,
+    pub group_name: String,
+    pub group_type: AdminGroupType,
+    pub object: AdminProjectGroupObject,
+    pub project_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after removing a group from a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectGroupDeleteResponse {
+    pub deleted: bool,
+    pub object: AdminProjectGroupDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectGroupListResponse = AdminNextCursorPage<AdminProjectGroup>;
+
 /// Project service-account creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminProjectServiceAccountCreateParams {
@@ -2106,6 +2144,11 @@ impl From<AdminProjectGroupRoleListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+pub type AdminProjectGroupRoleCreateResponse = AdminGroupRoleCreateResponse;
+pub type AdminProjectGroupRoleRetrieveResponse = AdminRoleAssignment;
+pub type AdminProjectGroupRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
+pub type AdminProjectGroupRoleDeleteResponse = AdminRoleAssignmentDeleteResponse;
 
 /// Project role creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -4055,12 +4098,13 @@ impl ProjectGroups {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroup>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/groups"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4069,13 +4113,16 @@ impl ProjectGroups {
         project_id: &str,
         group_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroup>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/groups/{group_id}"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/groups/{group_id}"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -4083,12 +4130,15 @@ impl ProjectGroups {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/groups"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/groups"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -4096,12 +4146,13 @@ impl ProjectGroups {
         &self,
         project_id: &str,
         group_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/groups/{group_id}"),
+            RequestOptions::default(),
         )
     }
 }
@@ -4122,13 +4173,14 @@ impl ProjectGroupRoles {
         project_id: &str,
         group_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupRoleCreateResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/projects/{project_id}/groups/{group_id}/roles"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4137,13 +4189,14 @@ impl ProjectGroupRoles {
         project_id: &str,
         group_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupRoleRetrieveResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
         let role_id = path_id("role_id", role_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -4152,13 +4205,16 @@ impl ProjectGroupRoles {
         project_id: &str,
         group_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupRoleListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
-        get_query(
-            &self.runtime,
-            format!("/projects/{project_id}/groups/{group_id}/roles"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/projects/{project_id}/groups/{group_id}/roles"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -4167,13 +4223,14 @@ impl ProjectGroupRoles {
         project_id: &str,
         group_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectGroupRoleDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let group_id = path_id("group_id", group_id)?;
         let role_id = path_id("role_id", role_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/projects/{project_id}/groups/{group_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 }

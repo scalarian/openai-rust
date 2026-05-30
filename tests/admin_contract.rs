@@ -286,6 +286,17 @@ fn project_service_account_create_json(id: &str, name: &str) -> Value {
     service_account
 }
 
+fn project_group_json(group_id: &str, group_name: &str, group_type: &str) -> Value {
+    json!({
+        "created_at": 1_717_172_500u64,
+        "group_id": group_id,
+        "group_name": group_name,
+        "group_type": group_type,
+        "object": "project.group",
+        "project_id": "proj_research"
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -446,6 +457,16 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         })
         .to_string(),
     );
+    responses[16] = json_response(
+        json!({
+            "data": [organization_role_assignment_json("role_group_viewer")],
+            "has_more": true,
+            "next": "role_group_viewer"
+        })
+        .to_string(),
+    );
+    responses[21] =
+        json_response(project_group_json("grp_eng", "Engineering", "group").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -606,7 +627,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    let project_group_roles = projects
         .groups()
         .roles()
         .list(
@@ -618,6 +639,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert_eq!(project_group_roles.output.data[0].id, "role_group_viewer");
+    assert_eq!(
+        project_group_roles.output.next_after(),
+        Some("role_group_viewer")
+    );
     let project_key = projects
         .api_keys()
         .retrieve("proj_research", "key_project")
@@ -661,7 +687,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         )
         .unwrap();
     assert!(hosted_tool_permissions.output.web_search.enabled);
-    projects
+    let project_group = projects
         .groups()
         .retrieve(
             "proj_research",
@@ -671,6 +697,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert_eq!(
+        project_group.output.object,
+        AdminProjectGroupObject::ProjectGroup
+    );
+    assert_eq!(project_group.output.group_type, AdminGroupType::Group);
     let deactivated_project_certificates = projects
         .certificates()
         .deactivate(
@@ -1313,6 +1344,19 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .to_string(),
     );
     responses[9] = json_response(project_model_permissions_json().to_string());
+    responses[10] =
+        json_response(project_group_json("grp_eng", "Engineering", "group").to_string());
+    responses[11] = json_response(
+        json!({
+            "data": [project_group_json("grp_eng", "Engineering", "group")],
+            "has_more": true,
+            "next": "grp_eng"
+        })
+        .to_string(),
+    );
+    responses[12] = json_response(
+        organization_group_role_create_json("grp_eng", "role_group_viewer").to_string(),
+    );
     responses[15] = json_response(project_data_retention_json("organization_default").to_string());
     responses[16] = json_response(project_spend_alert_json("alert_project", 30_000).to_string());
     responses[17] = json_response(
@@ -1509,7 +1553,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         vec![String::from("gpt-5")]
     );
 
-    projects
+    let created_project_group = projects
         .groups()
         .create(
             "proj_research",
@@ -1519,7 +1563,11 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        created_project_group.output.object,
+        AdminProjectGroupObject::ProjectGroup
+    );
+    let project_groups = projects
         .groups()
         .list(
             "proj_research",
@@ -1530,7 +1578,9 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(project_groups.output.data[0].group_id, "grp_eng");
+    assert_eq!(project_groups.output.next_after(), Some("grp_eng"));
+    let created_project_group_role = projects
         .groups()
         .roles()
         .create(
@@ -1541,6 +1591,10 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(
+        created_project_group_role.output.object,
+        AdminGroupRoleObject::GroupRole
+    );
 
     projects
         .roles()
@@ -2333,6 +2387,93 @@ fn admin_project_service_account_retrieve_and_delete_return_typed_responses() {
     assert_eq!(
         requests[1].path,
         "/v1/organization/projects/proj_research/service_accounts/svc_robot"
+    );
+}
+
+#[test]
+fn admin_project_group_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(project_group_json("grp_eng", "Engineering", "group").to_string()),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "project.group.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let groups = client.admin().organization().projects().groups();
+
+    let group = groups
+        .retrieve(
+            "proj_research",
+            "grp_eng",
+            AdminProjectGroupRetrieveParams {
+                group_type: Some(AdminGroupType::Group),
+            },
+        )
+        .unwrap();
+    assert_eq!(group.output.group_name, "Engineering");
+    assert_eq!(group.output.project_id, "proj_research");
+
+    let deleted = groups.delete("proj_research", "grp_eng").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminProjectGroupDeletedObject::ProjectGroupDeleted
+    );
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/projects/proj_research/groups/grp_eng?group_type=group"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/organization/projects/proj_research/groups/grp_eng"
+    );
+}
+
+#[test]
+fn admin_project_group_role_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_role_assignment_json("role_group_viewer").to_string()),
+        json_response(
+            json!({
+                "deleted": true,
+                "object": "group.role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let roles = client.admin().organization().projects().groups().roles();
+
+    let role = roles
+        .retrieve("proj_research", "grp_eng", "role_group_viewer")
+        .unwrap();
+    assert_eq!(role.output.id, "role_group_viewer");
+    assert_eq!(role.output.resource_type, "api.organization");
+
+    let deleted = roles
+        .delete("proj_research", "grp_eng", "role_group_viewer")
+        .unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, "group.role.deleted");
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/projects/proj_research/groups/grp_eng/roles/role_group_viewer"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/projects/proj_research/groups/grp_eng/roles/role_group_viewer"
     );
 }
 
