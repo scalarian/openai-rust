@@ -4,7 +4,7 @@ use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
         ResponseConversation, ResponseConversationObject, ResponseFormatTextConfig, ResponsePrompt,
-        ResponseReasoning,
+        ResponseReasoning, ResponseToolChoice,
     },
 };
 use serde_json::{Value, json};
@@ -60,6 +60,9 @@ fn create_populates_output_text_helper() {
             stream: Some(false),
             stream_options: Some(json!({"include_usage": true})),
             temperature: Some(0.2),
+            tool_choice: Some(ResponseToolChoice::Function {
+                name: String::from("lookup_weather"),
+            }),
             top_logprobs: Some(2),
             top_p: Some(0.8),
             truncation: Some(String::from("auto")),
@@ -98,6 +101,8 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["store"], true);
     assert_eq!(body["stream_options"]["include_usage"], true);
     assert_eq!(body["temperature"], 0.2);
+    assert_eq!(body["tool_choice"]["type"], "function");
+    assert_eq!(body["tool_choice"]["name"], "lookup_weather");
     assert_eq!(body["stream"], false);
     assert_eq!(body["top_logprobs"], 2);
     assert_eq!(body["top_p"], 0.8);
@@ -163,7 +168,10 @@ fn create_populates_output_text_helper() {
             .and_then(|text| text.format.as_ref()),
         Some(&ResponseFormatTextConfig::Text)
     );
-    assert_eq!(response.output().tool_choice, Some(json!("auto")));
+    assert_eq!(
+        response.output().tool_choice,
+        Some(ResponseToolChoice::Auto)
+    );
     assert_eq!(
         response.output().tools,
         vec![json!({"type": "web_search_preview"})]

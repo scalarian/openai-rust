@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize, Serializer, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio::sync::watch;
@@ -599,7 +599,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
@@ -697,7 +697,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
@@ -825,7 +825,7 @@ pub struct ResponseInputTokensCountParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ResponseToolChoice>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<FunctionTool>,
     /// Non-function Responses tools, such as built-in web/file search, MCP, code
@@ -1011,7 +1011,7 @@ pub struct Response {
     pub service_tier: Option<String>,
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ResponseToolChoice>,
     pub tools: Vec<Value>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
@@ -1365,7 +1365,7 @@ pub struct ParsedResponse<T> {
     pub service_tier: Option<String>,
     pub temperature: Option<f64>,
     pub text: Option<ResponseTextConfig>,
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<ResponseToolChoice>,
     pub tools: Vec<Value>,
     pub top_logprobs: Option<u64>,
     pub top_p: Option<f64>,
@@ -2123,6 +2123,259 @@ impl Serialize for ResponseFormatTextJSONSchemaConfig {
     }
 }
 
+/// Responses API tool-choice selector.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseToolChoice {
+    Auto,
+    None,
+    Required,
+    Allowed {
+        mode: String,
+        tools: Vec<BTreeMap<String, Value>>,
+    },
+    FileSearch,
+    WebSearchPreview,
+    Computer,
+    ComputerUsePreview,
+    ComputerUse,
+    WebSearchPreview20250311,
+    ImageGeneration,
+    CodeInterpreter,
+    Function {
+        name: String,
+    },
+    Mcp {
+        server_label: String,
+        name: Option<String>,
+    },
+    Custom {
+        name: String,
+    },
+    ApplyPatch,
+    Shell,
+    Other {
+        tool_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+impl Serialize for ResponseToolChoice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::None => serializer.serialize_str("none"),
+            Self::Required => serializer.serialize_str("required"),
+            Self::Allowed { mode, tools } => {
+                #[derive(Serialize)]
+                struct WireAllowed<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'static str,
+                    mode: &'a str,
+                    tools: &'a [BTreeMap<String, Value>],
+                }
+
+                WireAllowed {
+                    choice_type: "allowed_tools",
+                    mode,
+                    tools,
+                }
+                .serialize(serializer)
+            }
+            Self::FileSearch => serialize_tool_choice_type(serializer, "file_search"),
+            Self::WebSearchPreview => serialize_tool_choice_type(serializer, "web_search_preview"),
+            Self::Computer => serialize_tool_choice_type(serializer, "computer"),
+            Self::ComputerUsePreview => {
+                serialize_tool_choice_type(serializer, "computer_use_preview")
+            }
+            Self::ComputerUse => serialize_tool_choice_type(serializer, "computer_use"),
+            Self::WebSearchPreview20250311 => {
+                serialize_tool_choice_type(serializer, "web_search_preview_2025_03_11")
+            }
+            Self::ImageGeneration => serialize_tool_choice_type(serializer, "image_generation"),
+            Self::CodeInterpreter => serialize_tool_choice_type(serializer, "code_interpreter"),
+            Self::Function { name } => {
+                #[derive(Serialize)]
+                struct WireFunction<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'static str,
+                    name: &'a str,
+                }
+
+                WireFunction {
+                    choice_type: "function",
+                    name,
+                }
+                .serialize(serializer)
+            }
+            Self::Mcp { server_label, name } => {
+                #[derive(Serialize)]
+                struct WireMcp<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'static str,
+                    server_label: &'a str,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    name: Option<&'a String>,
+                }
+
+                WireMcp {
+                    choice_type: "mcp",
+                    server_label,
+                    name: name.as_ref(),
+                }
+                .serialize(serializer)
+            }
+            Self::Custom { name } => {
+                #[derive(Serialize)]
+                struct WireCustom<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'static str,
+                    name: &'a str,
+                }
+
+                WireCustom {
+                    choice_type: "custom",
+                    name,
+                }
+                .serialize(serializer)
+            }
+            Self::ApplyPatch => serialize_tool_choice_type(serializer, "apply_patch"),
+            Self::Shell => serialize_tool_choice_type(serializer, "shell"),
+            Self::Other { tool_type, extra } => {
+                let mut object = serde_json::Map::new();
+                object.insert(String::from("type"), Value::String(tool_type.clone()));
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                Value::Object(object).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseToolChoice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) => match value.as_str() {
+                "auto" => Ok(Self::Auto),
+                "none" => Ok(Self::None),
+                "required" => Ok(Self::Required),
+                other => Err(serde::de::Error::custom(format!(
+                    "unknown response tool choice option `{other}`"
+                ))),
+            },
+            Value::Object(mut object) => {
+                let tool_type = object
+                    .remove("type")
+                    .and_then(|value| match value {
+                        Value::String(value) => Some(value),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        serde::de::Error::custom("response tool choice object missing `type`")
+                    })?;
+                deserialize_response_tool_choice_object(tool_type, object)
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => Err(serde::de::Error::custom(
+                "response tool choice must be a string or object",
+            )),
+        }
+    }
+}
+
+fn serialize_tool_choice_type<S>(serializer: S, tool_type: &'static str) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct WireTypeChoice {
+        #[serde(rename = "type")]
+        choice_type: &'static str,
+    }
+
+    WireTypeChoice {
+        choice_type: tool_type,
+    }
+    .serialize(serializer)
+}
+
+fn deserialize_response_tool_choice_object(
+    tool_type: String,
+    mut object: serde_json::Map<String, Value>,
+) -> Result<ResponseToolChoice, String> {
+    match tool_type.as_str() {
+        "allowed_tools" => {
+            let mode = remove_required_string(&mut object, "mode", &tool_type)?;
+            let tools = object
+                .remove("tools")
+                .ok_or_else(|| String::from("allowed_tools response tool choice missing `tools`"))
+                .and_then(|value| {
+                    serde_json::from_value::<Vec<BTreeMap<String, Value>>>(value)
+                        .map_err(|error| format!("invalid allowed_tools `tools`: {error}"))
+                })?;
+            Ok(ResponseToolChoice::Allowed { mode, tools })
+        }
+        "file_search" => Ok(ResponseToolChoice::FileSearch),
+        "web_search_preview" => Ok(ResponseToolChoice::WebSearchPreview),
+        "computer" => Ok(ResponseToolChoice::Computer),
+        "computer_use_preview" => Ok(ResponseToolChoice::ComputerUsePreview),
+        "computer_use" => Ok(ResponseToolChoice::ComputerUse),
+        "web_search_preview_2025_03_11" => Ok(ResponseToolChoice::WebSearchPreview20250311),
+        "image_generation" => Ok(ResponseToolChoice::ImageGeneration),
+        "code_interpreter" => Ok(ResponseToolChoice::CodeInterpreter),
+        "function" => Ok(ResponseToolChoice::Function {
+            name: remove_required_string(&mut object, "name", &tool_type)?,
+        }),
+        "mcp" => Ok(ResponseToolChoice::Mcp {
+            server_label: remove_required_string(&mut object, "server_label", &tool_type)?,
+            name: remove_optional_string(&mut object, "name")?,
+        }),
+        "custom" => Ok(ResponseToolChoice::Custom {
+            name: remove_required_string(&mut object, "name", &tool_type)?,
+        }),
+        "apply_patch" => Ok(ResponseToolChoice::ApplyPatch),
+        "shell" => Ok(ResponseToolChoice::Shell),
+        _ => Ok(ResponseToolChoice::Other {
+            tool_type,
+            extra: object.into_iter().collect(),
+        }),
+    }
+}
+
+fn remove_required_string(
+    object: &mut serde_json::Map<String, Value>,
+    field: &str,
+    tool_type: &str,
+) -> Result<String, String> {
+    object
+        .remove(field)
+        .and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        })
+        .ok_or_else(|| format!("{tool_type} response tool choice missing string `{field}`"))
+}
+
+fn remove_optional_string(
+    object: &mut serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<Option<String>, String> {
+    match object.remove(field) {
+        Some(Value::String(value)) => Ok(Some(value)),
+        Some(Value::Null) | None => Ok(None),
+        Some(_) => Err(format!(
+            "response tool choice field `{field}` must be a string"
+        )),
+    }
+}
+
 /// Function tool definition for non-stream parse and input-token helpers.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionTool {
@@ -2210,7 +2463,7 @@ struct WireResponse {
     #[serde(default)]
     text: Option<ResponseTextConfig>,
     #[serde(default)]
-    tool_choice: Option<Value>,
+    tool_choice: Option<ResponseToolChoice>,
     #[serde(default)]
     tools: Vec<Value>,
     #[serde(default)]
