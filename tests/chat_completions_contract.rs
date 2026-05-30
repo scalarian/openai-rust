@@ -2,17 +2,26 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
         chat::{
-            ChatCompletionAudioFormat, ChatCompletionAudioParams, ChatCompletionFunction,
+            ChatCompletionAllowedToolChoice, ChatCompletionAllowedTools,
+            ChatCompletionAllowedToolsMode, ChatCompletionAudioFormat, ChatCompletionAudioParams,
+            ChatCompletionContentPartFile, ChatCompletionContentPartFileValue,
+            ChatCompletionContentPartInputAudio, ChatCompletionContentPartText,
+            ChatCompletionCustomTool, ChatCompletionCustomToolConfig,
+            ChatCompletionCustomToolFormat, ChatCompletionCustomToolGrammar,
+            ChatCompletionCustomToolGrammarFormat, ChatCompletionCustomToolGrammarSyntax,
+            ChatCompletionDeveloperMessageParam, ChatCompletionFunction,
             ChatCompletionFunctionCall, ChatCompletionFunctionDefinition,
-            ChatCompletionFunctionTool, ChatCompletionMessageParam, ChatCompletionModality,
-            ChatCompletionPredictionContent, ChatCompletionResponseFormat,
+            ChatCompletionFunctionTool, ChatCompletionInputAudioParam, ChatCompletionMessageParam,
+            ChatCompletionModality, ChatCompletionPredictionContent, ChatCompletionResponseFormat,
             ChatCompletionStreamOptions, ChatCompletionTool, ChatCompletionToolChoice,
-            ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
+            ChatCompletionVoice, ChatStop, ChatWebSearchOptions, ChatWebSearchUserLocation,
+            ChatWebSearchUserLocationApproximate,
         },
         common::{
             ListOrder, PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier,
             Verbosity,
         },
+        multimodal::InputAudioFormat,
     },
 };
 use serde_json::{Value, json};
@@ -340,6 +349,81 @@ fn stored_chat_retrieve_accepts_nullable_tool_calls() {
         .expect("stored chat completion should deserialize when tool_calls is null");
 
     assert!(retrieved.output().choices[0].message.tool_calls.is_empty());
+}
+
+#[test]
+fn chat_request_literal_fields_serialize_as_python_literals() {
+    let developer = serde_json::to_value(ChatCompletionMessageParam::from(
+        ChatCompletionDeveloperMessageParam::new(vec![ChatCompletionContentPartText::new(
+            "Be terse",
+        )]),
+    ))
+    .unwrap();
+    assert_eq!(developer["role"], "developer");
+    assert_eq!(developer["content"][0]["type"], "text");
+
+    let user = serde_json::to_value(ChatCompletionMessageParam::user(vec![
+        ChatCompletionContentPartFile::new(ChatCompletionContentPartFileValue {
+            file_id: Some(String::from("file_123")),
+            ..Default::default()
+        })
+        .into(),
+        ChatCompletionContentPartInputAudio::new(ChatCompletionInputAudioParam {
+            data: String::from("base64-audio"),
+            format: InputAudioFormat::Wav,
+            ..Default::default()
+        })
+        .into(),
+    ]))
+    .unwrap();
+    assert_eq!(user["role"], "user");
+    assert_eq!(user["content"][0]["type"], "file");
+    assert_eq!(user["content"][1]["type"], "input_audio");
+
+    let allowed_choice = serde_json::to_value(ChatCompletionToolChoice::AllowedTools(
+        ChatCompletionAllowedToolChoice::new(ChatCompletionAllowedTools {
+            mode: ChatCompletionAllowedToolsMode::Required,
+            tools: vec![BTreeMap::from([(
+                String::from("type"),
+                Value::String(String::from("function")),
+            )])],
+            ..Default::default()
+        }),
+    ))
+    .unwrap();
+    assert_eq!(allowed_choice["type"], "allowed_tools");
+    assert_eq!(allowed_choice["allowed_tools"]["mode"], "required");
+
+    let custom_tool = serde_json::to_value(ChatCompletionTool::from(
+        ChatCompletionCustomTool::new(ChatCompletionCustomToolConfig {
+            name: String::from("grep_logs"),
+            format: Some(ChatCompletionCustomToolFormat::Grammar(
+                ChatCompletionCustomToolGrammarFormat::new(ChatCompletionCustomToolGrammar {
+                    definition: String::from("start: /.+/"),
+                    syntax: ChatCompletionCustomToolGrammarSyntax::Regex,
+                    ..Default::default()
+                }),
+            )),
+            ..Default::default()
+        }),
+    ))
+    .unwrap();
+    assert_eq!(custom_tool["type"], "custom");
+    assert_eq!(custom_tool["custom"]["format"]["type"], "grammar");
+    assert_eq!(
+        custom_tool["custom"]["format"]["grammar"]["syntax"],
+        "regex"
+    );
+
+    let location = serde_json::to_value(ChatWebSearchUserLocation::approximate(
+        ChatWebSearchUserLocationApproximate {
+            city: Some(String::from("San Francisco")),
+            country: Some(String::from("US")),
+            ..Default::default()
+        },
+    ))
+    .unwrap();
+    assert_eq!(location["type"], "approximate");
 }
 
 fn json_response(body: String) -> mock_http::ScriptedResponse {

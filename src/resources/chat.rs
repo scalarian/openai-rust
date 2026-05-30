@@ -27,6 +27,79 @@ use crate::{
     },
 };
 
+macro_rules! chat_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                })
+            }
+        }
+    };
+}
+
 /// Chat namespace for compatibility surfaces.
 #[derive(Clone, Debug)]
 pub struct Chat {
@@ -504,12 +577,75 @@ impl<'de> Deserialize<'de> for ChatCompletionFinishReason {
     }
 }
 
+chat_string_literal_enum! {
+    /// Chat message content-part discriminator.
+    pub enum ChatCompletionContentPartType {
+        Text => "text",
+        ImageUrl => "image_url",
+        InputAudio => "input_audio",
+        File => "file",
+        Refusal => "refusal",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Predicted-content discriminator used by chat completions.
+    pub enum ChatCompletionPredictionContentType {
+        Content => "content",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Chat tool discriminator.
+    pub enum ChatCompletionToolType {
+        Function => "function",
+        Custom => "custom",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Chat allowed-tool choice discriminator.
+    pub enum ChatCompletionAllowedToolChoiceType {
+        AllowedTools => "allowed_tools",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Mode used by a constrained chat tool choice.
+    pub enum ChatCompletionAllowedToolsMode {
+        Auto => "auto",
+        Required => "required",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Chat web-search user-location discriminator.
+    pub enum ChatWebSearchUserLocationType {
+        Approximate => "approximate",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Chat custom-tool format discriminator.
+    pub enum ChatCompletionCustomToolFormatType {
+        Grammar => "grammar",
+    }
+}
+
+chat_string_literal_enum! {
+    /// Grammar syntax accepted by chat custom tools.
+    pub enum ChatCompletionCustomToolGrammarSyntax {
+        Lark => "lark",
+        Regex => "regex",
+    }
+}
+
 /// Developer-role chat message parameter.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ChatCompletionDeveloperMessageParam {
     pub content: ChatCompletionTextMessageContent,
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(flatten)]
@@ -520,7 +656,7 @@ impl ChatCompletionDeveloperMessageParam {
     pub fn new(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
         Self {
             content: content.into(),
-            role: String::from("developer"),
+            role: ChatCompletionRole::Developer,
             name: None,
             extra: BTreeMap::new(),
         }
@@ -532,7 +668,7 @@ impl ChatCompletionDeveloperMessageParam {
 pub struct ChatCompletionSystemMessageParam {
     pub content: ChatCompletionTextMessageContent,
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(flatten)]
@@ -543,7 +679,7 @@ impl ChatCompletionSystemMessageParam {
     pub fn new(content: impl Into<ChatCompletionTextMessageContent>) -> Self {
         Self {
             content: content.into(),
-            role: String::from("system"),
+            role: ChatCompletionRole::System,
             name: None,
             extra: BTreeMap::new(),
         }
@@ -555,7 +691,7 @@ impl ChatCompletionSystemMessageParam {
 pub struct ChatCompletionUserMessageParam {
     pub content: ChatCompletionUserMessageContent,
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(flatten)]
@@ -566,7 +702,7 @@ impl ChatCompletionUserMessageParam {
     pub fn new(content: impl Into<ChatCompletionUserMessageContent>) -> Self {
         Self {
             content: content.into(),
-            role: String::from("user"),
+            role: ChatCompletionRole::User,
             name: None,
             extra: BTreeMap::new(),
         }
@@ -577,7 +713,7 @@ impl ChatCompletionUserMessageParam {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ChatCompletionAssistantMessageParam {
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<ChatCompletionAssistantAudioParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -597,7 +733,7 @@ pub struct ChatCompletionAssistantMessageParam {
 impl ChatCompletionAssistantMessageParam {
     pub fn new(content: Option<ChatCompletionAssistantMessageContent>) -> Self {
         Self {
-            role: String::from("assistant"),
+            role: ChatCompletionRole::Assistant,
             audio: None,
             content,
             function_call: None,
@@ -614,7 +750,7 @@ impl ChatCompletionAssistantMessageParam {
 pub struct ChatCompletionToolMessageParam {
     pub content: ChatCompletionTextMessageContent,
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     pub tool_call_id: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -627,7 +763,7 @@ impl ChatCompletionToolMessageParam {
     ) -> Self {
         Self {
             content: content.into(),
-            role: String::from("tool"),
+            role: ChatCompletionRole::Tool,
             tool_call_id: tool_call_id.into(),
             extra: BTreeMap::new(),
         }
@@ -640,7 +776,7 @@ pub struct ChatCompletionFunctionMessageParam {
     pub content: Option<String>,
     pub name: String,
     #[serde(rename = "role")]
-    pub role: String,
+    pub role: ChatCompletionRole,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -650,7 +786,7 @@ impl ChatCompletionFunctionMessageParam {
         Self {
             content,
             name: name.into(),
-            role: String::from("function"),
+            role: ChatCompletionRole::Function,
             extra: BTreeMap::new(),
         }
     }
@@ -793,7 +929,7 @@ impl From<ChatCompletionContentPartRefusal> for ChatCompletionAssistantContentPa
 pub struct ChatCompletionContentPartImage {
     pub image_url: ChatCompletionImageUrlParam,
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionContentPartType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -806,7 +942,7 @@ impl ChatCompletionContentPartImage {
                 detail,
                 extra: BTreeMap::new(),
             },
-            content_type: String::from("image_url"),
+            content_type: ChatCompletionContentPartType::ImageUrl,
             extra: BTreeMap::new(),
         }
     }
@@ -850,7 +986,7 @@ pub struct ChatCompletionImageUrlParam {
 pub struct ChatCompletionContentPartInputAudio {
     pub input_audio: ChatCompletionInputAudioParam,
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionContentPartType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -859,7 +995,7 @@ impl ChatCompletionContentPartInputAudio {
     pub fn new(input_audio: ChatCompletionInputAudioParam) -> Self {
         Self {
             input_audio,
-            content_type: String::from("input_audio"),
+            content_type: ChatCompletionContentPartType::InputAudio,
             extra: BTreeMap::new(),
         }
     }
@@ -879,7 +1015,7 @@ pub struct ChatCompletionInputAudioParam {
 pub struct ChatCompletionContentPartFile {
     pub file: ChatCompletionContentPartFileValue,
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionContentPartType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -888,7 +1024,7 @@ impl ChatCompletionContentPartFile {
     pub fn new(file: ChatCompletionContentPartFileValue) -> Self {
         Self {
             file,
-            content_type: String::from("file"),
+            content_type: ChatCompletionContentPartType::File,
             extra: BTreeMap::new(),
         }
     }
@@ -912,7 +1048,7 @@ pub struct ChatCompletionContentPartFileValue {
 pub struct ChatCompletionContentPartRefusal {
     pub refusal: String,
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionContentPartType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -921,7 +1057,7 @@ impl ChatCompletionContentPartRefusal {
     pub fn new(refusal: impl Into<String>) -> Self {
         Self {
             refusal: refusal.into(),
-            content_type: String::from("refusal"),
+            content_type: ChatCompletionContentPartType::Refusal,
             extra: BTreeMap::new(),
         }
     }
@@ -970,7 +1106,7 @@ pub struct ChatCompletionMessageFunctionToolCallParam {
     pub id: String,
     pub function: ChatCompletionMessageFunctionToolCallFunctionParam,
     #[serde(rename = "type")]
-    pub tool_type: String,
+    pub tool_type: ChatCompletionToolType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -983,7 +1119,7 @@ impl ChatCompletionMessageFunctionToolCallParam {
         Self {
             id: id.into(),
             function,
-            tool_type: String::from("function"),
+            tool_type: ChatCompletionToolType::Function,
             extra: BTreeMap::new(),
         }
     }
@@ -1004,7 +1140,7 @@ pub struct ChatCompletionMessageCustomToolCallParam {
     pub id: String,
     pub custom: ChatCompletionMessageCustomToolCallCustomParam,
     #[serde(rename = "type")]
-    pub tool_type: String,
+    pub tool_type: ChatCompletionToolType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1017,7 +1153,7 @@ impl ChatCompletionMessageCustomToolCallParam {
         Self {
             id: id.into(),
             custom,
-            tool_type: String::from("custom"),
+            tool_type: ChatCompletionToolType::Custom,
             extra: BTreeMap::new(),
         }
     }
@@ -1149,7 +1285,7 @@ impl From<Vec<String>> for ChatStop {
 pub struct ChatCompletionPredictionContent {
     pub content: ChatCompletionPredictionContentValue,
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionPredictionContentType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1158,7 +1294,7 @@ impl ChatCompletionPredictionContent {
     pub fn text(content: impl Into<String>) -> Self {
         Self {
             content: ChatCompletionPredictionContentValue::Text(content.into()),
-            content_type: String::from("content"),
+            content_type: ChatCompletionPredictionContentType::Content,
             extra: BTreeMap::new(),
         }
     }
@@ -1166,7 +1302,7 @@ impl ChatCompletionPredictionContent {
     pub fn parts(content: Vec<ChatCompletionContentPartText>) -> Self {
         Self {
             content: ChatCompletionPredictionContentValue::TextParts(content),
-            content_type: String::from("content"),
+            content_type: ChatCompletionPredictionContentType::Content,
             extra: BTreeMap::new(),
         }
     }
@@ -1202,7 +1338,7 @@ impl From<Vec<ChatCompletionContentPartText>> for ChatCompletionPredictionConten
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ChatCompletionContentPartText {
     #[serde(rename = "type")]
-    pub content_type: String,
+    pub content_type: ChatCompletionContentPartType,
     pub text: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -1211,7 +1347,7 @@ pub struct ChatCompletionContentPartText {
 impl ChatCompletionContentPartText {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
-            content_type: String::from("text"),
+            content_type: ChatCompletionContentPartType::Text,
             text: text.into(),
             extra: BTreeMap::new(),
         }
@@ -1303,7 +1439,7 @@ pub struct ChatWebSearchOptions {
 pub struct ChatWebSearchUserLocation {
     pub approximate: ChatWebSearchUserLocationApproximate,
     #[serde(rename = "type")]
-    pub location_type: String,
+    pub location_type: ChatWebSearchUserLocationType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1312,7 +1448,7 @@ impl ChatWebSearchUserLocation {
     pub fn approximate(approximate: ChatWebSearchUserLocationApproximate) -> Self {
         Self {
             approximate,
-            location_type: String::from("approximate"),
+            location_type: ChatWebSearchUserLocationType::Approximate,
             extra: BTreeMap::new(),
         }
     }
@@ -1448,7 +1584,7 @@ pub struct ChatCompletionNamedToolChoiceCustom {
 pub struct ChatCompletionAllowedToolChoice {
     pub allowed_tools: ChatCompletionAllowedTools,
     #[serde(rename = "type")]
-    pub choice_type: String,
+    pub choice_type: ChatCompletionAllowedToolChoiceType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1457,7 +1593,7 @@ impl ChatCompletionAllowedToolChoice {
     pub fn new(allowed_tools: ChatCompletionAllowedTools) -> Self {
         Self {
             allowed_tools,
-            choice_type: String::from("allowed_tools"),
+            choice_type: ChatCompletionAllowedToolChoiceType::AllowedTools,
             extra: BTreeMap::new(),
         }
     }
@@ -1466,7 +1602,7 @@ impl ChatCompletionAllowedToolChoice {
 /// Set of tools allowed by a constrained chat tool choice.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatCompletionAllowedTools {
-    pub mode: String,
+    pub mode: ChatCompletionAllowedToolsMode,
     pub tools: Vec<BTreeMap<String, Value>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -1497,7 +1633,7 @@ impl From<ChatCompletionCustomTool> for ChatCompletionTool {
 pub struct ChatCompletionFunctionTool {
     pub function: ChatCompletionFunctionDefinition,
     #[serde(rename = "type")]
-    pub tool_type: String,
+    pub tool_type: ChatCompletionToolType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1506,7 +1642,7 @@ impl ChatCompletionFunctionTool {
     pub fn new(function: ChatCompletionFunctionDefinition) -> Self {
         Self {
             function,
-            tool_type: String::from("function"),
+            tool_type: ChatCompletionToolType::Function,
             extra: BTreeMap::new(),
         }
     }
@@ -1531,7 +1667,7 @@ pub struct ChatCompletionFunctionDefinition {
 pub struct ChatCompletionCustomTool {
     pub custom: ChatCompletionCustomToolConfig,
     #[serde(rename = "type")]
-    pub tool_type: String,
+    pub tool_type: ChatCompletionToolType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1540,7 +1676,7 @@ impl ChatCompletionCustomTool {
     pub fn new(custom: ChatCompletionCustomToolConfig) -> Self {
         Self {
             custom,
-            tool_type: String::from("custom"),
+            tool_type: ChatCompletionToolType::Custom,
             extra: BTreeMap::new(),
         }
     }
@@ -1593,7 +1729,7 @@ impl Serialize for ChatCompletionCustomToolFormat {
 pub struct ChatCompletionCustomToolGrammarFormat {
     pub grammar: ChatCompletionCustomToolGrammar,
     #[serde(rename = "type")]
-    pub format_type: String,
+    pub format_type: ChatCompletionCustomToolFormatType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1602,7 +1738,7 @@ impl ChatCompletionCustomToolGrammarFormat {
     pub fn new(grammar: ChatCompletionCustomToolGrammar) -> Self {
         Self {
             grammar,
-            format_type: String::from("grammar"),
+            format_type: ChatCompletionCustomToolFormatType::Grammar,
             extra: BTreeMap::new(),
         }
     }
@@ -1612,7 +1748,7 @@ impl ChatCompletionCustomToolGrammarFormat {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatCompletionCustomToolGrammar {
     pub definition: String,
-    pub syntax: String,
+    pub syntax: ChatCompletionCustomToolGrammarSyntax,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1795,7 +1931,7 @@ pub struct ChatCompletionMessageToolCall {
     #[serde(default)]
     pub index: Option<usize>,
     #[serde(rename = "type", default)]
-    pub tool_type: Option<String>,
+    pub tool_type: Option<ChatCompletionToolType>,
     #[serde(default)]
     pub function: ToolCallFunction,
     #[serde(flatten)]
@@ -1965,7 +2101,7 @@ pub struct StoredChatCompletionMessage {
     #[serde(default)]
     pub object: Option<String>,
     #[serde(default)]
-    pub role: Option<String>,
+    pub role: Option<ChatCompletionRole>,
     #[serde(default)]
     pub content: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_default_vec")]
