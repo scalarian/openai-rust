@@ -129,6 +129,52 @@ realtime_string_literal_enum! {
     }
 }
 
+realtime_string_literal_enum! {
+    /// Realtime conversation item content kinds.
+    pub enum RealtimeConversationContentType {
+        InputText => "input_text",
+        InputAudio => "input_audio",
+        InputImage => "input_image",
+        ItemReference => "item_reference",
+        Text => "text",
+        Audio => "audio",
+        OutputText => "output_text",
+        OutputAudio => "output_audio",
+    }
+}
+
+realtime_string_literal_enum! {
+    /// Realtime conversation item kinds.
+    pub enum RealtimeConversationItemType {
+        Message => "message",
+        FunctionCall => "function_call",
+        FunctionCallOutput => "function_call_output",
+        McpApprovalRequest => "mcp_approval_request",
+        McpApprovalResponse => "mcp_approval_response",
+        McpListTools => "mcp_list_tools",
+        McpCall => "mcp_call",
+        ItemReference => "item_reference",
+    }
+}
+
+realtime_string_literal_enum! {
+    /// Realtime conversation message roles.
+    pub enum RealtimeConversationItemRole {
+        User => "user",
+        Assistant => "assistant",
+        System => "system",
+    }
+}
+
+realtime_string_literal_enum! {
+    /// Realtime conversation item statuses.
+    pub enum RealtimeConversationItemStatus {
+        Completed => "completed",
+        Incomplete => "incomplete",
+        InProgress => "in_progress",
+    }
+}
+
 /// Typed Realtime session configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeSessionConfig {
@@ -196,7 +242,7 @@ impl Default for RealtimeSessionConfig {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeConversationMessageContentPart {
     #[serde(rename = "type")]
-    pub part_type: String,
+    pub part_type: RealtimeConversationContentType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -210,7 +256,7 @@ pub struct RealtimeConversationMessageContentPart {
 impl RealtimeConversationMessageContentPart {
     pub fn input_text(text: impl Into<String>) -> Self {
         Self {
-            part_type: String::from("input_text"),
+            part_type: RealtimeConversationContentType::InputText,
             text: Some(text.into()),
             audio: None,
             transcript: None,
@@ -225,13 +271,13 @@ pub struct RealtimeConversationItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(rename = "type")]
-    pub item_type: String,
+    pub item_type: RealtimeConversationItemType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
+    pub role: Option<RealtimeConversationItemRole>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub content: Vec<RealtimeConversationMessageContentPart>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<RealtimeConversationItemStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -247,8 +293,8 @@ pub struct RealtimeConversationItem {
 impl RealtimeConversationItem {
     pub fn user_message(content: Vec<RealtimeConversationMessageContentPart>) -> Self {
         Self {
-            item_type: String::from("message"),
-            role: Some(String::from("user")),
+            item_type: RealtimeConversationItemType::Message,
+            role: Some(RealtimeConversationItemRole::User),
             content,
             ..Default::default()
         }

@@ -3,8 +3,8 @@ use serde_json::Value;
 use crate::{OpenAIError, error::ErrorKind};
 
 use super::events::{
-    RealtimeConversationItem, RealtimeConversationMessageContentPart, RealtimeServerEvent,
-    RealtimeSessionConfig,
+    RealtimeConversationItem, RealtimeConversationItemStatus,
+    RealtimeConversationMessageContentPart, RealtimeServerEvent, RealtimeSessionConfig,
 };
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -439,7 +439,9 @@ impl RealtimeEventState {
                 ..
             } => {
                 let item = self.response_item_mut(*output_index)?;
-                item.status = Some(status_from_event_type(event_type).to_string());
+                item.status = Some(RealtimeConversationItemStatus::from(
+                    status_from_event_type(event_type),
+                ));
                 self.current_response_mut()?.sync_response();
             }
             RealtimeServerEvent::OutputAudioBufferStarted { .. }

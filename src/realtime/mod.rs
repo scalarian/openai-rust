@@ -14,9 +14,10 @@ pub use client::{
     RealtimeSessionResource, RealtimeSessionTTL, RealtimeSessionTTLAnchor,
 };
 pub use events::{
-    RealtimeClientEvent, RealtimeConversationItem, RealtimeConversationMessageContentPart,
-    RealtimeErrorInfo, RealtimeInclude, RealtimeOutputModality, RealtimeResponseCreateParams,
-    RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, decode_server_event,
-    decode_server_event_text,
+    RealtimeClientEvent, RealtimeConversationContentType, RealtimeConversationItem,
+    RealtimeConversationItemRole, RealtimeConversationItemStatus, RealtimeConversationItemType,
+    RealtimeConversationMessageContentPart, RealtimeErrorInfo, RealtimeInclude,
+    RealtimeOutputModality, RealtimeResponseCreateParams, RealtimeServerEvent,
+    RealtimeSessionConfig, RealtimeSessionType, decode_server_event, decode_server_event_text,
 };
 pub use state::{RealtimeAudioBufferState, RealtimeEventState, RealtimeResponseState};

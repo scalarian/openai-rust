@@ -1,4 +1,7 @@
-use openai_rust::realtime::{RealtimeEventState, RealtimeServerEvent, decode_server_event};
+use openai_rust::realtime::{
+    RealtimeConversationContentType, RealtimeConversationItemRole, RealtimeConversationItemStatus,
+    RealtimeConversationItemType, RealtimeEventState, RealtimeServerEvent, decode_server_event,
+};
 use serde_json::json;
 
 #[test]
@@ -75,6 +78,19 @@ fn audio_buffer_commit_and_truncation_preserve_conversation_state() {
     assert!(buffer.cleared);
 
     let assistant = state.conversation_item("asst_1").expect("assistant item");
+    assert_eq!(assistant.item_type, RealtimeConversationItemType::Message);
+    assert_eq!(
+        assistant.role,
+        Some(RealtimeConversationItemRole::Assistant)
+    );
+    assert_eq!(
+        assistant.status,
+        Some(RealtimeConversationItemStatus::Completed)
+    );
+    assert_eq!(
+        assistant.content[0].part_type,
+        RealtimeConversationContentType::Audio
+    );
     assert_eq!(
         assistant.content[0].extra.get("audio_end_ms"),
         Some(&json!(240))
@@ -82,6 +98,12 @@ fn audio_buffer_commit_and_truncation_preserve_conversation_state() {
     assert_eq!(assistant.content[0].transcript.as_deref(), Some(""));
 
     let user_item = state.conversation_item("user_audio_1").expect("user item");
+    assert_eq!(user_item.item_type, RealtimeConversationItemType::Message);
+    assert_eq!(user_item.role, Some(RealtimeConversationItemRole::User));
+    assert_eq!(
+        user_item.content[0].part_type,
+        RealtimeConversationContentType::InputAudio
+    );
     assert_eq!(user_item.content[0].audio.as_deref(), Some("AQID"));
     assert_eq!(user_item.content[0].transcript.as_deref(), Some("hello"));
 
