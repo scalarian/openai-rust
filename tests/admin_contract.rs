@@ -5,7 +5,28 @@ use openai_rust::{
     ErrorKind, OpenAI,
     resources::{admin::*, common::ListOrder},
 };
-use serde_json::json;
+use serde_json::{Value, json};
+
+fn project_api_key_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_171_800u64,
+        "last_used_at": null,
+        "name": "project-key",
+        "object": "organization.project.api_key",
+        "owner": {
+            "type": "user",
+            "user": {
+                "id": "user_project",
+                "created_at": 1_717_171_500u64,
+                "email": "project@example.com",
+                "name": "Project User",
+                "role": "owner"
+            }
+        },
+        "redacted_value": "sk-project-...0"
+    })
+}
 
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
@@ -67,6 +88,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     responses.extend(
         (4..23).map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string())),
     );
+    responses[17] = json_response(project_api_key_json("key_project").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -213,10 +235,18 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    let project_key = projects
         .api_keys()
         .retrieve("proj_research", "key_project")
         .unwrap();
+    assert_eq!(
+        project_key.output.object,
+        ProjectApiKeyObject::OrganizationProjectApiKey
+    );
+    assert_eq!(
+        project_key.output.owner.owner_type,
+        Some(ProjectApiKeyOwnerType::User)
+    );
     projects
         .rate_limits()
         .update_rate_limit(
@@ -634,12 +664,18 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
 
 #[test]
 fn admin_project_typed_params_preserve_queries_and_bodies() {
-    let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..21)
-            .map(|index| json_response(json!({"id": format!("typed_project_{index}")}).to_string()))
-            .collect(),
-    )
-    .unwrap();
+    let mut responses = (0..21)
+        .map(|index| json_response(json!({"id": format!("typed_project_{index}")}).to_string()))
+        .collect::<Vec<_>>();
+    responses[7] = json_response(
+        json!({
+            "data": [project_api_key_json("key_project")],
+            "has_more": true,
+            "last_id": "key_project"
+        })
+        .to_string(),
+    );
+    let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let projects = client.admin().organization().projects();
 
@@ -719,7 +755,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         )
         .unwrap();
 
-    projects
+    let project_keys = projects
         .api_keys()
         .list(
             "proj_research",
@@ -729,6 +765,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(project_keys.output.data[0].id, "key_project");
+    assert_eq!(project_keys.output.next_after(), Some("key_project"));
     projects
         .rate_limits()
         .list_rate_limits(
@@ -930,6 +968,40 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     assert_eq!(
         project_alert_body["notification_channel"],
         json!({"type": "email", "recipients": ["ops@example.com"]})
+    );
+}
+
+#[test]
+fn admin_project_api_key_delete_returns_typed_confirmation() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(
+        json!({
+            "id": "key_project",
+            "deleted": true,
+            "object": "organization.project.api_key.deleted"
+        })
+        .to_string(),
+    )])
+    .unwrap();
+    let client = client(&server.url());
+
+    let deleted = client
+        .admin()
+        .organization()
+        .projects()
+        .api_keys()
+        .delete("proj_research", "key_project")
+        .unwrap();
+
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        ProjectApiKeyDeletedObject::OrganizationProjectApiKeyDeleted
+    );
+    let requests = server.captured_requests(1).unwrap();
+    assert_eq!(requests[0].method, "DELETE");
+    assert_eq!(
+        requests[0].path,
+        "/v1/organization/projects/proj_research/api_keys/key_project"
     );
 }
 

@@ -142,6 +142,28 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project API key object type.
+    pub enum ProjectApiKeyObject {
+        OrganizationProjectApiKey => "organization.project.api_key",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Project API key deletion object type.
+    pub enum ProjectApiKeyDeletedObject {
+        OrganizationProjectApiKeyDeleted => "organization.project.api_key.deleted",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Owner type for a project API key.
+    pub enum ProjectApiKeyOwnerType {
+        User => "user",
+        ServiceAccount => "service_account",
+    }
+}
+
+admin_string_literal_enum! {
     /// Organization invite role.
     pub enum AdminInviteRole {
         Reader => "reader",
@@ -634,6 +656,34 @@ impl AdminCursorPage<AdminApiKey> {
 
 pub type AdminApiKeyListResponse = AdminCursorPage<AdminApiKey>;
 
+/// Conversation-style cursor page returned by admin list endpoints.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminConversationCursorPage<T> {
+    #[serde(default)]
+    pub object: Option<String>,
+    pub data: Vec<T>,
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    #[serde(default)]
+    pub last_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl<T> AdminConversationCursorPage<T> {
+    pub fn has_next_page(&self) -> bool {
+        self.has_more != Some(false) && self.last_id.is_some()
+    }
+
+    pub fn next_after(&self) -> Option<&str> {
+        if self.has_next_page() {
+            self.last_id.as_deref()
+        } else {
+            None
+        }
+    }
+}
+
 /// Organization invite creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminInviteCreateParams {
@@ -1069,6 +1119,69 @@ impl From<AdminProjectApiKeyListParams> for AdminQueryParams {
             .push_opt("limit", value.limit)
     }
 }
+
+/// Service account that owns a project API key.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ProjectApiKeyOwnerServiceAccount {
+    pub id: String,
+    pub created_at: u64,
+    pub name: String,
+    pub role: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// User that owns a project API key.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ProjectApiKeyOwnerUser {
+    pub id: String,
+    pub created_at: u64,
+    pub email: String,
+    pub name: String,
+    pub role: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Owner information attached to a project API key.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ProjectApiKeyOwner {
+    #[serde(default)]
+    pub service_account: Option<ProjectApiKeyOwnerServiceAccount>,
+    #[serde(default, rename = "type")]
+    pub owner_type: Option<ProjectApiKeyOwnerType>,
+    #[serde(default)]
+    pub user: Option<ProjectApiKeyOwnerUser>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual API key in a project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ProjectApiKey {
+    pub id: String,
+    pub created_at: u64,
+    #[serde(default)]
+    pub last_used_at: Option<u64>,
+    pub name: String,
+    pub object: ProjectApiKeyObject,
+    pub owner: ProjectApiKeyOwner,
+    pub redacted_value: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Project API key deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ProjectApiKeyDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: ProjectApiKeyDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type ProjectApiKeyListResponse = AdminConversationCursorPage<ProjectApiKey>;
 
 /// Project rate-limit list query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -2738,12 +2851,13 @@ impl ProjectApiKeys {
         &self,
         project_id: &str,
         api_key_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<ProjectApiKey>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let api_key_id = path_id("api_key_id", api_key_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}/api_keys/{api_key_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -2751,12 +2865,15 @@ impl ProjectApiKeys {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<ProjectApiKeyListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/api_keys"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/api_keys"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -2764,12 +2881,13 @@ impl ProjectApiKeys {
         &self,
         project_id: &str,
         api_key_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<ProjectApiKeyDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let api_key_id = path_id("api_key_id", api_key_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/projects/{project_id}/api_keys/{api_key_id}"),
+            RequestOptions::default(),
         )
     }
 }
