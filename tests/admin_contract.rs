@@ -241,6 +241,39 @@ fn project_spend_alert_json(id: &str, threshold_amount: i64) -> Value {
     })
 }
 
+fn certificate_json(
+    id: &str,
+    object: &str,
+    name: &str,
+    active: Option<bool>,
+    content: Option<&str>,
+) -> Value {
+    let mut certificate = json!({
+        "id": id,
+        "certificate_details": {
+            "expires_at": 1_817_171_700u64,
+            "valid_at": 1_717_171_700u64
+        },
+        "created_at": 1_717_171_700u64,
+        "name": name,
+        "object": object
+    });
+    if let Some(active) = active {
+        certificate["active"] = json!(active);
+    }
+    if let Some(content) = content {
+        certificate["certificate_details"]["content"] = json!(content);
+    }
+    certificate
+}
+
+fn certificate_action_page_json(certificate: Value) -> Value {
+    json!({
+        "object": "list",
+        "data": [certificate]
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -319,6 +352,16 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         })
         .to_string(),
     );
+    responses[8] = json_response(
+        certificate_action_page_json(certificate_json(
+            "cert_org",
+            "organization.certificate",
+            "org-cert",
+            Some(true),
+            None,
+        ))
+        .to_string(),
+    );
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -395,11 +438,17 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    org.certificates()
+    let activated_certificates = org
+        .certificates()
         .activate(AdminCertificateIdsParams {
             certificate_ids: vec![String::from("cert_org")],
         })
         .unwrap();
+    assert_eq!(activated_certificates.output.data[0].id, "cert_org");
+    assert_eq!(
+        activated_certificates.output.data[0].object,
+        AdminCertificateObject::OrganizationCertificate
+    );
 
     let projects = org.projects();
     projects
@@ -682,6 +731,48 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
+    responses[16] = json_response(
+        certificate_json("cert_org", "certificate", "org-cert", None, None).to_string(),
+    );
+    responses[17] = json_response(
+        certificate_json(
+            "cert_org",
+            "certificate",
+            "org-cert",
+            None,
+            Some("-----BEGIN CERTIFICATE-----"),
+        )
+        .to_string(),
+    );
+    responses[18] = json_response(
+        json!({
+            "data": [
+                certificate_json(
+                    "cert_org",
+                    "organization.certificate",
+                    "org-cert",
+                    Some(true),
+                    None
+                )
+            ],
+            "has_more": true,
+            "last_id": "cert_org"
+        })
+        .to_string(),
+    );
+    responses[19] = json_response(
+        certificate_json("cert_org", "certificate", "org-cert-renamed", None, None).to_string(),
+    );
+    responses[20] = json_response(
+        certificate_action_page_json(certificate_json(
+            "cert_org",
+            "organization.certificate",
+            "org-cert-renamed",
+            Some(false),
+            None,
+        ))
+        .to_string(),
+    );
     responses[21] = json_response(organization_spend_alert_json("alert_ops", 10_000).to_string());
     responses[22] = json_response(
         json!({
@@ -907,13 +998,19 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         AdminOrganizationDataRetentionType::ZeroDataRetention
     );
 
-    org.certificates()
+    let created_certificate = org
+        .certificates()
         .create(AdminCertificateCreateParams {
             certificate: String::from("-----BEGIN CERTIFICATE-----"),
             name: String::from("org-cert"),
         })
         .unwrap();
-    org.certificates()
+    assert_eq!(
+        created_certificate.output.object,
+        AdminCertificateObject::Certificate
+    );
+    let retrieved_certificate = org
+        .certificates()
         .retrieve(
             "cert_org",
             AdminCertificateRetrieveParams {
@@ -921,14 +1018,26 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    org.certificates()
+    assert_eq!(
+        retrieved_certificate
+            .output
+            .certificate_details
+            .content
+            .as_deref(),
+        Some("-----BEGIN CERTIFICATE-----")
+    );
+    let certificates = org
+        .certificates()
         .list(AdminCertificateListParams {
             after: Some(String::from("cert_after")),
             limit: Some(12),
             order: Some(ListOrder::Asc),
         })
         .unwrap();
-    org.certificates()
+    assert_eq!(certificates.output.data[0].active, Some(true));
+    assert_eq!(certificates.output.next_after(), Some("cert_org"));
+    let updated_certificate = org
+        .certificates()
         .update(
             "cert_org",
             AdminCertificateUpdateParams {
@@ -936,11 +1045,17 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    org.certificates()
+    assert_eq!(
+        updated_certificate.output.name.as_deref(),
+        Some("org-cert-renamed")
+    );
+    let deactivated_certificates = org
+        .certificates()
         .deactivate(AdminCertificateIdsParams {
             certificate_ids: vec![String::from("cert_org")],
         })
         .unwrap();
+    assert_eq!(deactivated_certificates.output.data[0].active, Some(false));
 
     let created_alert = org
         .spend_alerts()
@@ -1850,6 +1965,35 @@ fn admin_project_spend_alert_delete_returns_typed_response() {
         requests[0].path,
         "/v1/organization/projects/proj_research/spend_alerts/alert_project"
     );
+}
+
+#[test]
+fn admin_certificate_delete_returns_typed_response() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(
+        json!({
+            "id": "cert_org",
+            "object": "certificate.deleted"
+        })
+        .to_string(),
+    )])
+    .unwrap();
+    let client = client(&server.url());
+
+    let deleted = client
+        .admin()
+        .organization()
+        .certificates()
+        .delete("cert_org")
+        .unwrap();
+    assert_eq!(deleted.output.id, "cert_org");
+    assert_eq!(
+        deleted.output.object,
+        AdminCertificateDeletedObject::CertificateDeleted
+    );
+
+    let requests = server.captured_requests(1).unwrap();
+    assert_eq!(requests[0].method, "DELETE");
+    assert_eq!(requests[0].path, "/v1/organization/certificates/cert_org");
 }
 
 #[test]

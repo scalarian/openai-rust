@@ -410,6 +410,22 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Certificate object type.
+    pub enum AdminCertificateObject {
+        Certificate => "certificate",
+        OrganizationCertificate => "organization.certificate",
+        OrganizationProjectCertificate => "organization.project.certificate",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Certificate deletion object type.
+    pub enum AdminCertificateDeletedObject {
+        CertificateDeleted => "certificate.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Audit-log event type filter.
     pub enum AdminAuditLogEventType {
         ApiKeyCreated => "api_key.created",
@@ -874,6 +890,15 @@ impl<T> AdminNextCursorPage<T> {
             None
         }
     }
+}
+
+/// Non-paginated list page returned by admin bulk action endpoints.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminPage<T> {
+    pub data: Vec<T>,
+    pub object: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Organization invite creation body.
@@ -1444,6 +1469,46 @@ impl From<AdminCertificateListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+/// Certificate validity and optional PEM details.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminCertificateDetails {
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub expires_at: Option<u64>,
+    #[serde(default)]
+    pub valid_at: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual certificate uploaded to the organization.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminCertificate {
+    pub id: String,
+    #[serde(default)]
+    pub active: Option<bool>,
+    pub certificate_details: AdminCertificateDetails,
+    pub created_at: u64,
+    #[serde(default)]
+    pub name: Option<String>,
+    pub object: AdminCertificateObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting a certificate.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminCertificateDeleteResponse {
+    pub id: String,
+    pub object: AdminCertificateDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminCertificateListResponse = AdminConversationCursorPage<AdminCertificate>;
+pub type AdminCertificateActionResponse = AdminPage<AdminCertificate>;
 
 /// Organization data-retention update body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -3187,20 +3252,31 @@ impl OrganizationCertificates {
         Self { runtime }
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/certificates", params)
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<AdminCertificate>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/certificates",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
     pub fn retrieve(
         &self,
         certificate_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminCertificate>, OpenAIError> {
         let certificate_id = path_id("certificate_id", certificate_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/certificates/{certificate_id}"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/certificates/{certificate_id}"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -3208,45 +3284,60 @@ impl OrganizationCertificates {
         &self,
         certificate_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminCertificate>, OpenAIError> {
         let certificate_id = path_id("certificate_id", certificate_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/certificates/{certificate_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/certificates", params)
+    ) -> Result<ApiResponse<AdminCertificateListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/certificates", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, certificate_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        certificate_id: &str,
+    ) -> Result<ApiResponse<AdminCertificateDeleteResponse>, OpenAIError> {
         let certificate_id = path_id("certificate_id", certificate_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/certificates/{certificate_id}"),
+            RequestOptions::default(),
         )
     }
 
     pub fn activate<B: Serialize>(
         &self,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/certificates/activate", params)
+    ) -> Result<ApiResponse<AdminCertificateActionResponse>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/certificates/activate",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
     pub fn deactivate<B: Serialize>(
         &self,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(
-            &self.runtime,
+    ) -> Result<ApiResponse<AdminCertificateActionResponse>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
             "/organization/certificates/deactivate",
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 }
