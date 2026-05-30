@@ -85,11 +85,61 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["truncation"], "auto");
     assert_eq!(body["user"], "legacy-user");
     assert_eq!(response.output().id, "resp_create");
+    assert_eq!(response.output().object, "response");
+    assert_eq!(response.output().created_at, 1.25);
+    assert_eq!(response.output().status.as_deref(), Some("completed"));
+    assert_eq!(response.output().model.as_deref(), Some("gpt-4.1-nano"));
+    assert_eq!(
+        response.output().instructions,
+        Some(json!("Server instructions"))
+    );
+    assert_eq!(response.output().parallel_tool_calls, Some(true));
     assert_eq!(
         response.output().previous_response_id.as_deref(),
         Some("resp_prev")
     );
+    assert_eq!(response.output().conversation, Some(json!("conv_123")));
     assert_eq!(response.output().store, Some(true));
+    assert_eq!(response.output().background, Some(false));
+    assert_eq!(response.output().completed_at, Some(2.5));
+    assert_eq!(response.output().max_output_tokens, Some(512));
+    assert_eq!(response.output().max_tool_calls, Some(4));
+    assert_eq!(
+        response.output().prompt,
+        Some(json!({"id": "pmpt_response", "variables": {"topic": "Rust"}}))
+    );
+    assert_eq!(
+        response.output().prompt_cache_key.as_deref(),
+        Some("response-cache-key")
+    );
+    assert_eq!(
+        response.output().prompt_cache_retention.as_deref(),
+        Some("24h")
+    );
+    assert_eq!(response.output().reasoning, Some(json!({"effort": "low"})));
+    assert_eq!(
+        response.output().safety_identifier.as_deref(),
+        Some("response_user_hash")
+    );
+    assert_eq!(response.output().service_tier.as_deref(), Some("priority"));
+    assert_eq!(response.output().temperature, Some(0.2));
+    assert_eq!(
+        response.output().text,
+        Some(json!({"format": {"type": "text"}}))
+    );
+    assert_eq!(response.output().tool_choice, Some(json!("auto")));
+    assert_eq!(
+        response.output().tools,
+        vec![json!({"type": "web_search_preview"})]
+    );
+    assert_eq!(response.output().top_logprobs, Some(2));
+    assert_eq!(response.output().top_p, Some(0.8));
+    assert_eq!(response.output().truncation.as_deref(), Some("auto"));
+    assert_eq!(response.output().user.as_deref(), Some("legacy-user"));
+    assert_eq!(
+        response.output().metadata,
+        Some(json!({"trace": "response_payload"}))
+    );
     assert_eq!(response.output().output_text(), "Hello world!");
 }
 
@@ -472,12 +522,17 @@ fn response_payload(
     json!({
         "id": id,
         "object": "response",
-        "created_at": 1,
+        "created_at": 1.25,
         "status": "completed",
         "background": false,
+        "completed_at": 2.5,
         "error": null,
         "incomplete_details": null,
+        "instructions": "Server instructions",
+        "metadata": {"trace": "response_payload"},
         "model": "gpt-4.1-nano",
+        "max_output_tokens": 512,
+        "max_tool_calls": 4,
         "output": [
             {
                 "id": "msg_1",
@@ -506,8 +561,20 @@ fn response_payload(
         "previous_response_id": previous_response_id,
         "conversation": conversation,
         "store": store,
+        "prompt": {"id": "pmpt_response", "variables": {"topic": "Rust"}},
+        "prompt_cache_key": "response-cache-key",
+        "prompt_cache_retention": "24h",
+        "reasoning": {"effort": "low"},
+        "safety_identifier": "response_user_hash",
+        "service_tier": "priority",
+        "temperature": 0.2,
+        "text": {"format": {"type": "text"}},
         "tool_choice": "auto",
-        "tools": [],
+        "tools": [{"type": "web_search_preview"}],
+        "top_logprobs": 2,
+        "top_p": 0.8,
+        "truncation": "auto",
+        "user": "legacy-user",
         "usage": {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}
     })
     .to_string()
