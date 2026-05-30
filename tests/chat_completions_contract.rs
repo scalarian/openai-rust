@@ -1,4 +1,9 @@
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::chat::{
+        ChatCompletionAudioParams, ChatCompletionStreamOptions, ChatCompletionVoice, ChatStop,
+    },
+};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -31,7 +36,11 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 "role": "user",
                 "content": "Say hello"
             })],
-            audio: Some(json!({"voice": "alloy", "format": "wav"})),
+            audio: Some(ChatCompletionAudioParams {
+                format: String::from("wav"),
+                voice: ChatCompletionVoice::from("alloy"),
+                extra: BTreeMap::new(),
+            }),
             frequency_penalty: Some(0.1),
             function_call: Some(json!("auto")),
             functions: Some(vec![json!({
@@ -59,9 +68,12 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             safety_identifier: Some(String::from("user_hash")),
             seed: Some(7),
             service_tier: Some(String::from("priority")),
-            stop: Some(json!(["END"])),
+            stop: Some(ChatStop::Strings(vec![String::from("END")])),
             stream: Some(false),
-            stream_options: Some(json!({"include_usage": true})),
+            stream_options: Some(ChatCompletionStreamOptions {
+                include_usage: Some(true),
+                ..Default::default()
+            }),
             temperature: Some(0.3),
             tool_choice: Some(json!("auto")),
             tools: Some(vec![json!({

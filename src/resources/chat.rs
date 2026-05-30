@@ -170,7 +170,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub messages: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio: Option<Value>,
+    pub audio: Option<ChatCompletionAudioParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -212,13 +212,13 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stop: Option<Value>,
+    pub stop: Option<ChatStop>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_options: Option<Value>,
+    pub stream_options: Option<ChatCompletionStreamOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -262,6 +262,86 @@ impl ChatCompletionCreateParams {
             object.insert(String::from("stream"), Value::Bool(stream));
         }
         value
+    }
+}
+
+/// Parameters for audio output from chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionAudioParams {
+    pub format: String,
+    pub voice: ChatCompletionVoice,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Built-in voice name or custom voice object.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionVoice {
+    Name(String),
+    Custom(ChatCompletionVoiceId),
+}
+
+impl Default for ChatCompletionVoice {
+    fn default() -> Self {
+        Self::Name(String::new())
+    }
+}
+
+impl From<String> for ChatCompletionVoice {
+    fn from(value: String) -> Self {
+        Self::Name(value)
+    }
+}
+
+impl From<&str> for ChatCompletionVoice {
+    fn from(value: &str) -> Self {
+        Self::Name(value.to_string())
+    }
+}
+
+/// Custom voice reference for chat completion audio.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionVoiceId {
+    pub id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Streaming options for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionStreamOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_obfuscation: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_usage: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Stop sequence configuration for chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatStop {
+    String(String),
+    Strings(Vec<String>),
+}
+
+impl From<String> for ChatStop {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for ChatStop {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Vec<String>> for ChatStop {
+    fn from(value: Vec<String>) -> Self {
+        Self::Strings(value)
     }
 }
 
