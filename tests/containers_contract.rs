@@ -4,10 +4,12 @@ mod mock_http;
 use openai_rust::{
     DEFAULT_BASE_URL, ErrorKind, OpenAI,
     resources::containers::{
-        ContainerCreateParams, ContainerExpiresAfter, ContainerInlineSkill,
-        ContainerInlineSkillSource, ContainerListParams, ContainerMemoryLimit,
-        ContainerNetworkPolicy, ContainerOrder, ContainerReadNetworkPolicy, ContainerSkill,
-        ContainerSkillReference, ContainerStatus, DomainSecret,
+        ContainerCreateParams, ContainerExpiresAfter, ContainerExpiresAnchor, ContainerInlineSkill,
+        ContainerInlineSkillSource, ContainerInlineSkillSourceMediaType,
+        ContainerInlineSkillSourceType, ContainerInlineSkillType, ContainerListParams,
+        ContainerMemoryLimit, ContainerNetworkPolicy, ContainerOrder, ContainerReadNetworkPolicy,
+        ContainerSkill, ContainerSkillReference, ContainerSkillReferenceType, ContainerStatus,
+        DomainSecret,
     },
 };
 use serde_json::json;
@@ -28,7 +30,7 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
         .create(ContainerCreateParams {
             name: String::from("code-interpreter"),
             expires_after: Some(ContainerExpiresAfter {
-                anchor: String::from("last_active_at"),
+                anchor: ContainerExpiresAnchor::LastActiveAt,
                 minutes: 20,
             }),
             file_ids: Some(vec![String::from("file_alpha"), String::from("file_beta")]),
@@ -60,6 +62,10 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     assert_eq!(created.output.name, "code-interpreter");
     assert_eq!(created.output.memory_limit, Some(ContainerMemoryLimit::G4));
     assert_eq!(created.output.status, Some(ContainerStatus::Active));
+    assert_eq!(
+        created.output.expires_after.as_ref().unwrap().anchor,
+        Some(ContainerExpiresAnchor::LastActiveAt)
+    );
     match created.output.network_policy.as_ref().unwrap() {
         ContainerReadNetworkPolicy::Allowlist { allowed_domains } => {
             assert_eq!(
@@ -75,6 +81,10 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     assert_eq!(
         retrieved.output.expires_after.as_ref().unwrap().minutes,
         Some(20)
+    );
+    assert_eq!(
+        retrieved.output.expires_after.as_ref().unwrap().anchor,
+        Some(ContainerExpiresAnchor::LastActiveAt)
     );
 
     let listed = client
@@ -125,6 +135,27 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     );
     assert_eq!(create_body["skills"][0]["type"], json!("skill_reference"));
     assert_eq!(create_body["skills"][1]["type"], json!("inline"));
+    assert_eq!(
+        ContainerSkillReference::new("skill_type").kind,
+        ContainerSkillReferenceType::SkillReference
+    );
+    assert_eq!(
+        ContainerInlineSkill::new(
+            "inline-type",
+            "inline type",
+            ContainerInlineSkillSource::new("UEsDBAoAAAAAA")
+        )
+        .kind,
+        ContainerInlineSkillType::Inline
+    );
+    assert_eq!(
+        ContainerInlineSkillSource::new("UEsDBAoAAAAAA").media_type,
+        ContainerInlineSkillSourceMediaType::ApplicationZip
+    );
+    assert_eq!(
+        ContainerInlineSkillSource::new("UEsDBAoAAAAAA").source_type,
+        ContainerInlineSkillSourceType::Base64
+    );
     assert_eq!(
         create_body["skills"][1]["source"]["media_type"],
         json!("application/zip")
@@ -182,7 +213,7 @@ fn live_containers_smoke_records_entitlement_failures_explicitly() {
     let create_result = client.containers().create(ContainerCreateParams {
         name: String::from("live-containers-smoke"),
         expires_after: Some(ContainerExpiresAfter {
-            anchor: String::from("last_active_at"),
+            anchor: ContainerExpiresAnchor::LastActiveAt,
             minutes: 20,
         }),
         file_ids: None,

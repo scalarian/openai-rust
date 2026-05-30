@@ -14,6 +14,153 @@ use crate::{
     resources::files::{encode_path_id, validate_path_id},
 };
 
+macro_rules! container_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
+container_string_literal_enum! {
+    /// Container expiration anchor accepted by create requests and returned by read endpoints.
+    pub enum ContainerExpiresAnchor {
+        LastActiveAt => "last_active_at",
+    }
+}
+
+container_string_literal_enum! {
+    /// Skill reference discriminator accepted by container create requests.
+    pub enum ContainerSkillReferenceType {
+        SkillReference => "skill_reference",
+    }
+}
+
+container_string_literal_enum! {
+    /// Inline skill discriminator accepted by container create requests.
+    pub enum ContainerInlineSkillType {
+        Inline => "inline",
+    }
+}
+
+container_string_literal_enum! {
+    /// Inline skill source media type accepted by container create requests.
+    pub enum ContainerInlineSkillSourceMediaType {
+        ApplicationZip => "application/zip",
+    }
+}
+
+container_string_literal_enum! {
+    /// Inline skill source discriminator accepted by container create requests.
+    pub enum ContainerInlineSkillSourceType {
+        Base64 => "base64",
+    }
+}
+
 /// Containers API family.
 #[derive(Clone, Debug)]
 pub struct Containers {
@@ -253,7 +400,7 @@ pub struct ContainerCreateParams {
 /// Container expiration policy.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContainerExpiresAfter {
-    pub anchor: String,
+    pub anchor: ContainerExpiresAnchor,
     pub minutes: u64,
 }
 
@@ -314,7 +461,7 @@ pub enum ContainerSkill {
 pub struct ContainerSkillReference {
     pub skill_id: String,
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: ContainerSkillReferenceType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -323,7 +470,7 @@ impl ContainerSkillReference {
     pub fn new(skill_id: impl Into<String>) -> Self {
         Self {
             skill_id: skill_id.into(),
-            kind: String::from("skill_reference"),
+            kind: ContainerSkillReferenceType::SkillReference,
             version: None,
         }
     }
@@ -336,7 +483,7 @@ pub struct ContainerInlineSkill {
     pub name: String,
     pub source: ContainerInlineSkillSource,
     #[serde(rename = "type")]
-    pub kind: String,
+    pub kind: ContainerInlineSkillType,
 }
 
 impl ContainerInlineSkill {
@@ -349,7 +496,7 @@ impl ContainerInlineSkill {
             description: description.into(),
             name: name.into(),
             source,
-            kind: String::from("inline"),
+            kind: ContainerInlineSkillType::Inline,
         }
     }
 }
@@ -358,17 +505,17 @@ impl ContainerInlineSkill {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ContainerInlineSkillSource {
     pub data: String,
-    pub media_type: String,
+    pub media_type: ContainerInlineSkillSourceMediaType,
     #[serde(rename = "type")]
-    pub source_type: String,
+    pub source_type: ContainerInlineSkillSourceType,
 }
 
 impl ContainerInlineSkillSource {
     pub fn new(data: impl Into<String>) -> Self {
         Self {
             data: data.into(),
-            media_type: String::from("application/zip"),
-            source_type: String::from("base64"),
+            media_type: ContainerInlineSkillSourceMediaType::ApplicationZip,
+            source_type: ContainerInlineSkillSourceType::Base64,
         }
     }
 }
@@ -436,7 +583,7 @@ impl<'de> Deserialize<'de> for ContainerStatus {
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 pub struct ContainerResponseExpiresAfter {
     #[serde(default)]
-    pub anchor: Option<String>,
+    pub anchor: Option<ContainerExpiresAnchor>,
     #[serde(default)]
     pub minutes: Option<u64>,
     #[serde(flatten)]
