@@ -129,7 +129,7 @@ pub struct BetaAssistantCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -156,7 +156,7 @@ pub struct BetaAssistantUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -165,6 +165,176 @@ pub struct BetaAssistantUpdateParams {
     pub tools: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
+}
+
+/// Deprecated beta assistant response format selector.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BetaAssistantResponseFormat {
+    Auto,
+    Text,
+    JsonObject,
+    JsonSchema(BetaAssistantResponseFormatJsonSchema),
+}
+
+impl Serialize for BetaAssistantResponseFormat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Text => {
+                #[derive(Serialize)]
+                struct TextFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                TextFormat {
+                    format_type: "text",
+                }
+                .serialize(serializer)
+            }
+            Self::JsonObject => {
+                #[derive(Serialize)]
+                struct JsonObjectFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                JsonObjectFormat {
+                    format_type: "json_object",
+                }
+                .serialize(serializer)
+            }
+            Self::JsonSchema(json_schema) => {
+                #[derive(Serialize)]
+                struct JsonSchemaFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                    json_schema: &'a BetaAssistantResponseFormatJsonSchema,
+                }
+
+                JsonSchemaFormat {
+                    format_type: "json_schema",
+                    json_schema,
+                }
+                .serialize(serializer)
+            }
+        }
+    }
+}
+
+/// JSON-schema response format payload for deprecated beta assistants.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantResponseFormatJsonSchema {
+    pub name: String,
+    pub schema: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta assistant tool-choice selector.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BetaAssistantToolChoice {
+    None,
+    Auto,
+    Required,
+    Function(BetaAssistantToolChoiceFunction),
+    CodeInterpreter,
+    FileSearch,
+}
+
+impl Serialize for BetaAssistantToolChoice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::None => serializer.serialize_str("none"),
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Required => serializer.serialize_str("required"),
+            Self::Function(function) => {
+                #[derive(Serialize)]
+                struct FunctionChoice<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'a str,
+                    function: &'a BetaAssistantToolChoiceFunction,
+                }
+
+                FunctionChoice {
+                    choice_type: "function",
+                    function,
+                }
+                .serialize(serializer)
+            }
+            Self::CodeInterpreter => {
+                #[derive(Serialize)]
+                struct ToolChoice<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'a str,
+                }
+
+                ToolChoice {
+                    choice_type: "code_interpreter",
+                }
+                .serialize(serializer)
+            }
+            Self::FileSearch => {
+                #[derive(Serialize)]
+                struct ToolChoice<'a> {
+                    #[serde(rename = "type")]
+                    choice_type: &'a str,
+                }
+
+                ToolChoice {
+                    choice_type: "file_search",
+                }
+                .serialize(serializer)
+            }
+        }
+    }
+}
+
+/// Function name for a deprecated beta assistant named tool choice.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaAssistantToolChoiceFunction {
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Deprecated beta thread/run truncation strategy.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaTruncationStrategy {
+    #[serde(rename = "type")]
+    pub strategy_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_messages: Option<u32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl BetaTruncationStrategy {
+    pub fn auto() -> Self {
+        Self {
+            strategy_type: String::from("auto"),
+            last_messages: None,
+            extra: BTreeMap::new(),
+        }
+    }
+
+    pub fn last_messages(last_messages: u32) -> Self {
+        Self {
+            strategy_type: String::from("last_messages"),
+            last_messages: Some(last_messages),
+            extra: BTreeMap::new(),
+        }
+    }
 }
 
 /// Deprecated beta assistant list parameters.
@@ -302,7 +472,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -310,7 +480,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thread: Option<BetaThreadCreateParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<BetaAssistantToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -318,7 +488,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncation_strategy: Option<Value>,
+    pub truncation_strategy: Option<BetaTruncationStrategy>,
 }
 
 /// Deprecated beta thread message endpoints.
@@ -688,19 +858,19 @@ pub struct BetaThreadRunCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<BetaAssistantToolChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncation_strategy: Option<Value>,
+    pub truncation_strategy: Option<BetaTruncationStrategy>,
 }
 
 /// Deprecated beta thread run update parameters.

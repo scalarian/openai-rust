@@ -7,13 +7,15 @@ use openai_rust::{
     ErrorKind, OpenAI,
     core::metadata::ResponseMetadata,
     resources::beta::{
-        BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
-        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions,
-        BetaThreadCreateAndRunParams, BetaThreadCreateParams, BetaThreadMessageCreateParams,
-        BetaThreadMessageListParams, BetaThreadMessageUpdateParams, BetaThreadRunCreateParams,
-        BetaThreadRunListParams, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
-        BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput, BetaThreadRunUpdateParams,
-        BetaThreadUpdateParams,
+        BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantResponseFormat,
+        BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantToolChoice,
+        BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams, BetaQueryParams,
+        BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
+        BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
+        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
+        BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
+        BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
+        BetaTruncationStrategy,
     },
 };
 use serde_json::json;
@@ -77,6 +79,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                         String::from("tier"),
                         String::from("gold"),
                     )])),
+                    response_format: Some(BetaAssistantResponseFormat::JsonObject),
                     reasoning_effort: Some(String::from("minimal")),
                     ..Default::default()
                 },
@@ -166,6 +169,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 assistant_id: String::from("asst_123"),
                 max_prompt_tokens: Some(512),
                 parallel_tool_calls: Some(true),
+                response_format: Some(BetaAssistantResponseFormat::Text),
+                tool_choice: Some(BetaAssistantToolChoice::Function(
+                    BetaAssistantToolChoiceFunction {
+                        name: String::from("lookup_case"),
+                        ..Default::default()
+                    },
+                )),
+                truncation_strategy: Some(BetaTruncationStrategy::last_messages(4)),
                 thread: Some(BetaThreadCreateParams {
                     messages: Some(vec![BetaThreadMessageCreateParams {
                         role: String::from("user"),
@@ -259,7 +270,23 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 max_completion_tokens: Some(256),
                 parallel_tool_calls: Some(true),
                 reasoning_effort: Some(String::from("low")),
+                response_format: Some(BetaAssistantResponseFormat::JsonSchema(
+                    BetaAssistantResponseFormatJsonSchema {
+                        name: String::from("status_update"),
+                        schema: json!({
+                            "type": "object",
+                            "properties": {
+                                "status": {"type": "string"}
+                            },
+                            "required": ["status"]
+                        }),
+                        strict: Some(true),
+                        ..Default::default()
+                    },
+                )),
+                tool_choice: Some(BetaAssistantToolChoice::CodeInterpreter),
                 tools: Some(vec![json!({"type": "code_interpreter"})]),
+                truncation_strategy: Some(BetaTruncationStrategy::auto()),
                 ..Default::default()
             },
             BetaQueryParams::new().push_array("include", ["run_details"])
@@ -430,6 +457,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         serde_json::from_slice(&requests[2].body).unwrap();
     assert_eq!(assistant_update_body["metadata"]["tier"], json!("gold"));
     assert_eq!(assistant_update_body["reasoning_effort"], json!("minimal"));
+    assert_eq!(
+        assistant_update_body["response_format"]["type"],
+        json!("json_object")
+    );
     let empty_thread_body: serde_json::Value = serde_json::from_slice(&requests[5].body).unwrap();
     assert_eq!(empty_thread_body, json!({}));
     let thread_body: serde_json::Value = serde_json::from_slice(&requests[6].body).unwrap();
@@ -448,6 +479,20 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(thread_run_body["assistant_id"], json!("asst_123"));
     assert_eq!(thread_run_body["max_prompt_tokens"], json!(512));
     assert_eq!(thread_run_body["parallel_tool_calls"], json!(true));
+    assert_eq!(thread_run_body["response_format"]["type"], json!("text"));
+    assert_eq!(thread_run_body["tool_choice"]["type"], json!("function"));
+    assert_eq!(
+        thread_run_body["tool_choice"]["function"]["name"],
+        json!("lookup_case")
+    );
+    assert_eq!(
+        thread_run_body["truncation_strategy"]["type"],
+        json!("last_messages")
+    );
+    assert_eq!(
+        thread_run_body["truncation_strategy"]["last_messages"],
+        json!(4)
+    );
     assert_eq!(
         thread_run_body["thread"]["messages"][0]["content"],
         json!("Hello")
@@ -462,7 +507,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(run_body["assistant_id"], json!("asst_123"));
     assert_eq!(run_body["parallel_tool_calls"], json!(true));
     assert_eq!(run_body["reasoning_effort"], json!("low"));
+    assert_eq!(run_body["response_format"]["type"], json!("json_schema"));
+    assert_eq!(
+        run_body["response_format"]["json_schema"]["name"],
+        json!("status_update")
+    );
+    assert_eq!(run_body["tool_choice"]["type"], json!("code_interpreter"));
     assert_eq!(run_body["tools"][0]["type"], json!("code_interpreter"));
+    assert_eq!(run_body["truncation_strategy"]["type"], json!("auto"));
     let run_update_body: serde_json::Value = serde_json::from_slice(&requests[18].body).unwrap();
     assert_eq!(run_update_body["metadata"]["owner"], json!("support"));
     let tool_outputs_body: serde_json::Value = serde_json::from_slice(&requests[21].body).unwrap();
