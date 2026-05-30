@@ -20,7 +20,7 @@ use tokio_tungstenite::{
 use url::Url;
 
 use crate::{
-    OpenAIError,
+    ApiErrorPayload, OpenAIError,
     config::normalize_base_url,
     core::{
         metadata::ResponseMetadata,
@@ -1970,6 +1970,7 @@ struct StreamAccumulator {
     visible_events: VecDeque<RecordedResponseEvent>,
     snapshot: Option<Response>,
     terminal: Option<ResponseStreamTerminal>,
+    terminal_error: Option<OpenAIError>,
     seen_done: bool,
     starting_after: Option<u64>,
 }
@@ -1980,6 +1981,7 @@ impl StreamAccumulator {
             visible_events: VecDeque::new(),
             snapshot: None,
             terminal: None,
+            terminal_error: None,
             seen_done: false,
             starting_after,
         }
@@ -2011,6 +2013,9 @@ impl StreamAccumulator {
     }
 
     fn finish(self, metadata: ResponseMetadata) -> Result<ResponseStream, OpenAIError> {
+        if let Some(error) = self.terminal_error {
+            return Err(error);
+        }
         if self.seen_done && self.terminal.is_none() {
             return Err(OpenAIError::new(
                 ErrorKind::Parse,
@@ -2519,6 +2524,18 @@ impl StreamAccumulator {
             "error" => {
                 let payload: StreamErrorPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
+                self.terminal_error = Some(
+                    OpenAIError::new(
+                        ErrorKind::Api(ApiErrorKind::BadRequest),
+                        format!("response stream error: {}", payload.message),
+                    )
+                    .with_api_error(ApiErrorPayload {
+                        message: payload.message.clone(),
+                        error_type: None,
+                        code: payload.code.clone(),
+                        param: payload.param.clone(),
+                    }),
+                );
                 Ok(Some(ResponseStreamEvent::Error {
                     code: payload.code,
                     message: payload.message,

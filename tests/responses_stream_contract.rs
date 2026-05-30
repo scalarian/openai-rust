@@ -425,6 +425,30 @@ fn terminal_failure_and_refusal_states_remain_explicit() {
 }
 
 #[test]
+fn response_error_event_surfaces_api_error_payload() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+    let error_stream = concat!(
+        "event: error\n",
+        "data: {\"message\":\"stream exploded\",\"code\":\"bad_stream\",\"param\":\"input\",\"sequence_number\":1}\n\n",
+        "data: [DONE]\n\n"
+    );
+
+    let error = ResponseStream::from_sse_chunks(metadata, vec![error_stream])
+        .expect_err("response.error should fail the stream explicitly");
+    assert_eq!(
+        error.kind,
+        ErrorKind::Api(openai_rust::ApiErrorKind::BadRequest)
+    );
+    let api_error = error.api_error().expect("api error payload");
+    assert_eq!(api_error.message, "stream exploded");
+    assert_eq!(api_error.code.as_deref(), Some("bad_stream"));
+    assert_eq!(api_error.param.as_deref(), Some("input"));
+}
+
+#[test]
 fn terminal_incomplete_state_remains_explicit() {
     let metadata = ResponseMetadata {
         status_code: 200,
