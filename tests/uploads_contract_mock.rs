@@ -148,6 +148,23 @@ fn lifecycle_and_chunking() {
         unknown_status.status,
         UploadStatus::Unknown(String::from("future_status"))
     );
+
+    let unknown_purpose =
+        serde_json::from_value::<openai_rust::resources::uploads::Upload>(json!({
+            "id": "upload-unknown-purpose",
+            "object": "upload",
+            "bytes": 8,
+            "created_at": 1_717_171_717,
+            "expires_at": 1_717_171_818,
+            "filename": "future.txt",
+            "purpose": "future_purpose",
+            "status": "pending"
+        }))
+        .unwrap();
+    assert_eq!(
+        unknown_purpose.purpose,
+        Some(UploadPurpose::Unknown(String::from("future_purpose")))
+    );
 }
 
 fn client(base_url: &str) -> OpenAI {

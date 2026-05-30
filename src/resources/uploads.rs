@@ -165,24 +165,19 @@ pub struct UploadCreateParams {
 }
 
 /// Upload creation purpose enum limited to the documented upload API values.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UploadPurpose {
-    #[serde(rename = "assistants")]
     Assistants,
-    #[serde(rename = "batch")]
     Batch,
-    #[serde(rename = "fine-tune")]
     FineTune,
-    #[serde(rename = "vision")]
     Vision,
-    #[serde(rename = "user_data")]
     UserData,
-    #[serde(rename = "evals")]
     Evals,
+    Unknown(String),
 }
 
 impl UploadPurpose {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Assistants => "assistants",
             Self::Batch => "batch",
@@ -190,6 +185,35 @@ impl UploadPurpose {
             Self::Vision => "vision",
             Self::UserData => "user_data",
             Self::Evals => "evals",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl From<&str> for UploadPurpose {
+    fn from(value: &str) -> Self {
+        match value {
+            "assistants" => Self::Assistants,
+            "batch" => Self::Batch,
+            "fine-tune" => Self::FineTune,
+            "vision" => Self::Vision,
+            "user_data" => Self::UserData,
+            "evals" => Self::Evals,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for UploadPurpose {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "assistants" => Self::Assistants,
+            "batch" => Self::Batch,
+            "fine-tune" => Self::FineTune,
+            "vision" => Self::Vision,
+            "user_data" => Self::UserData,
+            "evals" => Self::Evals,
+            _ => Self::Unknown(value),
         }
     }
 }
@@ -197,6 +221,25 @@ impl UploadPurpose {
 impl std::fmt::Display for UploadPurpose {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for UploadPurpose {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for UploadPurpose {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
     }
 }
 
