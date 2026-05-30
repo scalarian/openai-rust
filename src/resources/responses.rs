@@ -559,7 +559,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub context_management: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
+    pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub include: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -577,13 +577,13 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<ResponseReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -659,7 +659,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub context_management: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
+    pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub include: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -677,13 +677,13 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<ResponseReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -809,7 +809,7 @@ pub struct ResponseCompactParams {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ResponseInputTokensCountParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<Value>,
+    pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -821,7 +821,7 @@ pub struct ResponseInputTokensCountParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<ResponseReasoning>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<ResponseTextConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -944,6 +944,47 @@ pub struct InputTokenCount {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Conversation reference used by Responses requests and returned Responses.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseConversation {
+    Id(String),
+    Object(ResponseConversationObject),
+}
+
+/// Object-shaped conversation reference.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseConversationObject {
+    pub id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Reference to a reusable prompt template and its variables.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct ResponsePrompt {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<BTreeMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Reasoning configuration returned by or sent to the Responses API.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct ResponseReasoning {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generate_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Public parsed response object with aggregated `output_text`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Response {
@@ -956,20 +997,20 @@ pub struct Response {
     pub output: Vec<ResponseOutputItem>,
     pub parallel_tool_calls: Option<bool>,
     pub previous_response_id: Option<String>,
-    pub conversation: Option<Value>,
+    pub conversation: Option<ResponseConversation>,
     pub store: Option<bool>,
     pub background: Option<bool>,
     pub completed_at: Option<f64>,
     pub max_output_tokens: Option<u64>,
     pub max_tool_calls: Option<u64>,
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     pub prompt_cache_key: Option<String>,
     pub prompt_cache_retention: Option<String>,
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<ResponseReasoning>,
     pub safety_identifier: Option<String>,
     pub service_tier: Option<String>,
     pub temperature: Option<f64>,
-    pub text: Option<Value>,
+    pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<Value>,
     pub tools: Vec<Value>,
     pub top_logprobs: Option<u64>,
@@ -1310,20 +1351,20 @@ pub struct ParsedResponse<T> {
     pub output: Vec<ResponseOutputItem>,
     pub parallel_tool_calls: Option<bool>,
     pub previous_response_id: Option<String>,
-    pub conversation: Option<Value>,
+    pub conversation: Option<ResponseConversation>,
     pub store: Option<bool>,
     pub background: Option<bool>,
     pub completed_at: Option<f64>,
     pub max_output_tokens: Option<u64>,
     pub max_tool_calls: Option<u64>,
-    pub prompt: Option<Value>,
+    pub prompt: Option<ResponsePrompt>,
     pub prompt_cache_key: Option<String>,
     pub prompt_cache_retention: Option<String>,
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<ResponseReasoning>,
     pub safety_identifier: Option<String>,
     pub service_tier: Option<String>,
     pub temperature: Option<f64>,
-    pub text: Option<Value>,
+    pub text: Option<ResponseTextConfig>,
     pub tool_choice: Option<Value>,
     pub tools: Vec<Value>,
     pub top_logprobs: Option<u64>,
@@ -1946,7 +1987,7 @@ impl ResponseInputItemsPage {
 }
 
 /// Text response config for create/parse/input-token helpers.
-#[derive(Clone, Debug, Default, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct ResponseTextConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<ResponseFormatTextConfig>,
@@ -1958,6 +1999,7 @@ pub struct ResponseTextConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseFormatTextConfig {
     Text,
+    JsonObject,
     JsonSchema(ResponseFormatTextJSONSchemaConfig),
 }
 
@@ -1979,7 +2021,42 @@ impl Serialize for ResponseFormatTextConfig {
                 }
                 .serialize(serializer)
             }
+            Self::JsonObject => {
+                #[derive(Serialize)]
+                struct JsonObjectFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                JsonObjectFormat {
+                    format_type: "json_object",
+                }
+                .serialize(serializer)
+            }
             Self::JsonSchema(config) => config.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseFormatTextConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let format_type = value
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| serde::de::Error::custom("response text format missing `type`"))?;
+        match format_type {
+            "text" => Ok(Self::Text),
+            "json_object" => Ok(Self::JsonObject),
+            "json_schema" => serde_json::from_value(value)
+                .map(Self::JsonSchema)
+                .map_err(serde::de::Error::custom),
+            other => Err(serde::de::Error::custom(format!(
+                "unknown response text format type `{other}`"
+            ))),
         }
     }
 }
@@ -1991,6 +2068,31 @@ pub struct ResponseFormatTextJSONSchemaConfig {
     pub schema: Value,
     pub description: Option<String>,
     pub strict: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for ResponseFormatTextJSONSchemaConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct WireJsonSchemaFormat {
+            name: String,
+            schema: Value,
+            #[serde(default)]
+            description: Option<String>,
+            #[serde(default)]
+            strict: Option<bool>,
+        }
+
+        let value = WireJsonSchemaFormat::deserialize(deserializer)?;
+        Ok(Self {
+            name: value.name,
+            schema: value.schema,
+            description: value.description,
+            strict: value.strict,
+        })
+    }
 }
 
 impl Serialize for ResponseFormatTextJSONSchemaConfig {
@@ -2080,7 +2182,7 @@ struct WireResponse {
     #[serde(default)]
     previous_response_id: Option<String>,
     #[serde(default)]
-    conversation: Option<Value>,
+    conversation: Option<ResponseConversation>,
     #[serde(default)]
     store: Option<bool>,
     #[serde(default)]
@@ -2092,13 +2194,13 @@ struct WireResponse {
     #[serde(default)]
     max_tool_calls: Option<u64>,
     #[serde(default)]
-    prompt: Option<Value>,
+    prompt: Option<ResponsePrompt>,
     #[serde(default)]
     prompt_cache_key: Option<String>,
     #[serde(default)]
     prompt_cache_retention: Option<String>,
     #[serde(default)]
-    reasoning: Option<Value>,
+    reasoning: Option<ResponseReasoning>,
     #[serde(default)]
     safety_identifier: Option<String>,
     #[serde(default)]
@@ -2106,7 +2208,7 @@ struct WireResponse {
     #[serde(default)]
     temperature: Option<f64>,
     #[serde(default)]
-    text: Option<Value>,
+    text: Option<ResponseTextConfig>,
     #[serde(default)]
     tool_choice: Option<Value>,
     #[serde(default)]

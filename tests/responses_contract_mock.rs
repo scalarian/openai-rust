@@ -1,4 +1,12 @@
-use openai_rust::{ApiErrorKind, ErrorKind, OpenAI};
+use std::collections::BTreeMap;
+
+use openai_rust::{
+    ApiErrorKind, ErrorKind, OpenAI,
+    resources::responses::{
+        ResponseConversation, ResponseConversationObject, ResponseFormatTextConfig, ResponsePrompt,
+        ResponseReasoning,
+    },
+};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -34,11 +42,18 @@ fn create_populates_output_text_helper() {
             metadata: Some(json!({"trace": "resp_create"})),
             parallel_tool_calls: Some(false),
             previous_response_id: Some("resp_prev".into()),
-            conversation: Some(json!("conv_123")),
-            prompt: Some(json!({"id": "pmpt_123", "variables": {"topic": "Rust"}})),
+            conversation: Some(ResponseConversation::Id(String::from("conv_123"))),
+            prompt: Some(ResponsePrompt {
+                id: String::from("pmpt_123"),
+                variables: Some(BTreeMap::from([(String::from("topic"), json!("Rust"))])),
+                ..Default::default()
+            }),
             prompt_cache_key: Some(String::from("cache-key")),
             prompt_cache_retention: Some(String::from("24h")),
-            reasoning: Some(json!({"effort": "low"})),
+            reasoning: Some(ResponseReasoning {
+                effort: Some(String::from("low")),
+                ..Default::default()
+            }),
             safety_identifier: Some(String::from("user_hash")),
             service_tier: Some(String::from("priority")),
             store: Some(true),
@@ -106,16 +121,18 @@ fn create_populates_output_text_helper() {
         response.output().previous_response_id.as_deref(),
         Some("resp_prev")
     );
-    assert_eq!(response.output().conversation, Some(json!("conv_123")));
+    assert_eq!(
+        response.output().conversation,
+        Some(ResponseConversation::Id(String::from("conv_123")))
+    );
     assert_eq!(response.output().store, Some(true));
     assert_eq!(response.output().background, Some(false));
     assert_eq!(response.output().completed_at, Some(2.5));
     assert_eq!(response.output().max_output_tokens, Some(512));
     assert_eq!(response.output().max_tool_calls, Some(4));
-    assert_eq!(
-        response.output().prompt,
-        Some(json!({"id": "pmpt_response", "variables": {"topic": "Rust"}}))
-    );
+    let prompt = response.output().prompt.as_ref().unwrap();
+    assert_eq!(prompt.id, "pmpt_response");
+    assert_eq!(prompt.variables.as_ref().unwrap()["topic"], json!("Rust"));
     assert_eq!(
         response.output().prompt_cache_key.as_deref(),
         Some("response-cache-key")
@@ -124,7 +141,14 @@ fn create_populates_output_text_helper() {
         response.output().prompt_cache_retention.as_deref(),
         Some("24h")
     );
-    assert_eq!(response.output().reasoning, Some(json!({"effort": "low"})));
+    assert_eq!(
+        response
+            .output()
+            .reasoning
+            .as_ref()
+            .and_then(|reasoning| reasoning.effort.as_deref()),
+        Some("low")
+    );
     assert_eq!(
         response.output().safety_identifier.as_deref(),
         Some("response_user_hash")
@@ -132,8 +156,12 @@ fn create_populates_output_text_helper() {
     assert_eq!(response.output().service_tier.as_deref(), Some("priority"));
     assert_eq!(response.output().temperature, Some(0.2));
     assert_eq!(
-        response.output().text,
-        Some(json!({"format": {"type": "text"}}))
+        response
+            .output()
+            .text
+            .as_ref()
+            .and_then(|text| text.format.as_ref()),
+        Some(&ResponseFormatTextConfig::Text)
     );
     assert_eq!(response.output().tool_choice, Some(json!("auto")));
     assert_eq!(
@@ -531,7 +559,10 @@ fn continuity_fields_round_trip() {
         .create(openai_rust::resources::responses::ResponseCreateParams {
             model: "gpt-4.1-nano".into(),
             previous_response_id: Some("resp_prev".into()),
-            conversation: Some(json!({"id": "conv_123"})),
+            conversation: Some(ResponseConversation::Object(ResponseConversationObject {
+                id: String::from("conv_123"),
+                extra: BTreeMap::new(),
+            })),
             ..Default::default()
         })
         .unwrap();
@@ -615,7 +646,7 @@ fn conflicting_state_api_failures_surface_cleanly() {
         .create(openai_rust::resources::responses::ResponseCreateParams {
             model: "gpt-4.1-nano".into(),
             previous_response_id: Some("resp_prev".into()),
-            conversation: Some(json!("conv_123")),
+            conversation: Some(ResponseConversation::Id(String::from("conv_123"))),
             ..Default::default()
         })
         .expect_err("conflicting continuity modes should surface API failure");

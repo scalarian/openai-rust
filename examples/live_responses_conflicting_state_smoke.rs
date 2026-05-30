@@ -1,4 +1,7 @@
-use openai_rust::{ApiErrorKind, ErrorKind, OpenAI, resources::responses::ResponseCreateParams};
+use openai_rust::{
+    ApiErrorKind, ErrorKind, OpenAI,
+    resources::responses::{ResponseConversation, ResponseCreateParams},
+};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +22,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "This request should fail because it mixes continuity modes."
         )),
         previous_response_id: Some(response_id),
-        conversation: Some(json!("conv_conflict_smoke")),
+        conversation: Some(ResponseConversation::Id(String::from(
+            "conv_conflict_smoke",
+        ))),
         store: Some(true),
         ..Default::default()
     }) {
