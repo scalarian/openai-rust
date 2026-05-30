@@ -1,7 +1,8 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::chat::{
-        ChatCompletionAudioParams, ChatCompletionStreamOptions, ChatCompletionVoice, ChatStop,
+        ChatCompletionAudioParams, ChatCompletionPredictionContent, ChatCompletionResponseFormat,
+        ChatCompletionStreamOptions, ChatCompletionVoice, ChatStop, ChatWebSearchOptions,
     },
 };
 use serde_json::{Value, json};
@@ -47,7 +48,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 "name": "legacy_lookup",
                 "parameters": {"type": "object"}
             })]),
-            logit_bias: Some(json!({"42": -1})),
+            logit_bias: Some(BTreeMap::from([(String::from("42"), -1)])),
             logprobs: Some(true),
             max_completion_tokens: Some(128),
             max_tokens: Some(256),
@@ -59,12 +60,12 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             modalities: Some(vec![String::from("text"), String::from("audio")]),
             n: Some(1),
             parallel_tool_calls: Some(true),
-            prediction: Some(json!({"type": "content", "content": "stored hello"})),
+            prediction: Some(ChatCompletionPredictionContent::text("stored hello")),
             presence_penalty: Some(0.2),
             prompt_cache_key: Some(String::from("chat-cache")),
             prompt_cache_retention: Some(String::from("24h")),
             reasoning_effort: Some(String::from("low")),
-            response_format: Some(json!({"type": "json_object"})),
+            response_format: Some(ChatCompletionResponseFormat::JsonObject),
             safety_identifier: Some(String::from("user_hash")),
             seed: Some(7),
             service_tier: Some(String::from("priority")),
@@ -84,7 +85,10 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             top_p: Some(0.9),
             user: Some(String::from("legacy-user")),
             verbosity: Some(String::from("medium")),
-            web_search_options: Some(json!({"search_context_size": "low"})),
+            web_search_options: Some(ChatWebSearchOptions {
+                search_context_size: Some(String::from("low")),
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .unwrap();

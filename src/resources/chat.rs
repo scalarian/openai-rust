@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use tokio::runtime::Builder;
 use tokio::sync::watch;
@@ -178,7 +178,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub functions: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub logit_bias: Option<Value>,
+    pub logit_bias: Option<BTreeMap<String, i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logprobs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -194,7 +194,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prediction: Option<Value>,
+    pub prediction: Option<ChatCompletionPredictionContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -204,7 +204,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<Value>,
+    pub response_format: Option<ChatCompletionResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -234,7 +234,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub web_search_options: Option<Value>,
+    pub web_search_options: Option<ChatWebSearchOptions>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -343,6 +343,195 @@ impl From<Vec<String>> for ChatStop {
     fn from(value: Vec<String>) -> Self {
         Self::Strings(value)
     }
+}
+
+/// Static predicted output content for faster matching completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionPredictionContent {
+    pub content: ChatCompletionPredictionContentValue,
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionPredictionContent {
+    pub fn text(content: impl Into<String>) -> Self {
+        Self {
+            content: ChatCompletionPredictionContentValue::Text(content.into()),
+            content_type: String::from("content"),
+            extra: BTreeMap::new(),
+        }
+    }
+
+    pub fn parts(content: Vec<ChatCompletionContentPartText>) -> Self {
+        Self {
+            content: ChatCompletionPredictionContentValue::TextParts(content),
+            content_type: String::from("content"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Prediction content value accepted by chat completions.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ChatCompletionPredictionContentValue {
+    Text(String),
+    TextParts(Vec<ChatCompletionContentPartText>),
+}
+
+impl From<String> for ChatCompletionPredictionContentValue {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ChatCompletionPredictionContentValue {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ChatCompletionContentPartText>> for ChatCompletionPredictionContentValue {
+    fn from(value: Vec<ChatCompletionContentPartText>) -> Self {
+        Self::TextParts(value)
+    }
+}
+
+/// Text content part accepted in chat prediction content.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatCompletionContentPartText {
+    #[serde(rename = "type")]
+    pub content_type: String,
+    pub text: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatCompletionContentPartText {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            content_type: String::from("text"),
+            text: text.into(),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Response format configuration for chat completions.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ChatCompletionResponseFormat {
+    Text,
+    JsonObject,
+    JsonSchema(ChatCompletionResponseFormatJsonSchema),
+}
+
+impl Serialize for ChatCompletionResponseFormat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text => {
+                #[derive(Serialize)]
+                struct TextFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                TextFormat {
+                    format_type: "text",
+                }
+                .serialize(serializer)
+            }
+            Self::JsonObject => {
+                #[derive(Serialize)]
+                struct JsonObjectFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                }
+
+                JsonObjectFormat {
+                    format_type: "json_object",
+                }
+                .serialize(serializer)
+            }
+            Self::JsonSchema(json_schema) => {
+                #[derive(Serialize)]
+                struct JsonSchemaFormat<'a> {
+                    #[serde(rename = "type")]
+                    format_type: &'a str,
+                    json_schema: &'a ChatCompletionResponseFormatJsonSchema,
+                }
+
+                JsonSchemaFormat {
+                    format_type: "json_schema",
+                    json_schema,
+                }
+                .serialize(serializer)
+            }
+        }
+    }
+}
+
+/// JSON-schema response format payload for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatCompletionResponseFormatJsonSchema {
+    pub name: String,
+    pub schema: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Web search options for chat completions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatWebSearchOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_context_size: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_location: Option<ChatWebSearchUserLocation>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Approximate user location wrapper for chat web search.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ChatWebSearchUserLocation {
+    pub approximate: ChatWebSearchUserLocationApproximate,
+    #[serde(rename = "type")]
+    pub location_type: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ChatWebSearchUserLocation {
+    pub fn approximate(approximate: ChatWebSearchUserLocationApproximate) -> Self {
+        Self {
+            approximate,
+            location_type: String::from("approximate"),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Approximate location values for chat web search.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ChatWebSearchUserLocationApproximate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Metadata-only stored chat-completion update body.
