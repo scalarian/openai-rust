@@ -361,6 +361,149 @@ impl From<Value> for ChatCompletionMessageParam {
     }
 }
 
+/// Chat message role literal used in chat completion responses and stream deltas.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ChatCompletionRole {
+    Developer,
+    System,
+    User,
+    Assistant,
+    Tool,
+    Function,
+    Unknown(String),
+}
+
+impl ChatCompletionRole {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Developer => "developer",
+            Self::System => "system",
+            Self::User => "user",
+            Self::Assistant => "assistant",
+            Self::Tool => "tool",
+            Self::Function => "function",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ChatCompletionRole {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ChatCompletionRole {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ChatCompletionRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ChatCompletionRole {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatCompletionRole {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "developer" => Self::Developer,
+            "system" => Self::System,
+            "user" => Self::User,
+            "assistant" => Self::Assistant,
+            "tool" => Self::Tool,
+            "function" => Self::Function,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
+/// Reason a chat completion choice stopped generating.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ChatCompletionFinishReason {
+    Stop,
+    Length,
+    ToolCalls,
+    ContentFilter,
+    FunctionCall,
+    Unknown(String),
+}
+
+impl ChatCompletionFinishReason {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Stop => "stop",
+            Self::Length => "length",
+            Self::ToolCalls => "tool_calls",
+            Self::ContentFilter => "content_filter",
+            Self::FunctionCall => "function_call",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ChatCompletionFinishReason {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ChatCompletionFinishReason {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ChatCompletionFinishReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ChatCompletionFinishReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatCompletionFinishReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "stop" => Self::Stop,
+            "length" => Self::Length,
+            "tool_calls" => Self::ToolCalls,
+            "content_filter" => Self::ContentFilter,
+            "function_call" => Self::FunctionCall,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
 /// Developer-role chat message parameter.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ChatCompletionDeveloperMessageParam {
@@ -1563,7 +1706,7 @@ pub struct ChatCompletion {
 pub struct ChatCompletionChoice {
     pub index: usize,
     #[serde(default)]
-    pub finish_reason: Option<String>,
+    pub finish_reason: Option<ChatCompletionFinishReason>,
     pub message: ChatCompletionMessage,
     #[serde(default)]
     pub logprobs: Option<ChatCompletionChoiceLogprobs>,
@@ -1575,7 +1718,7 @@ pub struct ChatCompletionChoice {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ChatCompletionMessage {
     #[serde(default)]
-    pub role: Option<String>,
+    pub role: Option<ChatCompletionRole>,
     #[serde(default)]
     pub content: Option<String>,
     #[serde(default)]
@@ -1870,7 +2013,7 @@ pub struct ChatCompletionChunkChoice {
     #[serde(default)]
     pub delta: ChatCompletionChunkDelta,
     #[serde(default)]
-    pub finish_reason: Option<String>,
+    pub finish_reason: Option<ChatCompletionFinishReason>,
     #[serde(default)]
     pub logprobs: Option<ChatCompletionChoiceLogprobs>,
     #[serde(flatten)]
@@ -1881,7 +2024,7 @@ pub struct ChatCompletionChunkChoice {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ChatCompletionChunkDelta {
     #[serde(default)]
-    pub role: Option<String>,
+    pub role: Option<ChatCompletionRole>,
     #[serde(default)]
     pub content: Option<String>,
     #[serde(default)]
@@ -2421,7 +2564,7 @@ impl ChatCompletionAccumulator {
 #[derive(Clone, Debug, Default)]
 struct AccumulatedChoice {
     message: ChatCompletionMessage,
-    finish_reason: Option<String>,
+    finish_reason: Option<ChatCompletionFinishReason>,
 }
 
 fn serialize_json_value<T>(label: &str, value: T) -> Result<Value, OpenAIError>
