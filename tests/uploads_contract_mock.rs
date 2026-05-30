@@ -6,7 +6,7 @@ mod multipart_support;
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::{
-        files::{FileExpiresAfter, FileStatus},
+        files::{FileExpiresAfter, FileExpiresAnchor, FileStatus},
         uploads::{
             UploadCompleteParams, UploadCreateParams, UploadPartCreateParams, UploadPartInput,
             UploadPurpose, UploadStatus,
@@ -55,7 +55,7 @@ fn lifecycle_and_chunking() {
             mime_type: String::from("application/jsonl"),
             purpose: UploadPurpose::UserData,
             expires_after: Some(FileExpiresAfter {
-                anchor: String::from("created_at"),
+                anchor: FileExpiresAnchor::CreatedAt,
                 seconds: 3600,
             }),
         })

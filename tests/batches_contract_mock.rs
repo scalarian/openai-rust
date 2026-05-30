@@ -3,9 +3,12 @@ mod mock_http;
 
 use openai_rust::{
     ErrorKind, OpenAI,
-    resources::batches::{
-        BatchCompletionWindow, BatchCreateParams, BatchEndpoint, BatchListParams,
-        BatchOutputExpiresAfter, BatchStatus,
+    resources::{
+        batches::{
+            BatchCompletionWindow, BatchCreateParams, BatchEndpoint, BatchListParams,
+            BatchOutputExpiresAfter, BatchStatus,
+        },
+        files::FileExpiresAnchor,
     },
 };
 use serde_json::json;
@@ -31,7 +34,7 @@ fn create_and_cancel_lifecycle() {
                 String::from("nightly"),
             )])),
             output_expires_after: Some(BatchOutputExpiresAfter {
-                anchor: String::from("created_at"),
+                anchor: FileExpiresAnchor::CreatedAt,
                 seconds: 3600,
             }),
         })

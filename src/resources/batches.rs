@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
-    resources::files::{encode_path_id, validate_path_id},
+    resources::files::{FileExpiresAnchor, encode_path_id, validate_path_id},
 };
 
 /// Top-level batches API family.
@@ -109,7 +109,7 @@ pub enum BatchEndpoint {
 /// Output/error file expiration policy for a batch.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BatchOutputExpiresAfter {
-    pub anchor: String,
+    pub anchor: FileExpiresAnchor,
     pub seconds: u64,
 }
 

@@ -191,17 +191,120 @@ impl FileCreateParams {
         builder.add_file("file", self.file.to_multipart_file());
         builder.add_text("purpose", self.purpose.to_string());
         if let Some(expires_after) = self.expires_after {
-            builder.add_text("expires_after[anchor]", expires_after.anchor);
+            builder.add_text("expires_after[anchor]", expires_after.anchor.to_string());
             builder.add_text("expires_after[seconds]", expires_after.seconds.to_string());
         }
         builder.build()
     }
 }
 
+/// File expiration anchor accepted by file, upload, and batch output expiration requests.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FileExpiresAnchor {
+    CreatedAt,
+    Unknown(String),
+}
+
+impl FileExpiresAnchor {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::CreatedAt => "created_at",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for FileExpiresAnchor {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for FileExpiresAnchor {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for FileExpiresAnchor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Default for FileExpiresAnchor {
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+
+impl From<&str> for FileExpiresAnchor {
+    fn from(value: &str) -> Self {
+        match value {
+            "created_at" => Self::CreatedAt,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for FileExpiresAnchor {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "created_at" => Self::CreatedAt,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+impl PartialEq<&str> for FileExpiresAnchor {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<FileExpiresAnchor> for &str {
+    fn eq(&self, other: &FileExpiresAnchor) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<String> for FileExpiresAnchor {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<FileExpiresAnchor> for String {
+    fn eq(&self, other: &FileExpiresAnchor) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Serialize for FileExpiresAnchor {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for FileExpiresAnchor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
 /// File expiration policy.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileExpiresAfter {
-    pub anchor: String,
+    pub anchor: FileExpiresAnchor,
     pub seconds: u64,
 }
 

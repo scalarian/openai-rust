@@ -11,7 +11,7 @@ use openai_rust::{
         common::ListOrder,
         files::{
             FileCreateParams, FileCreatePurpose, FileDeleteResponse, FileExpiresAfter,
-            FileListParams, FileStatus, FileUpload, WaitForProcessingOptions,
+            FileExpiresAnchor, FileListParams, FileStatus, FileUpload, WaitForProcessingOptions,
         },
     },
 };
@@ -34,7 +34,7 @@ fn create_preserves_multipart_semantics() {
             ),
             purpose: FileCreatePurpose::FineTune,
             expires_after: Some(FileExpiresAfter {
-                anchor: String::from("created_at"),
+                anchor: FileExpiresAnchor::CreatedAt,
                 seconds: 3600,
             }),
         })
