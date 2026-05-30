@@ -31,8 +31,44 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
                 "role": "user",
                 "content": "Say hello"
             })],
+            audio: Some(json!({"voice": "alloy", "format": "wav"})),
+            frequency_penalty: Some(0.1),
+            function_call: Some(json!("auto")),
+            functions: Some(vec![json!({
+                "name": "legacy_lookup",
+                "parameters": {"type": "object"}
+            })]),
+            logit_bias: Some(json!({"42": -1})),
+            logprobs: Some(true),
+            max_completion_tokens: Some(128),
+            max_tokens: Some(256),
             store: Some(true),
             metadata: Some(json!({"tenant": "acme"})),
+            modalities: Some(vec![String::from("text"), String::from("audio")]),
+            n: Some(1),
+            parallel_tool_calls: Some(true),
+            prediction: Some(json!({"type": "content", "content": "stored hello"})),
+            presence_penalty: Some(0.2),
+            prompt_cache_key: Some(String::from("chat-cache")),
+            prompt_cache_retention: Some(String::from("24h")),
+            reasoning_effort: Some(String::from("low")),
+            response_format: Some(json!({"type": "json_object"})),
+            safety_identifier: Some(String::from("user_hash")),
+            seed: Some(7),
+            service_tier: Some(String::from("priority")),
+            stop: Some(json!(["END"])),
+            stream_options: Some(json!({"include_usage": true})),
+            temperature: Some(0.3),
+            tool_choice: Some(json!("auto")),
+            tools: Some(vec![json!({
+                "type": "function",
+                "function": {"name": "lookup", "parameters": {"type": "object"}}
+            })]),
+            top_logprobs: Some(2),
+            top_p: Some(0.9),
+            user: Some(String::from("legacy-user")),
+            verbosity: Some(String::from("medium")),
+            web_search_options: Some(json!({"search_context_size": "low"})),
             ..Default::default()
         })
         .unwrap();
@@ -96,9 +132,42 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
     assert_eq!(requests[0].method, "POST");
     assert_eq!(requests[0].path, "/v1/chat/completions");
     let create_body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(create_body["audio"]["voice"], "alloy");
+    assert_eq!(create_body["frequency_penalty"], 0.1);
+    assert_eq!(create_body["function_call"], "auto");
+    assert_eq!(create_body["functions"][0]["name"], "legacy_lookup");
+    assert_eq!(create_body["logit_bias"]["42"], -1);
+    assert_eq!(create_body["logprobs"], true);
+    assert_eq!(create_body["max_completion_tokens"], 128);
+    assert_eq!(create_body["max_tokens"], 256);
     assert_eq!(create_body["store"], Value::Bool(true));
     assert_eq!(create_body["metadata"]["tenant"], "acme");
     assert_eq!(create_body["messages"][0]["content"], "Say hello");
+    assert_eq!(create_body["modalities"], json!(["text", "audio"]));
+    assert_eq!(create_body["n"], 1);
+    assert_eq!(create_body["parallel_tool_calls"], true);
+    assert_eq!(create_body["prediction"]["content"], "stored hello");
+    assert_eq!(create_body["presence_penalty"], 0.2);
+    assert_eq!(create_body["prompt_cache_key"], "chat-cache");
+    assert_eq!(create_body["prompt_cache_retention"], "24h");
+    assert_eq!(create_body["reasoning_effort"], "low");
+    assert_eq!(create_body["response_format"]["type"], "json_object");
+    assert_eq!(create_body["safety_identifier"], "user_hash");
+    assert_eq!(create_body["seed"], 7);
+    assert_eq!(create_body["service_tier"], "priority");
+    assert_eq!(create_body["stop"], json!(["END"]));
+    assert_eq!(create_body["stream_options"]["include_usage"], true);
+    assert_eq!(create_body["temperature"], 0.3);
+    assert_eq!(create_body["tool_choice"], "auto");
+    assert_eq!(create_body["tools"][0]["function"]["name"], "lookup");
+    assert_eq!(create_body["top_logprobs"], 2);
+    assert_eq!(create_body["top_p"], 0.9);
+    assert_eq!(create_body["user"], "legacy-user");
+    assert_eq!(create_body["verbosity"], "medium");
+    assert_eq!(
+        create_body["web_search_options"]["search_context_size"],
+        "low"
+    );
 
     assert_eq!(requests[1].method, "GET");
     assert_eq!(requests[1].path, "/v1/chat/completions/chatcmpl_store");
