@@ -28,8 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let status = cancelled
         .output()
         .status
-        .clone()
-        .unwrap_or_else(|| String::from("<missing>"));
+        .as_ref()
+        .map(|status| status.as_str())
+        .unwrap_or("<missing>");
 
     println!(
         "cancel request id: {}",
@@ -41,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cancelled.output().output_text().len()
     );
 
-    match status.as_str() {
+    match status {
         "cancelled" | "completed" | "incomplete" => Ok(()),
         other => Err(format!("unexpected terminal status after cancel attempt: {other}").into()),
     }

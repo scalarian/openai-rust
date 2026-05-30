@@ -1284,13 +1284,86 @@ pub enum ResponseInstructions {
     Items(Vec<ResponseOutputItem>),
 }
 
+/// Top-level response lifecycle status.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResponseStatus {
+    Completed,
+    Failed,
+    InProgress,
+    Cancelled,
+    Queued,
+    Incomplete,
+    Unknown(String),
+}
+
+impl ResponseStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::InProgress => "in_progress",
+            Self::Cancelled => "cancelled",
+            Self::Queued => "queued",
+            Self::Incomplete => "incomplete",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ResponseStatus {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for ResponseStatus {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ResponseStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for ResponseStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "completed" => Self::Completed,
+            "failed" => Self::Failed,
+            "in_progress" => Self::InProgress,
+            "cancelled" => Self::Cancelled,
+            "queued" => Self::Queued,
+            "incomplete" => Self::Incomplete,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
 /// Public parsed response object with aggregated `output_text`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Response {
     pub id: String,
     pub object: String,
     pub created_at: f64,
-    pub status: Option<String>,
+    pub status: Option<ResponseStatus>,
     pub model: Option<String>,
     pub instructions: Option<ResponseInstructions>,
     pub output: Vec<ResponseOutputItem>,
@@ -2521,7 +2594,7 @@ pub struct ParsedResponse<T> {
     pub id: String,
     pub object: String,
     pub created_at: f64,
-    pub status: Option<String>,
+    pub status: Option<ResponseStatus>,
     pub model: Option<String>,
     pub instructions: Option<ResponseInstructions>,
     pub output: Vec<ResponseOutputItem>,
@@ -4605,7 +4678,7 @@ struct WireResponse {
     object: String,
     created_at: f64,
     #[serde(default)]
-    status: Option<String>,
+    status: Option<ResponseStatus>,
     #[serde(default)]
     model: Option<String>,
     #[serde(default)]
