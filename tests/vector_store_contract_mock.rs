@@ -7,9 +7,10 @@ use openai_rust::{
         common::ListOrder,
         vector_stores::{
             StaticChunkingStrategy, VectorStoreAttributeValue, VectorStoreCreateParams,
-            VectorStoreDeleteResponse, VectorStoreExpiresAfter, VectorStoreListParams,
-            VectorStoreSearchFilter, VectorStoreSearchFilterValue, VectorStoreSearchParams,
-            VectorStoreSearchQuery, VectorStoreSearchRankingOptions, VectorStoreStatus,
+            VectorStoreDeleteResponse, VectorStoreExpiresAfter, VectorStoreExpiresAnchor,
+            VectorStoreListParams, VectorStoreSearchContentType, VectorStoreSearchFilter,
+            VectorStoreSearchFilterValue, VectorStoreSearchParams, VectorStoreSearchQuery,
+            VectorStoreSearchRanker, VectorStoreSearchRankingOptions, VectorStoreStatus,
             VectorStoreUpdateParams,
         },
     },
@@ -59,7 +60,7 @@ fn crud_and_errors() {
                 String::from("test"),
             )])),
             expires_after: Some(VectorStoreExpiresAfter {
-                anchor: String::from("last_active_at"),
+                anchor: VectorStoreExpiresAnchor::LastActiveAt,
                 days: 7,
             }),
             chunking_strategy: Some(
@@ -91,7 +92,7 @@ fn crud_and_errors() {
                     String::from("prod"),
                 )])),
                 expires_after: Some(VectorStoreExpiresAfter {
-                    anchor: String::from("last_active_at"),
+                    anchor: VectorStoreExpiresAnchor::LastActiveAt,
                     days: 30,
                 }),
             },
@@ -168,7 +169,7 @@ fn list_and_search_preserve_distinct_page_contracts() {
                 }),
                 max_num_results: Some(8),
                 ranking_options: Some(VectorStoreSearchRankingOptions {
-                    ranker: Some(String::from("default-2024-11-15")),
+                    ranker: Some(VectorStoreSearchRanker::Default2024_11_15),
                     score_threshold: Some(0.42),
                 }),
                 rewrite_query: Some(true),
@@ -188,6 +189,10 @@ fn list_and_search_preserve_distinct_page_contracts() {
     assert_eq!(
         searched.output.data[0].content[0].text,
         "Refunds are handled within 5 business days."
+    );
+    assert_eq!(
+        searched.output.data[0].content[0].r#type,
+        VectorStoreSearchContentType::Text
     );
 
     let requests = server.captured_requests(2).unwrap();

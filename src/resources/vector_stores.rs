@@ -27,6 +27,141 @@ use crate::{
 const VECTOR_STORE_BETA_HEADER: &str = "assistants=v2";
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
+macro_rules! vector_store_string_literal_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($variant:ident => $literal:literal,)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum $name {
+            $($variant,)+
+            Unknown(String),
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                match self {
+                    $(Self::$variant => $literal,)+
+                    Self::Unknown(value) => value.as_str(),
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = str;
+
+            fn deref(&self) -> &Self::Target {
+                self.as_str()
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::Unknown(String::new())
+            }
+        }
+
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value.to_string()),
+                }
+            }
+        }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                match value.as_str() {
+                    $($literal => Self::$variant,)+
+                    _ => Self::Unknown(value),
+                }
+            }
+        }
+
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                self.as_str() == *other
+            }
+        }
+
+        impl PartialEq<$name> for &str {
+            fn eq(&self, other: &$name) -> bool {
+                *self == other.as_str()
+            }
+        }
+
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl PartialEq<$name> for String {
+            fn eq(&self, other: &$name) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Ok(Self::from(value))
+            }
+        }
+    };
+}
+
+vector_store_string_literal_enum! {
+    /// Expiration anchor accepted by vector-store create/update requests.
+    pub enum VectorStoreExpiresAnchor {
+        LastActiveAt => "last_active_at",
+    }
+}
+
+vector_store_string_literal_enum! {
+    /// Ranker identifiers accepted by vector-store search.
+    pub enum VectorStoreSearchRanker {
+        None => "none",
+        Auto => "auto",
+        Default2024_11_15 => "default-2024-11-15",
+    }
+}
+
+vector_store_string_literal_enum! {
+    /// Content-part type returned by vector-store search results.
+    pub enum VectorStoreSearchContentType {
+        Text => "text",
+    }
+}
+
 /// Top-level vector stores API family.
 #[derive(Clone, Debug)]
 pub struct VectorStores {
@@ -785,7 +920,7 @@ pub enum VectorStoreSearchFilterValue {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct VectorStoreSearchRankingOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ranker: Option<String>,
+    pub ranker: Option<VectorStoreSearchRanker>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score_threshold: Option<f64>,
 }
@@ -947,7 +1082,7 @@ pub struct StaticChunkingStrategy {
 /// Vector-store expiration policy.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VectorStoreExpiresAfter {
-    pub anchor: String,
+    pub anchor: VectorStoreExpiresAnchor,
     pub days: u32,
 }
 
@@ -1114,7 +1249,7 @@ pub struct VectorStoreSearchContentPart {
     #[serde(default)]
     pub text: String,
     #[serde(default, rename = "type")]
-    pub r#type: String,
+    pub r#type: VectorStoreSearchContentType,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
