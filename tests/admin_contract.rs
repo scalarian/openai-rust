@@ -211,6 +211,21 @@ fn organization_role_assignment_json(id: &str) -> Value {
     })
 }
 
+fn organization_spend_alert_json(id: &str, threshold_amount: i64) -> Value {
+    json!({
+        "id": id,
+        "currency": "USD",
+        "interval": "month",
+        "notification_channel": {
+            "type": "email",
+            "recipients": ["ops@example.com"],
+            "subject_prefix": null
+        },
+        "object": "organization.spend_alert",
+        "threshold_amount": threshold_amount
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -652,6 +667,16 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
+    responses[21] = json_response(organization_spend_alert_json("alert_ops", 10_000).to_string());
+    responses[22] = json_response(
+        json!({
+            "data": [organization_spend_alert_json("alert_ops", 10_000)],
+            "has_more": true,
+            "last_id": "alert_ops"
+        })
+        .to_string(),
+    );
+    responses[23] = json_response(organization_spend_alert_json("alert_ops", 20_000).to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -902,7 +927,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .unwrap();
 
-    org.spend_alerts()
+    let created_alert = org
+        .spend_alerts()
         .create(AdminSpendAlertCreateParams {
             currency: AdminSpendAlertCurrency::Usd,
             interval: AdminSpendAlertInterval::Month,
@@ -914,7 +940,13 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             threshold_amount: 10_000,
         })
         .unwrap();
-    org.spend_alerts()
+    assert_eq!(
+        created_alert.output.object,
+        AdminOrganizationSpendAlertObject::OrganizationSpendAlert
+    );
+    assert_eq!(created_alert.output.threshold_amount, 10_000);
+    let spend_alerts = org
+        .spend_alerts()
         .list(AdminSpendAlertListParams {
             after: Some(String::from("alert_after")),
             before: Some(String::from("alert_before")),
@@ -922,7 +954,10 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             order: Some(ListOrder::Desc),
         })
         .unwrap();
-    org.spend_alerts()
+    assert_eq!(spend_alerts.output.data[0].id, "alert_ops");
+    assert_eq!(spend_alerts.output.next_after(), Some("alert_ops"));
+    let updated_alert = org
+        .spend_alerts()
         .update(
             "alert_ops",
             AdminSpendAlertUpdateParams {
@@ -937,6 +972,7 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(updated_alert.output.threshold_amount, 20_000);
 
     let requests = server.captured_requests(24).unwrap();
     let paths = requests
@@ -1717,6 +1753,36 @@ fn admin_user_role_create_retrieve_list_and_delete_return_typed_responses() {
         requests[3].path,
         "/v1/organization/users/user_admin/roles/role_viewer"
     );
+}
+
+#[test]
+fn admin_spend_alert_delete_returns_typed_response() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(
+        json!({
+            "id": "alert_ops",
+            "deleted": true,
+            "object": "organization.spend_alert.deleted"
+        })
+        .to_string(),
+    )])
+    .unwrap();
+    let client = client(&server.url());
+
+    let deleted = client
+        .admin()
+        .organization()
+        .spend_alerts()
+        .delete("alert_ops")
+        .unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(
+        deleted.output.object,
+        AdminOrganizationSpendAlertDeletedObject::OrganizationSpendAlertDeleted
+    );
+
+    let requests = server.captured_requests(1).unwrap();
+    assert_eq!(requests[0].method, "DELETE");
+    assert_eq!(requests[0].path, "/v1/organization/spend_alerts/alert_ops");
 }
 
 #[test]
