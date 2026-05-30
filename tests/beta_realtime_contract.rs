@@ -4,7 +4,14 @@ mod mock_http;
 use openai_rust::{
     OpenAI,
     resources::beta::{
-        BetaRealtimeSessionCreateParams, BetaRealtimeTranscriptionSessionCreateParams,
+        BetaRealtimeAudioFormat, BetaRealtimeClientSecret, BetaRealtimeClientSecretAnchor,
+        BetaRealtimeClientSecretExpiresAfter, BetaRealtimeClientSecretExpiresAt,
+        BetaRealtimeInputAudioNoiseReduction, BetaRealtimeInputAudioTranscription,
+        BetaRealtimeMaxResponseOutputTokens, BetaRealtimeModality, BetaRealtimeNoiseReductionType,
+        BetaRealtimeNullable, BetaRealtimeSessionCreateParams, BetaRealtimeTool,
+        BetaRealtimeToolType, BetaRealtimeTracing, BetaRealtimeTranscriptionClientSecret,
+        BetaRealtimeTranscriptionSessionCreateParams, BetaRealtimeTurnDetection,
+        BetaRealtimeTurnDetectionType,
     },
 };
 use serde_json::json;
@@ -23,17 +30,38 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
         .sessions()
         .create(BetaRealtimeSessionCreateParams {
             model: Some(String::from("gpt-realtime")),
-            modalities: Some(vec![String::from("text"), String::from("audio")]),
+            modalities: Some(vec![
+                BetaRealtimeModality::Text,
+                BetaRealtimeModality::Audio,
+            ]),
             voice: Some(String::from("verse")),
-            client_secret: Some(json!({
-                "expires_after": {
-                    "anchor": "created_at",
-                    "seconds": 120
-                }
-            })),
-            turn_detection: Some(json!({
-                "type": "server_vad",
-                "threshold": 0.5
+            client_secret: Some(BetaRealtimeClientSecret {
+                expires_after: Some(BetaRealtimeClientSecretExpiresAfter {
+                    anchor: Some(BetaRealtimeClientSecretAnchor::CreatedAt),
+                    seconds: Some(120),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            input_audio_noise_reduction: Some(BetaRealtimeNullable::Value(
+                BetaRealtimeInputAudioNoiseReduction {
+                    noise_reduction_type: Some(BetaRealtimeNoiseReductionType::NearField),
+                    ..Default::default()
+                },
+            )),
+            max_response_output_tokens: Some(BetaRealtimeMaxResponseOutputTokens::Inf),
+            tool_choice: Some(String::from("auto")),
+            tools: Some(vec![BetaRealtimeTool {
+                name: Some(String::from("lookup_case")),
+                parameters: Some(json!({"type": "object"})),
+                tool_type: Some(BetaRealtimeToolType::Function),
+                ..Default::default()
+            }]),
+            tracing: Some(BetaRealtimeNullable::Value(BetaRealtimeTracing::Auto)),
+            turn_detection: Some(BetaRealtimeNullable::Value(BetaRealtimeTurnDetection {
+                turn_detection_type: Some(BetaRealtimeTurnDetectionType::ServerVad),
+                threshold: Some(0.5),
+                ..Default::default()
             })),
             ..Default::default()
         })
@@ -46,21 +74,27 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
     let transcription = realtime
         .transcription_sessions()
         .create(BetaRealtimeTranscriptionSessionCreateParams {
-            modalities: Some(vec![String::from("text")]),
-            input_audio_format: Some(String::from("pcm16")),
+            modalities: Some(vec![BetaRealtimeModality::Text]),
+            input_audio_format: Some(BetaRealtimeAudioFormat::Pcm16),
             include: Some(vec![String::from(
                 "item.input_audio_transcription.logprobs",
             )]),
-            input_audio_transcription: Some(json!({
-                "model": "gpt-4o-transcribe",
-                "language": "en"
-            })),
-            client_secret: Some(json!({
-                "expires_at": {
-                    "anchor": "created_at",
-                    "seconds": 300
-                }
-            })),
+            input_audio_transcription: Some(BetaRealtimeNullable::Value(
+                BetaRealtimeInputAudioTranscription {
+                    model: Some(String::from("gpt-4o-transcribe")),
+                    language: Some(String::from("en")),
+                    ..Default::default()
+                },
+            )),
+            client_secret: Some(BetaRealtimeTranscriptionClientSecret {
+                expires_at: Some(BetaRealtimeClientSecretExpiresAt {
+                    anchor: Some(BetaRealtimeClientSecretAnchor::CreatedAt),
+                    seconds: Some(300),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            turn_detection: Some(BetaRealtimeNullable::Null),
             ..Default::default()
         })
         .unwrap();
@@ -87,12 +121,23 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
         session_body["client_secret"]["expires_after"]["seconds"],
         json!(120)
     );
+    assert_eq!(
+        session_body["input_audio_noise_reduction"]["type"],
+        json!("near_field")
+    );
+    assert_eq!(session_body["max_response_output_tokens"], json!("inf"));
+    assert_eq!(session_body["tools"][0]["type"], json!("function"));
+    assert_eq!(session_body["tracing"], json!("auto"));
 
     let transcription_body: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
     assert_eq!(transcription_body["input_audio_format"], json!("pcm16"));
     assert_eq!(
         transcription_body["input_audio_transcription"]["model"],
         json!("gpt-4o-transcribe")
+    );
+    assert_eq!(
+        transcription_body["turn_detection"],
+        serde_json::Value::Null
     );
 }
 

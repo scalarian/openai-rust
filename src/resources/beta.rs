@@ -1667,35 +1667,37 @@ impl BetaRealtimeTranscriptionSessions {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaRealtimeSessionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_secret: Option<Value>,
+    pub client_secret: Option<BetaRealtimeClientSecret>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_format: Option<String>,
+    pub input_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_noise_reduction: Option<Value>,
+    pub input_audio_noise_reduction:
+        Option<BetaRealtimeNullable<BetaRealtimeInputAudioNoiseReduction>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_transcription: Option<Value>,
+    pub input_audio_transcription:
+        Option<BetaRealtimeNullable<BetaRealtimeInputAudioTranscription>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_response_output_tokens: Option<Value>,
+    pub max_response_output_tokens: Option<BetaRealtimeMaxResponseOutputTokens>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub modalities: Option<Vec<String>>,
+    pub modalities: Option<Vec<BetaRealtimeModality>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_audio_format: Option<String>,
+    pub output_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Value>>,
+    pub tools: Option<Vec<BetaRealtimeTool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tracing: Option<Value>,
+    pub tracing: Option<BetaRealtimeNullable<BetaRealtimeTracing>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub turn_detection: Option<Value>,
+    pub turn_detection: Option<BetaRealtimeNullable<BetaRealtimeTurnDetection>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub voice: Option<String>,
 }
@@ -1704,19 +1706,241 @@ pub struct BetaRealtimeSessionCreateParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaRealtimeTranscriptionSessionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_secret: Option<Value>,
+    pub client_secret: Option<BetaRealtimeTranscriptionClientSecret>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_format: Option<String>,
+    pub input_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_noise_reduction: Option<Value>,
+    pub input_audio_noise_reduction:
+        Option<BetaRealtimeNullable<BetaRealtimeInputAudioNoiseReduction>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_audio_transcription: Option<Value>,
+    pub input_audio_transcription:
+        Option<BetaRealtimeNullable<BetaRealtimeInputAudioTranscription>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub modalities: Option<Vec<String>>,
+    pub modalities: Option<Vec<BetaRealtimeModality>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub turn_detection: Option<Value>,
+    pub turn_detection: Option<BetaRealtimeNullable<BetaRealtimeTurnDetection>>,
+}
+
+/// Nullable realtime config slot used when `null` disables an active config.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum BetaRealtimeNullable<T> {
+    Value(T),
+    Null,
+}
+
+impl<T> From<T> for BetaRealtimeNullable<T> {
+    fn from(value: T) -> Self {
+        Self::Value(value)
+    }
+}
+
+/// Realtime audio wire formats.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeAudioFormat {
+    Pcm16,
+    G711Ulaw,
+    G711Alaw,
+}
+
+/// Realtime response modalities.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeModality {
+    Text,
+    Audio,
+}
+
+/// Realtime client-secret creation options.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeClientSecret {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_after: Option<BetaRealtimeClientSecretExpiresAfter>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime transcription client-secret creation options.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeTranscriptionClientSecret {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<BetaRealtimeClientSecretExpiresAt>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime client-secret expiration relative to token creation.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeClientSecretExpiresAfter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<BetaRealtimeClientSecretAnchor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<u32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime transcription client-secret expiration relative to token creation.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeClientSecretExpiresAt {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<BetaRealtimeClientSecretAnchor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<u32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime client-secret expiration anchor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeClientSecretAnchor {
+    CreatedAt,
+}
+
+/// Realtime input-audio noise-reduction config.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeInputAudioNoiseReduction {
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub noise_reduction_type: Option<BetaRealtimeNoiseReductionType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime input-audio noise-reduction modes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeNoiseReductionType {
+    NearField,
+    FarField,
+}
+
+/// Realtime input-audio transcription config.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeInputAudioTranscription {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime max response output token limit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BetaRealtimeMaxResponseOutputTokens {
+    Tokens(u64),
+    Inf,
+}
+
+impl Serialize for BetaRealtimeMaxResponseOutputTokens {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Tokens(tokens) => serializer.serialize_u64(*tokens),
+            Self::Inf => serializer.serialize_str("inf"),
+        }
+    }
+}
+
+/// Realtime function tool definition.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeTool {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub tool_type: Option<BetaRealtimeToolType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime tool kind.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeToolType {
+    Function,
+}
+
+/// Realtime tracing config.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BetaRealtimeTracing {
+    Auto,
+    Configuration(BetaRealtimeTracingConfiguration),
+}
+
+impl Serialize for BetaRealtimeTracing {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::Configuration(config) => config.serialize(serializer),
+        }
+    }
+}
+
+/// Realtime tracing configuration object.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeTracingConfiguration {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workflow_name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime server or semantic VAD turn-detection config.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaRealtimeTurnDetection {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_response: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eagerness: Option<BetaRealtimeTurnDetectionEagerness>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interrupt_response: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefix_padding_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub silence_duration_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f64>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub turn_detection_type: Option<BetaRealtimeTurnDetectionType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime turn-detection mode.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeTurnDetectionType {
+    ServerVad,
+    SemanticVad,
+}
+
+/// Realtime semantic VAD eagerness.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaRealtimeTurnDetectionEagerness {
+    Low,
+    Medium,
+    High,
+    Auto,
 }
 
 impl ChatKit {
