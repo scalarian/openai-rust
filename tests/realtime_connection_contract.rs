@@ -5,8 +5,9 @@ use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
         RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
-        RealtimeConversationMessageContentPart, RealtimeOutputModality, RealtimeServerEvent,
-        RealtimeSessionConfig, RealtimeSessionType,
+        RealtimeConversationMessageContentPart, RealtimeOutputModality,
+        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
+        RealtimeSessionType,
     },
 };
 use serde_json::json;
@@ -367,11 +368,12 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         .unwrap();
     connection
         .response()
-        .create(
-            Some(json!({
-                "modalities": ["text"],
-                "metadata": {"source": "test"}
-            })),
+        .create_params(
+            RealtimeResponseCreateParams {
+                metadata: Some(json!({"source": "test"})),
+                output_modalities: Some(vec![String::from("text")]),
+                ..Default::default()
+            },
             Some(String::from("evt_response")),
         )
         .await
@@ -465,6 +467,10 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
     assert_eq!(captured[0]["event_id"], "evt_update");
     assert_eq!(captured[0]["session"]["instructions"], "Be direct.");
     assert_eq!(captured[1]["response"]["metadata"]["source"], "test");
+    assert_eq!(
+        captured[1]["response"]["output_modalities"],
+        json!(["text"])
+    );
     assert_eq!(captured[2]["response_id"], "resp_cancel");
     assert_eq!(captured[3]["audio"], "AQID");
     assert_eq!(captured[6]["previous_item_id"], "root");

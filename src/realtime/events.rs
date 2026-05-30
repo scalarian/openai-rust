@@ -164,6 +164,35 @@ pub struct RealtimeErrorInfo {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Create a new Realtime response with these parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseCreateParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_modalities: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Value>>,
+}
+
 /// Typed client event helpers for the text/bootstrap path.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RealtimeClientEvent {
@@ -203,6 +232,19 @@ impl RealtimeClientEvent {
             event_id: None,
             response,
         }
+    }
+
+    pub fn response_create_params(
+        response: RealtimeResponseCreateParams,
+    ) -> Result<Self, OpenAIError> {
+        let response = serde_json::to_value(response).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("failed to serialize Realtime response.create event: {error}"),
+            )
+            .with_source(error)
+        })?;
+        Ok(Self::response_create(Some(response)))
     }
 
     pub fn with_event_id(mut self, event_id: impl Into<String>) -> Self {

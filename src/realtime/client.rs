@@ -24,8 +24,9 @@ use crate::{
 };
 
 use super::events::{
-    RealtimeClientEvent, RealtimeConversationItem, RealtimeOutputModality, RealtimeServerEvent,
-    RealtimeSessionConfig, RealtimeSessionType, decode_server_event_text,
+    RealtimeClientEvent, RealtimeConversationItem, RealtimeOutputModality,
+    RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType,
+    decode_server_event_text,
 };
 
 /// Realtime client-secret expiration settings.
@@ -938,6 +939,21 @@ impl RealtimeResponseResource<'_> {
             object.insert(String::from("response"), response);
         }
         self.connection.send_json_value(Value::Object(object)).await
+    }
+
+    pub async fn create_params(
+        self,
+        response: RealtimeResponseCreateParams,
+        event_id: Option<String>,
+    ) -> Result<(), OpenAIError> {
+        let response = serde_json::to_value(response).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("failed to serialize Realtime response.create event: {error}"),
+            )
+            .with_source(error)
+        })?;
+        self.create(Some(response), event_id).await
     }
 
     pub async fn cancel(
