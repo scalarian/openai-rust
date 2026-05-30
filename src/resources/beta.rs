@@ -166,6 +166,13 @@ beta_string_literal_enum! {
 }
 
 beta_string_literal_enum! {
+    /// Additional beta Assistants run-step fields that can be included in responses.
+    pub enum BetaThreadRunStepInclude {
+        StepDetailsToolCallsFileSearchResultsContent => "step_details.tool_calls[*].file_search.results[*].content",
+    }
+}
+
+beta_string_literal_enum! {
     /// ChatKit attachment discriminator.
     pub enum ChatKitAttachmentType {
         Image => "image",
@@ -1394,7 +1401,7 @@ impl BetaThreadRunSteps {
 /// Deprecated beta run-step retrieve query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BetaThreadRunStepRetrieveParams {
-    pub include: Option<Vec<String>>,
+    pub include: Option<Vec<BetaThreadRunStepInclude>>,
 }
 
 /// Deprecated beta run-step list query parameters.
@@ -1402,7 +1409,7 @@ pub struct BetaThreadRunStepRetrieveParams {
 pub struct BetaThreadRunStepListParams {
     pub after: Option<String>,
     pub before: Option<String>,
-    pub include: Option<Vec<String>>,
+    pub include: Option<Vec<BetaThreadRunStepInclude>>,
     pub limit: Option<u32>,
     pub order: Option<ListOrder>,
 }

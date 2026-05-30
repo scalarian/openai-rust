@@ -17,11 +17,12 @@ use openai_rust::{
             BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
             BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
             BetaThreadMessageRole, BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
-            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
-            BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
-            BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
-            BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
-            BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
+            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepInclude,
+            BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+            BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
+            BetaThreadRunUpdateParams, BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides,
+            BetaToolResourceOverrides, BetaToolResources, BetaToolResourcesCodeInterpreter,
+            BetaTruncationStrategy,
         },
         common::{ListOrder, ReasoningEffort},
     },
@@ -314,7 +315,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 truncation_strategy: Some(BetaTruncationStrategy::auto()),
                 ..Default::default()
             },
-            BetaQueryParams::new().push_array("include", ["run_details"])
+            BetaQueryParams::new().push_array(
+                "include",
+                [BetaThreadRunStepInclude::StepDetailsToolCallsFileSearchResultsContent],
+            )
         )
         .unwrap()
         .output["id"],
@@ -382,7 +386,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 "run_123",
                 "step_123",
                 BetaThreadRunStepRetrieveParams {
-                    include: Some(vec![String::from("step_details")]),
+                    include: Some(vec![
+                        BetaThreadRunStepInclude::StepDetailsToolCallsFileSearchResultsContent,
+                    ]),
                 },
             )
             .unwrap()
@@ -397,7 +403,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 BetaThreadRunStepListParams {
                     after: Some(String::from("step_after")),
                     before: Some(String::from("step_before")),
-                    include: Some(vec![String::from("step_details")]),
+                    include: Some(vec![
+                        BetaThreadRunStepInclude::StepDetailsToolCallsFileSearchResultsContent,
+                    ]),
                     limit: Some(1),
                     order: Some(ListOrder::Asc),
                 },
@@ -440,7 +448,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(requests[15].path, "/v1/threads/thread_123/messages/msg_123");
     assert_eq!(
         requests[16].path,
-        "/v1/threads/thread_123/runs?include%5B%5D=run_details"
+        "/v1/threads/thread_123/runs?include%5B%5D=step_details.tool_calls%5B*%5D.file_search.results%5B*%5D.content"
     );
     assert_eq!(requests[17].path, "/v1/threads/thread_123/runs/run_123");
     assert_eq!(requests[18].path, "/v1/threads/thread_123/runs/run_123");
@@ -458,11 +466,11 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         requests[22].path,
-        "/v1/threads/thread_123/runs/run_123/steps/step_123?include%5B%5D=step_details"
+        "/v1/threads/thread_123/runs/run_123/steps/step_123?include%5B%5D=step_details.tool_calls%5B*%5D.file_search.results%5B*%5D.content"
     );
     assert_eq!(
         requests[23].path,
-        "/v1/threads/thread_123/runs/run_123/steps?after=step_after&before=step_before&limit=1&order=asc&include%5B%5D=step_details"
+        "/v1/threads/thread_123/runs/run_123/steps?after=step_after&before=step_before&limit=1&order=asc&include%5B%5D=step_details.tool_calls%5B*%5D.file_search.results%5B*%5D.content"
     );
     for request in &requests {
         assert_eq!(
