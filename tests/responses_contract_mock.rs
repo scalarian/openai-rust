@@ -10,12 +10,12 @@ use openai_rust::{
             ResponseConversation, ResponseConversationObject, ResponseCustomTool,
             ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
             ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
-            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseItemAction,
-            ResponseItemEnvironment, ResponseItemOutput, ResponseMcpAllowedTools,
-            ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
-            ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning, ResponseShellEnvironment,
-            ResponseShellOutputOutcome, ResponseShellTool, ResponseTextAnnotation, ResponseTool,
-            ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseInstructions,
+            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
+            ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
+            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
+            ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -251,7 +251,9 @@ fn create_populates_output_text_helper() {
     assert_eq!(response.output().model.as_deref(), Some("gpt-4.1-nano"));
     assert_eq!(
         response.output().instructions,
-        Some(json!("Server instructions"))
+        Some(ResponseInstructions::Text(String::from(
+            "Server instructions"
+        )))
     );
     assert_eq!(response.output().parallel_tool_calls, Some(true));
     assert_eq!(
@@ -528,6 +530,34 @@ fn retrieve_round_trips_output_text_and_query() {
         .retrieve("   ", Default::default())
         .expect_err("blank response id should be rejected locally");
     assert_eq!(error.kind, ErrorKind::Validation);
+}
+
+#[test]
+fn response_instructions_decode_input_items() {
+    let server = mock_http::MockHttpServer::spawn(json_response(
+        response_payload_with_instruction_items("resp_instruction_items"),
+    ))
+    .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let response = client
+        .responses()
+        .retrieve("resp_instruction_items", Default::default())
+        .unwrap();
+
+    let Some(ResponseInstructions::Items(items)) = &response.output().instructions else {
+        panic!("expected typed instruction items");
+    };
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].item_type, "message");
+    assert_eq!(items[0].role.as_deref(), Some("developer"));
+    assert_eq!(items[0].content[0].content_type, "input_text");
+    assert_eq!(items[0].content[0].text.as_deref(), Some("Use plain text."));
 }
 
 #[test]
@@ -1189,6 +1219,19 @@ fn response_payload(
         }
     })
     .to_string()
+}
+
+fn response_payload_with_instruction_items(id: &str) -> String {
+    let mut payload: Value =
+        serde_json::from_str(&response_payload(id, Some(true), None, None)).unwrap();
+    payload["instructions"] = json!([
+        {
+            "type": "message",
+            "role": "developer",
+            "content": "Use plain text."
+        }
+    ]);
+    payload.to_string()
 }
 
 fn response_payload_tools() -> Value {

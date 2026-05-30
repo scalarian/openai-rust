@@ -986,6 +986,14 @@ pub struct ResponseReasoning {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// System or developer instructions returned on a response object.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum ResponseInstructions {
+    Text(String),
+    Items(Vec<ResponseOutputItem>),
+}
+
 /// Public parsed response object with aggregated `output_text`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Response {
@@ -994,7 +1002,7 @@ pub struct Response {
     pub created_at: f64,
     pub status: Option<String>,
     pub model: Option<String>,
-    pub instructions: Option<Value>,
+    pub instructions: Option<ResponseInstructions>,
     pub output: Vec<ResponseOutputItem>,
     pub parallel_tool_calls: Option<bool>,
     pub previous_response_id: Option<String>,
@@ -1945,7 +1953,7 @@ struct WireResponseOutputItem {
     pending_safety_checks: Vec<ResponseComputerSafetyCheck>,
     #[serde(default)]
     acknowledged_safety_checks: Vec<ResponseComputerSafetyCheck>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_response_content_parts")]
     content: Vec<ResponseContentPart>,
     #[serde(flatten)]
     extra: BTreeMap<String, Value>,
@@ -2048,8 +2056,47 @@ pub struct ResponseContentPart {
 }
 
 impl ResponseContentPart {
+    fn input_text(text: String) -> Self {
+        Self {
+            content_type: String::from("input_text"),
+            text: Some(text),
+            refusal: None,
+            annotations: Vec::new(),
+            logprobs: None,
+            detail: None,
+            file_data: None,
+            file_id: None,
+            file_url: None,
+            filename: None,
+            image_url: None,
+            input_audio: None,
+            extra: BTreeMap::new(),
+        }
+    }
+
     fn refusal_text(&self) -> Option<&str> {
         self.refusal.as_deref().or(self.text.as_deref())
+    }
+}
+
+fn deserialize_response_content_parts<'de, D>(
+    deserializer: D,
+) -> Result<Vec<ResponseContentPart>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Array(parts) => parts
+            .into_iter()
+            .map(serde_json::from_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(serde::de::Error::custom),
+        Value::String(text) => Ok(vec![ResponseContentPart::input_text(text)]),
+        Value::Null => Ok(Vec::new()),
+        other => Err(serde::de::Error::custom(format!(
+            "invalid response content payload: expected string or array, got {other}"
+        ))),
     }
 }
 
@@ -2201,7 +2248,7 @@ pub struct ParsedResponse<T> {
     pub created_at: f64,
     pub status: Option<String>,
     pub model: Option<String>,
-    pub instructions: Option<Value>,
+    pub instructions: Option<ResponseInstructions>,
     pub output: Vec<ResponseOutputItem>,
     pub parallel_tool_calls: Option<bool>,
     pub previous_response_id: Option<String>,
@@ -4263,7 +4310,7 @@ struct WireResponse {
     #[serde(default)]
     model: Option<String>,
     #[serde(default)]
-    instructions: Option<Value>,
+    instructions: Option<ResponseInstructions>,
     #[serde(default)]
     output: Vec<ResponseOutputItem>,
     #[serde(default)]
