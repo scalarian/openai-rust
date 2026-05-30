@@ -354,6 +354,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization role deletion object type.
+    pub enum AdminRoleDeletedObject {
+        RoleDeleted => "role.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Organization group-role assignment object type.
     pub enum AdminGroupRoleObject {
         GroupRole => "group.role",
@@ -1079,6 +1086,18 @@ pub struct AdminRole {
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
+
+/// Confirmation payload returned after deleting a role.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminRoleDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminRoleDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminRoleListResponse = AdminNextCursorPage<AdminRole>;
 
 /// Organization user-role creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -2906,38 +2925,59 @@ impl OrganizationRoles {
         Self { runtime }
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/roles", params)
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminRole>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/roles",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
-    pub fn retrieve(&self, role_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(&self, role_id: &str) -> Result<ApiResponse<AdminRole>, OpenAIError> {
         let role_id = path_id("role_id", role_id)?;
-        get(&self.runtime, format!("/organization/roles/{role_id}"))
+        self.runtime.execute_json(
+            "GET",
+            format!("/organization/roles/{role_id}"),
+            RequestOptions::default(),
+        )
     }
 
     pub fn update<B: Serialize>(
         &self,
         role_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminRole>, OpenAIError> {
         let role_id = path_id("role_id", role_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/roles/{role_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/roles", params)
+    ) -> Result<ApiResponse<AdminRoleListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/roles", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, role_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        role_id: &str,
+    ) -> Result<ApiResponse<AdminRoleDeleteResponse>, OpenAIError> {
         let role_id = path_id("role_id", role_id)?;
-        delete(&self.runtime, format!("/organization/roles/{role_id}"))
+        self.runtime.execute_json(
+            "DELETE",
+            format!("/organization/roles/{role_id}"),
+            RequestOptions::default(),
+        )
     }
 }
 

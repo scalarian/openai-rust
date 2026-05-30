@@ -622,6 +622,16 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[12] = json_response(organization_role_json("role_audit").to_string());
+    responses[13] = json_response(organization_role_json("role_audit").to_string());
+    responses[14] = json_response(
+        json!({
+            "data": [organization_role_json("role_audit")],
+            "has_more": true,
+            "next": "role_audit"
+        })
+        .to_string(),
+    );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -788,14 +798,18 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     assert_eq!(group_roles.output.data[0].permissions, vec!["logs.read"]);
     assert_eq!(group_roles.output.next_after(), Some("role_viewer"));
 
-    org.roles()
+    let created_role = org
+        .roles()
         .create(AdminRoleCreateParams {
             description: Some(String::from("Read audit logs")),
             permissions: vec![String::from("logs.read")],
             role_name: String::from("audit_reader"),
         })
         .unwrap();
-    org.roles()
+    assert_eq!(created_role.output.id, "role_audit");
+    assert_eq!(created_role.output.object, AdminRoleObject::Role);
+    let updated_role = org
+        .roles()
         .update(
             "role_audit",
             AdminRoleUpdateParams {
@@ -805,13 +819,17 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    org.roles()
+    assert_eq!(updated_role.output.permissions, vec!["logs.read"]);
+    let roles = org
+        .roles()
         .list(AdminRoleListParams {
             after: Some(String::from("role_after")),
             limit: Some(11),
             order: Some(ListOrder::Desc),
         })
         .unwrap();
+    assert_eq!(roles.output.data[0].resource_type, "api.organization");
+    assert_eq!(roles.output.next_after(), Some("role_audit"));
 
     let organization_retention = org
         .data_retention()
@@ -1549,6 +1567,56 @@ fn admin_group_role_retrieve_list_and_delete_return_typed_responses() {
         requests[2].path,
         "/v1/organization/groups/grp_eng/roles/role_viewer"
     );
+}
+
+#[test]
+fn admin_role_retrieve_list_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_role_json("role_audit").to_string()),
+        json_response(
+            json!({
+                "data": [organization_role_json("role_audit")],
+                "has_more": true,
+                "next": "role_audit"
+            })
+            .to_string(),
+        ),
+        json_response(
+            json!({
+                "id": "role_audit",
+                "deleted": true,
+                "object": "role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let roles = client.admin().organization().roles();
+
+    let role = roles.retrieve("role_audit").unwrap();
+    assert_eq!(role.output.object, AdminRoleObject::Role);
+    assert_eq!(role.output.permissions, vec!["logs.read"]);
+
+    let listed = roles
+        .list(AdminRoleListParams {
+            limit: Some(2),
+            order: Some(ListOrder::Asc),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(listed.output.data[0].id, "role_audit");
+    assert_eq!(listed.output.next_after(), Some("role_audit"));
+
+    let deleted = roles.delete("role_audit").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, AdminRoleDeletedObject::RoleDeleted);
+
+    let requests = server.captured_requests(3).unwrap();
+    assert_eq!(requests[0].path, "/v1/organization/roles/role_audit");
+    assert_eq!(requests[1].path, "/v1/organization/roles?limit=2&order=asc");
+    assert_eq!(requests[2].method, "DELETE");
+    assert_eq!(requests[2].path, "/v1/organization/roles/role_audit");
 }
 
 #[test]
