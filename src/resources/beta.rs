@@ -13,6 +13,7 @@ use crate::{
 };
 
 const CHATKIT_BETA_HEADER: &str = "chatkit_beta=v1";
+const REALTIME_BETA_HEADER: &str = "assistants=v2";
 
 /// Beta API family.
 #[derive(Clone, Debug)]
@@ -30,9 +31,9 @@ impl Beta {
         crate::resources::chat::Chat::new(self.runtime.clone())
     }
 
-    /// Returns the realtime surface through the upstream beta alias.
-    pub fn realtime(&self) -> crate::realtime::Realtime {
-        crate::realtime::Realtime::new(self.runtime.clone())
+    /// Returns beta realtime REST endpoints.
+    pub fn realtime(&self) -> BetaRealtime {
+        BetaRealtime::new(self.runtime.clone())
     }
 
     /// Returns ChatKit beta endpoints.
@@ -45,6 +46,62 @@ impl Beta {
 #[derive(Clone, Debug)]
 pub struct ChatKit {
     runtime: Arc<ClientRuntime>,
+}
+
+/// Beta realtime REST API family.
+#[derive(Clone, Debug)]
+pub struct BetaRealtime {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaRealtime {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Returns beta realtime session-token endpoints.
+    pub fn sessions(&self) -> BetaRealtimeSessions {
+        BetaRealtimeSessions::new(self.runtime.clone())
+    }
+
+    /// Returns beta realtime transcription-session token endpoints.
+    pub fn transcription_sessions(&self) -> BetaRealtimeTranscriptionSessions {
+        BetaRealtimeTranscriptionSessions::new(self.runtime.clone())
+    }
+}
+
+/// Beta realtime session-token endpoints.
+#[derive(Clone, Debug)]
+pub struct BetaRealtimeSessions {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaRealtimeSessions {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Creates an ephemeral Realtime API token with session configuration.
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+        realtime_beta_post_body(&self.runtime, "/realtime/sessions", &params)
+    }
+}
+
+/// Beta realtime transcription-session token endpoints.
+#[derive(Clone, Debug)]
+pub struct BetaRealtimeTranscriptionSessions {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaRealtimeTranscriptionSessions {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Creates an ephemeral Realtime transcription API token.
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+        realtime_beta_post_body(&self.runtime, "/realtime/transcription_sessions", &params)
+    }
 }
 
 impl ChatKit {
@@ -489,6 +546,23 @@ where
     request.headers.insert(
         String::from("openai-beta"),
         String::from(CHATKIT_BETA_HEADER),
+    );
+    let options = runtime.resolve_request_options(&RequestOptions::default())?;
+    execute_json(&request, &options)
+}
+
+fn realtime_beta_post_body<B>(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+    body: &B,
+) -> Result<ApiResponse<Value>, OpenAIError>
+where
+    B: Serialize,
+{
+    let mut request = runtime.prepare_json_request("POST", path, body)?;
+    request.headers.insert(
+        String::from("openai-beta"),
+        String::from(REALTIME_BETA_HEADER),
     );
     let options = runtime.resolve_request_options(&RequestOptions::default())?;
     execute_json(&request, &options)
