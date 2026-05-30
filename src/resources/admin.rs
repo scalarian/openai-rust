@@ -309,6 +309,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization project object type.
+    pub enum AdminProjectObject {
+        OrganizationProject => "organization.project",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1636,6 +1643,26 @@ impl From<AdminProjectListParams> for AdminQueryParams {
             .push_opt("limit", value.limit)
     }
 }
+
+/// Represents an individual project.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProject {
+    pub id: String,
+    pub created_at: u64,
+    pub object: AdminProjectObject,
+    #[serde(default)]
+    pub archived_at: Option<u64>,
+    #[serde(default)]
+    pub external_key_id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectListResponse = AdminConversationCursorPage<AdminProject>;
 
 /// Project user creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -3400,15 +3427,24 @@ impl OrganizationProjects {
         ProjectCertificates::new(self.runtime.clone())
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/projects", params)
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<AdminProject>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/projects",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
-    pub fn retrieve(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(&self, project_id: &str) -> Result<ApiResponse<AdminProject>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/projects/{project_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -3416,27 +3452,33 @@ impl OrganizationProjects {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProject>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/projects", params)
+    ) -> Result<ApiResponse<AdminProjectListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/projects", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn archive(&self, project_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn archive(&self, project_id: &str) -> Result<ApiResponse<AdminProject>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post(
-            &self.runtime,
+        self.runtime.execute_json(
+            "POST",
             format!("/organization/projects/{project_id}/archive"),
+            RequestOptions::default(),
         )
     }
 }
@@ -4277,13 +4319,6 @@ fn get_query(
     params: impl Into<AdminQueryParams>,
 ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
     get(runtime, path_with_query(base, params))
-}
-
-fn post(
-    runtime: &ClientRuntime,
-    path: impl AsRef<str>,
-) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-    runtime.execute_json("POST", path, RequestOptions::default())
 }
 
 fn post_body<B: Serialize>(

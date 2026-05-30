@@ -241,6 +241,18 @@ fn project_spend_alert_json(id: &str, threshold_amount: i64) -> Value {
     })
 }
 
+fn project_json(id: &str, name: &str, status: &str, archived_at: Option<u64>) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_171_700u64,
+        "object": "organization.project",
+        "archived_at": archived_at,
+        "external_key_id": "key_ext",
+        "name": name,
+        "status": status
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -372,6 +384,27 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         ))
         .to_string(),
     );
+    responses[9] =
+        json_response(project_json("proj_research", "research", "active", None).to_string());
+    responses[10] =
+        json_response(project_json("proj_research", "research-prod", "active", None).to_string());
+    responses[11] = json_response(
+        json!({
+            "data": [project_json("proj_research", "research-prod", "active", None)],
+            "has_more": true,
+            "last_id": "proj_research"
+        })
+        .to_string(),
+    );
+    responses[12] = json_response(
+        project_json(
+            "proj_research",
+            "research-prod",
+            "archived",
+            Some(1_717_172_000u64),
+        )
+        .to_string(),
+    );
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
@@ -461,14 +494,19 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     );
 
     let projects = org.projects();
-    projects
+    let created_project = projects
         .create(AdminProjectCreateParams {
             name: String::from("research"),
             external_key_id: Some(String::from("key_ext")),
             geography: Some(String::from("us")),
         })
         .unwrap();
-    projects
+    assert_eq!(
+        created_project.output.object,
+        AdminProjectObject::OrganizationProject
+    );
+    assert_eq!(created_project.output.name.as_deref(), Some("research"));
+    let updated_project = projects
         .update(
             "proj_research",
             AdminProjectUpdateParams {
@@ -477,14 +515,22 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(
+        updated_project.output.name.as_deref(),
+        Some("research-prod")
+    );
+    let listed_projects = projects
         .list(AdminProjectListParams {
             after: Some(String::from("proj_prev")),
             include_archived: Some(true),
             limit: Some(10),
         })
         .unwrap();
-    projects.archive("proj_research").unwrap();
+    assert_eq!(listed_projects.output.data[0].id, "proj_research");
+    assert_eq!(listed_projects.output.next_after(), Some("proj_research"));
+    let archived_project = projects.archive("proj_research").unwrap();
+    assert_eq!(archived_project.output.status.as_deref(), Some("archived"));
+    assert_eq!(archived_project.output.archived_at, Some(1_717_172_000));
     projects
         .users()
         .create(
@@ -2018,6 +2064,30 @@ fn admin_project_spend_alert_delete_returns_typed_response() {
         requests[0].path,
         "/v1/organization/projects/proj_research/spend_alerts/alert_project"
     );
+}
+
+#[test]
+fn admin_project_retrieve_returns_typed_response() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![json_response(
+        project_json("proj_research", "research", "active", None).to_string(),
+    )])
+    .unwrap();
+    let client = client(&server.url());
+
+    let project = client
+        .admin()
+        .organization()
+        .projects()
+        .retrieve("proj_research")
+        .unwrap();
+    assert_eq!(
+        project.output.object,
+        AdminProjectObject::OrganizationProject
+    );
+    assert_eq!(project.output.external_key_id.as_deref(), Some("key_ext"));
+
+    let requests = server.captured_requests(1).unwrap();
+    assert_eq!(requests[0].path, "/v1/organization/projects/proj_research");
 }
 
 #[test]
