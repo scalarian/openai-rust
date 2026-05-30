@@ -18,7 +18,8 @@ pub use events::{
     RealtimeConversationItemRole, RealtimeConversationItemStatus, RealtimeConversationItemType,
     RealtimeConversationMessageContentPart, RealtimeErrorInfo, RealtimeInclude,
     RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeResponseCreateParams,
-    RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, RealtimeTruncation,
+    RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, RealtimeToolChoice,
+    RealtimeToolChoiceFunction, RealtimeToolChoiceMcp, RealtimeToolChoiceOther, RealtimeTruncation,
     RealtimeTruncationRetentionRatio, RealtimeTruncationRetentionRatioType,
     RealtimeTruncationTokenLimits, decode_server_event, decode_server_event_text,
 };

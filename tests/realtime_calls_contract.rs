@@ -4,7 +4,7 @@ use openai_rust::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
         RealtimeMaxOutputTokens, RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
-        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeTruncation,
+        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice, RealtimeTruncation,
         RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits,
     },
 };
@@ -29,6 +29,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "model": "gpt-realtime-mini",
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
+                    "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
                     "truncation": "auto",
                     "instructions": "Answer tersely."
                 }
@@ -65,6 +66,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
+                tool_choice: Some(RealtimeToolChoice::Required),
                 truncation: Some(RealtimeTruncation::Disabled),
                 ..Default::default()
             }),
@@ -87,6 +89,13 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.truncation,
         Some(RealtimeTruncation::Auto)
+    );
+    assert_eq!(
+        secret.output().session.tool_choice,
+        Some(RealtimeToolChoice::mcp(
+            "remote",
+            Some(String::from("lookup"))
+        ))
     );
 
     let sdp_only = client
@@ -111,6 +120,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
+                tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
                 truncation: Some(RealtimeTruncation::from(RealtimeTruncationRetentionRatio {
                     token_limits: Some(RealtimeTruncationTokenLimits {
                         post_instructions: Some(5_000),
@@ -141,6 +151,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
+                tool_choice: Some(RealtimeToolChoice::mcp("remote", None)),
                 truncation: Some(RealtimeTruncation::Auto),
                 ..Default::default()
             },
@@ -189,6 +200,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
+    assert_eq!(client_secret_body["session"]["tool_choice"], "required");
     assert_eq!(client_secret_body["session"]["truncation"], "disabled");
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
@@ -229,6 +241,8 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(multipart_session["max_output_tokens"], "inf");
     assert_eq!(multipart_session["parallel_tool_calls"], true);
     assert_eq!(multipart_session["reasoning"]["effort"], "low");
+    assert_eq!(multipart_session["tool_choice"]["type"], "function");
+    assert_eq!(multipart_session["tool_choice"]["name"], "lookup_weather");
     assert_eq!(multipart_session["truncation"]["type"], "retention_ratio");
     assert_eq!(multipart_session["truncation"]["retention_ratio"], 0.8);
     assert_eq!(
@@ -250,6 +264,9 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(accept_body["max_output_tokens"], 128);
+    assert_eq!(accept_body["tool_choice"]["type"], "mcp");
+    assert_eq!(accept_body["tool_choice"]["server_label"], "remote");
+    assert!(accept_body["tool_choice"].get("name").is_none());
     assert_eq!(accept_body["truncation"], "auto");
     assert_eq!(accept_body["parallel_tool_calls"], true);
     assert_eq!(accept_body["reasoning"]["effort"], "low");

@@ -7,7 +7,7 @@ use openai_rust::{
         RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
         RealtimeConversationMessageContentPart, RealtimeMaxOutputTokens, RealtimeOutputModality,
         RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
-        RealtimeSessionType,
+        RealtimeSessionType, RealtimeToolChoice,
     },
 };
 use serde_json::json;
@@ -526,6 +526,7 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 metadata: Some(json!({"source": "test"})),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
                 ..Default::default()
             },
             Some(String::from("evt_response")),
@@ -626,6 +627,11 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         json!(["text"])
     );
     assert_eq!(captured[1]["response"]["max_output_tokens"], "inf");
+    assert_eq!(captured[1]["response"]["tool_choice"]["type"], "function");
+    assert_eq!(
+        captured[1]["response"]["tool_choice"]["name"],
+        "lookup_weather"
+    );
     assert_eq!(captured[2]["response_id"], "resp_cancel");
     assert_eq!(captured[3]["audio"], "AQID");
     assert_eq!(captured[6]["previous_item_id"], "root");

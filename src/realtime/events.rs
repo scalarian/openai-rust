@@ -275,6 +275,168 @@ pub struct RealtimeTruncationTokenLimits {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Realtime tool-choice selector.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeToolChoice {
+    Auto,
+    None,
+    Required,
+    Function(Box<RealtimeToolChoiceFunction>),
+    Mcp(Box<RealtimeToolChoiceMcp>),
+    Other(Box<RealtimeToolChoiceOther>),
+    UnknownString(String),
+}
+
+impl RealtimeToolChoice {
+    pub fn function(name: impl Into<String>) -> Self {
+        Self::Function(Box::new(RealtimeToolChoiceFunction {
+            name: name.into(),
+            extra: BTreeMap::new(),
+        }))
+    }
+
+    pub fn mcp(server_label: impl Into<String>, name: Option<String>) -> Self {
+        Self::Mcp(Box::new(RealtimeToolChoiceMcp {
+            server_label: server_label.into(),
+            name,
+            extra: BTreeMap::new(),
+        }))
+    }
+}
+
+/// Force a specific Realtime function tool.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeToolChoiceFunction {
+    pub name: String,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Force a specific Realtime MCP tool.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeToolChoiceMcp {
+    pub server_label: String,
+    pub name: Option<String>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Forward-compatible Realtime tool-choice object.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeToolChoiceOther {
+    pub tool_type: String,
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl Serialize for RealtimeToolChoice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Auto => serializer.serialize_str("auto"),
+            Self::None => serializer.serialize_str("none"),
+            Self::Required => serializer.serialize_str("required"),
+            Self::Function(function) => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(String::from("function")),
+                );
+                object.insert(String::from("name"), Value::String(function.name.clone()));
+                object.extend(function.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Mcp(mcp) => {
+                let mut object = Map::new();
+                object.insert(String::from("type"), Value::String(String::from("mcp")));
+                object.insert(
+                    String::from("server_label"),
+                    Value::String(mcp.server_label.clone()),
+                );
+                if let Some(name) = &mcp.name {
+                    object.insert(String::from("name"), Value::String(name.clone()));
+                }
+                object.extend(mcp.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Other(other) => {
+                let mut object = Map::new();
+                object.insert(String::from("type"), Value::String(other.tool_type.clone()));
+                object.extend(other.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+            Self::UnknownString(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeToolChoice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) => match value.as_str() {
+                "auto" => Ok(Self::Auto),
+                "none" => Ok(Self::None),
+                "required" => Ok(Self::Required),
+                _ => Ok(Self::UnknownString(value)),
+            },
+            Value::Object(mut object) => {
+                let tool_type = remove_required_object_string(&mut object, "type")
+                    .map_err(serde::de::Error::custom)?;
+                match tool_type.as_str() {
+                    "function" => Ok(Self::Function(Box::new(RealtimeToolChoiceFunction {
+                        name: remove_required_object_string(&mut object, "name")
+                            .map_err(serde::de::Error::custom)?,
+                        extra: object.into_iter().collect(),
+                    }))),
+                    "mcp" => Ok(Self::Mcp(Box::new(RealtimeToolChoiceMcp {
+                        server_label: remove_required_object_string(&mut object, "server_label")
+                            .map_err(serde::de::Error::custom)?,
+                        name: remove_optional_object_string(&mut object, "name")
+                            .map_err(serde::de::Error::custom)?,
+                        extra: object.into_iter().collect(),
+                    }))),
+                    _ => Ok(Self::Other(Box::new(RealtimeToolChoiceOther {
+                        tool_type,
+                        extra: object.into_iter().collect(),
+                    }))),
+                }
+            }
+            _ => Err(serde::de::Error::custom(
+                "tool_choice must be a string or object",
+            )),
+        }
+    }
+}
+
+fn remove_required_object_string(
+    object: &mut Map<String, Value>,
+    field: &str,
+) -> Result<String, String> {
+    object
+        .remove(field)
+        .and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        })
+        .ok_or_else(|| format!("Realtime tool choice missing string `{field}`"))
+}
+
+fn remove_optional_object_string(
+    object: &mut Map<String, Value>,
+    field: &str,
+) -> Result<Option<String>, String> {
+    match object.remove(field) {
+        Some(Value::String(value)) => Ok(Some(value)),
+        Some(Value::Null) | None => Ok(None),
+        Some(_) => Err(format!(
+            "Realtime tool choice field `{field}` must be a string"
+        )),
+    }
+}
+
 realtime_string_literal_enum! {
     /// Additional Realtime fields that can be requested in server outputs.
     pub enum RealtimeInclude {
@@ -354,7 +516,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -494,7 +656,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Value>>,
 }
