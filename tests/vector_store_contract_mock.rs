@@ -12,6 +12,7 @@ use openai_rust::{
     },
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[test]
 fn crud_and_errors() {
@@ -50,7 +51,10 @@ fn crud_and_errors() {
             name: Some(String::from("Knowledge Base")),
             description: Some(String::from("Customer support snippets")),
             file_ids: vec![String::from("file_1"), String::from("file_2")],
-            metadata: Some(json!({"env": "test"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("env"),
+                String::from("test"),
+            )])),
             expires_after: Some(VectorStoreExpiresAfter {
                 anchor: String::from("last_active_at"),
                 days: 7,
@@ -79,7 +83,10 @@ fn crud_and_errors() {
             "vs_123",
             VectorStoreUpdateParams {
                 name: Some(String::from("Knowledge Base v2")),
-                metadata: Some(json!({"env": "prod"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("env"),
+                    String::from("prod"),
+                )])),
                 expires_after: Some(VectorStoreExpiresAfter {
                     anchor: String::from("last_active_at"),
                     days: 30,

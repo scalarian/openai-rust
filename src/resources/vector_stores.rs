@@ -663,7 +663,7 @@ pub struct VectorStoreCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub file_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -674,7 +674,7 @@ pub struct VectorStoreUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_after: Option<VectorStoreExpiresAfter>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -971,7 +971,7 @@ pub struct VectorStore {
     #[serde(default)]
     pub last_active_at: Option<u64>,
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
