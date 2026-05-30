@@ -9,12 +9,65 @@ use serde_json::json;
 
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
-    let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..23)
-            .map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string()))
-            .collect(),
-    )
-    .unwrap();
+    let key_owner = json!({
+        "id": "user_owner",
+        "created_at": 1_717_171_600u64,
+        "name": "Ops Owner",
+        "object": "organization.user",
+        "role": "owner",
+        "type": "user"
+    });
+    let admin_key = json!({
+        "id": "admin_0",
+        "created_at": 1_717_171_700u64,
+        "object": "organization.admin_api_key",
+        "owner": key_owner,
+        "redacted_value": "sk-admin-...0",
+        "last_used_at": null,
+        "name": "ops-key"
+    });
+    let mut responses = vec![
+        json_response(
+            json!({
+                "id": "admin_0",
+                "created_at": 1_717_171_700u64,
+                "object": "organization.admin_api_key",
+                "owner": {
+                    "id": "user_owner",
+                    "created_at": 1_717_171_600u64,
+                    "name": "Ops Owner",
+                    "object": "organization.user",
+                    "role": "owner",
+                    "type": "user"
+                },
+                "redacted_value": "sk-admin-...0",
+                "value": "sk-admin-full",
+                "name": "ops-key"
+            })
+            .to_string(),
+        ),
+        json_response(admin_key.to_string()),
+        json_response(
+            json!({
+                "object": "list",
+                "data": [admin_key],
+                "has_more": false
+            })
+            .to_string(),
+        ),
+        json_response(
+            json!({
+                "id": "key_ops",
+                "deleted": true,
+                "object": "organization.admin_api_key.deleted"
+            })
+            .to_string(),
+        ),
+    ];
+    responses.extend(
+        (4..23).map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string())),
+    );
+    let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
     let client = client(&server.url());
     let org = client.admin().organization();
 
@@ -24,16 +77,32 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             name: String::from("ops-key"),
         })
         .unwrap();
-    assert_eq!(created_key.output["id"], json!("admin_0"));
-    org.admin_api_keys().retrieve("key_ops").unwrap();
-    org.admin_api_keys()
+    assert_eq!(created_key.output.id, "admin_0");
+    assert_eq!(
+        created_key.output.object,
+        AdminApiKeyObject::OrganizationAdminApiKey
+    );
+    assert_eq!(created_key.output.value, "sk-admin-full");
+    assert_eq!(created_key.output.owner.owner_type.as_deref(), Some("user"));
+    let retrieved_key = org.admin_api_keys().retrieve("key_ops").unwrap();
+    assert_eq!(retrieved_key.output.redacted_value, "sk-admin-...0");
+    let listed_keys = org
+        .admin_api_keys()
         .list(AdminApiKeyListParams {
             after: Some(String::from("key_prev")),
             limit: Some(2),
             order: Some(ListOrder::Asc),
         })
         .unwrap();
-    org.admin_api_keys().delete("key_ops").unwrap();
+    assert_eq!(listed_keys.output.data[0].id, "admin_0");
+    assert_eq!(listed_keys.output.has_more, Some(false));
+    assert_eq!(listed_keys.output.next_after(), None);
+    let deleted_key = org.admin_api_keys().delete("key_ops").unwrap();
+    assert!(deleted_key.output.deleted);
+    assert_eq!(
+        deleted_key.output.object,
+        AdminApiKeyDeletedObject::OrganizationAdminApiKeyDeleted
+    );
 
     org.usage()
         .completions(AdminUsageCompletionsParams {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -125,6 +125,20 @@ macro_rules! admin_string_literal_enum {
             }
         }
     };
+}
+
+admin_string_literal_enum! {
+    /// Organization admin API key object type.
+    pub enum AdminApiKeyObject {
+        OrganizationAdminApiKey => "organization.admin_api_key",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Organization admin API key deletion object type.
+    pub enum AdminApiKeyDeletedObject {
+        OrganizationAdminApiKeyDeleted => "organization.admin_api_key.deleted",
+    }
 }
 
 admin_string_literal_enum! {
@@ -529,6 +543,96 @@ impl From<AdminApiKeyListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+/// Owner information attached to an organization admin API key.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminApiKeyOwner {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<u64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub object: Option<String>,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default, rename = "type")]
+    pub owner_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Represents an individual organization admin API key.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminApiKey {
+    pub id: String,
+    pub created_at: u64,
+    pub object: AdminApiKeyObject,
+    pub owner: AdminApiKeyOwner,
+    pub redacted_value: String,
+    #[serde(default)]
+    pub last_used_at: Option<u64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Organization admin API key creation response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminApiKeyCreateResponse {
+    pub id: String,
+    pub created_at: u64,
+    pub object: AdminApiKeyObject,
+    pub owner: AdminApiKeyOwner,
+    pub redacted_value: String,
+    pub value: String,
+    #[serde(default)]
+    pub last_used_at: Option<u64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Organization admin API key deletion response.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminApiKeyDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminApiKeyDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Cursor page returned by admin list endpoints.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminCursorPage<T> {
+    #[serde(default)]
+    pub object: Option<String>,
+    pub data: Vec<T>,
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl AdminCursorPage<AdminApiKey> {
+    pub fn has_next_page(&self) -> bool {
+        self.has_more != Some(false) && !self.data.is_empty()
+    }
+
+    pub fn next_after(&self) -> Option<&str> {
+        if self.has_next_page() {
+            self.data.last().map(|key| key.id.as_str())
+        } else {
+            None
+        }
+    }
+}
+
+pub type AdminApiKeyListResponse = AdminCursorPage<AdminApiKey>;
 
 /// Organization invite creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -1629,30 +1733,47 @@ impl AdminApiKeys {
         Self { runtime }
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/admin_api_keys", params)
+    pub fn create<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<AdminApiKeyCreateResponse>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/admin_api_keys",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
-    pub fn retrieve(&self, key_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(&self, key_id: &str) -> Result<ApiResponse<AdminApiKey>, OpenAIError> {
         let key_id = path_id("key_id", key_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/organization/admin_api_keys/{key_id}"),
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/admin_api_keys", params)
+    ) -> Result<ApiResponse<AdminApiKeyListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/admin_api_keys", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, key_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        key_id: &str,
+    ) -> Result<ApiResponse<AdminApiKeyDeleteResponse>, OpenAIError> {
         let key_id = path_id("key_id", key_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/organization/admin_api_keys/{key_id}"),
+            RequestOptions::default(),
         )
     }
 }
