@@ -4,7 +4,7 @@ This note tracks the public surface that is already shipped in the crate.
 
 ## Primary modern surface
 
-- `src/resources/responses.rs` — create, parse, stream, persistent websocket connect, retrieve, cancel, compact, input helpers — `examples/responses_quickstart.rs`, `examples/responses_streaming.rs`, `examples/structured_outputs.rs`, `tests/responses_websocket_contract.rs`
+- `src/resources/responses.rs` — create, parse, stream, persistent websocket connect with parse/callback dispatch helpers, retrieve, cancel, compact, input helpers — `examples/responses_quickstart.rs`, `examples/responses_streaming.rs`, `examples/structured_outputs.rs`, `tests/responses_websocket_contract.rs`
 - `src/resources/conversations.rs` — conversation CRUD and item helpers — `examples/live_conversations_crud_smoke.rs`, `examples/live_conversations_items_smoke.rs`
 
 ## Compatibility surface
@@ -36,4 +36,4 @@ This note tracks the public surface that is already shipped in the crate.
 - `src/resources/containers.rs`
 - `src/resources/skills.rs`
 - `src/resources/videos.rs`
-- `src/realtime` — Realtime client-secret/calls REST helpers, persistent websocket connect, and upstream-shaped connection event helpers — `tests/realtime_connection_contract.rs`, `tests/realtime_audio_contract.rs`, `tests/realtime_decode_contract.rs`
+- `src/realtime` — Realtime client-secret/calls REST helpers, persistent websocket connect, upstream-shaped connection event helpers, and parse/callback dispatch helpers — `tests/realtime_connection_contract.rs`, `tests/realtime_audio_contract.rs`, `tests/realtime_decode_contract.rs`

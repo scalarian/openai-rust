@@ -1,6 +1,9 @@
 #![allow(clippy::result_large_err)]
 
-use std::{collections::BTreeMap, sync::mpsc};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex, mpsc},
+};
 
 use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
@@ -180,4 +183,131 @@ async fn responses_websocket_can_exchange_flexible_json_events() {
     );
 
     server.await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn responses_websocket_callbacks_parse_and_dispatch_events() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_hdr_async(stream, |_request: &Request, response: Response| {
+            Ok(response)
+        })
+        .await
+        .unwrap();
+
+        for event in [
+            json!({
+                "type": "response.created",
+                "response": {
+                    "id": "resp_callbacks",
+                    "status": "in_progress"
+                }
+            }),
+            json!({
+                "type": "response.output_text.delta",
+                "response_id": "resp_callbacks",
+                "item_id": "item_123",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": "Hel"
+            }),
+            json!({
+                "type": "response.output_text.delta",
+                "response_id": "resp_callbacks",
+                "item_id": "item_123",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": "lo"
+            }),
+        ] {
+            socket
+                .send(Message::Text(event.to_string().into()))
+                .await
+                .unwrap();
+        }
+
+        socket.close(None).await.unwrap();
+    });
+
+    let client = OpenAI::builder()
+        .api_key("sk-test")
+        .base_url(format!("http://{addr}/v1"))
+        .build();
+    let mut connection = client
+        .responses()
+        .connect(ResponsesConnectOptions::new())
+        .await
+        .expect("responses websocket connection");
+
+    let parsed = connection
+        .parse_event(br#"{"type":"response.output_text.delta","delta":"Hi"}"#)
+        .unwrap();
+    assert_eq!(
+        parsed,
+        ResponsesConnectionEvent {
+            event_type: Some(String::from("response.output_text.delta")),
+            payload: json!({
+                "type": "response.output_text.delta",
+                "delta": "Hi"
+            }),
+        }
+    );
+
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let removed = {
+        let calls = calls.clone();
+        connection.on("response.created", move |_| {
+            calls
+                .lock()
+                .unwrap()
+                .push(String::from("removed:response.created"));
+        })
+    };
+    assert!(connection.off("response.created", removed));
+
+    {
+        let calls = calls.clone();
+        connection.on("response.created", move |event| {
+            calls.lock().unwrap().push(format!(
+                "specific:{}",
+                event.event_type.as_deref().unwrap_or_default()
+            ));
+        });
+    }
+    {
+        let calls = calls.clone();
+        connection.once("response.output_text.delta", move |event| {
+            calls.lock().unwrap().push(format!(
+                "once:delta:{}",
+                event.payload["delta"].as_str().unwrap()
+            ));
+        });
+    }
+    {
+        let calls = calls.clone();
+        connection.on("event", move |event| {
+            calls.lock().unwrap().push(format!(
+                "generic:{}",
+                event.event_type.as_deref().unwrap_or_default()
+            ));
+        });
+    }
+
+    connection.dispatch_events().await.unwrap();
+    server.await.unwrap();
+
+    let calls = calls.lock().unwrap().clone();
+    assert_eq!(
+        calls,
+        vec![
+            "specific:response.created",
+            "generic:response.created",
+            "once:delta:Hel",
+            "generic:response.output_text.delta",
+            "generic:response.output_text.delta",
+        ]
+    );
 }

@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 
 use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
@@ -474,4 +474,130 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
     assert_eq!(captured[7]["audio_end_ms"], 240);
     assert_eq!(captured[8]["item_id"], "item_user");
     assert_eq!(captured[9]["item_id"], "item_user");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn connection_callbacks_parse_and_dispatch_events() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = accept_async(stream).await.unwrap();
+
+        for event in [
+            json!({
+                "type": "session.created",
+                "event_id": "evt_created",
+                "session": {
+                    "id": "sess_callbacks",
+                    "type": "realtime",
+                    "model": "gpt-realtime-mini",
+                    "output_modalities": ["text"]
+                }
+            }),
+            json!({
+                "type": "response.output_text.delta",
+                "event_id": "evt_delta_1",
+                "response_id": "resp_123",
+                "item_id": "item_123",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": "Hel"
+            }),
+            json!({
+                "type": "response.output_text.delta",
+                "event_id": "evt_delta_2",
+                "response_id": "resp_123",
+                "item_id": "item_123",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": "lo"
+            }),
+        ] {
+            socket
+                .send(Message::Text(event.to_string().into()))
+                .await
+                .unwrap();
+        }
+
+        socket.close(None).await.unwrap();
+    });
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(format!("http://{addr}/v1"))
+        .build();
+    let mut connection = client
+        .realtime()
+        .connect(RealtimeConnectOptions {
+            model: Some(String::from("gpt-realtime-mini")),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let parsed = connection
+        .parse_event(
+            br#"{"type":"response.output_text.done","event_id":"evt_done","response_id":"resp_123","item_id":"item_123","output_index":0,"content_index":0,"text":"Hello"}"#,
+        )
+        .unwrap();
+    assert!(matches!(
+        parsed,
+        RealtimeServerEvent::OutputTextDone { ref text, .. } if text == "Hello"
+    ));
+
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let removed = {
+        let calls = calls.clone();
+        connection.on("session.created", move |_| {
+            calls
+                .lock()
+                .unwrap()
+                .push(String::from("removed:session.created"));
+        })
+    };
+    assert!(connection.off("session.created", removed));
+
+    {
+        let calls = calls.clone();
+        connection.on("session.created", move |event| {
+            calls
+                .lock()
+                .unwrap()
+                .push(format!("specific:{}", event.event_type()));
+        });
+    }
+    {
+        let calls = calls.clone();
+        connection.once("response.output_text.delta", move |event| {
+            if let RealtimeServerEvent::OutputTextDelta { delta, .. } = event {
+                calls.lock().unwrap().push(format!("once:delta:{delta}"));
+            }
+        });
+    }
+    {
+        let calls = calls.clone();
+        connection.on("event", move |event| {
+            calls
+                .lock()
+                .unwrap()
+                .push(format!("generic:{}", event.event_type()));
+        });
+    }
+
+    connection.dispatch_events().await.unwrap();
+    server.await.unwrap();
+
+    let calls = calls.lock().unwrap().clone();
+    assert_eq!(
+        calls,
+        vec![
+            "specific:session.created",
+            "generic:session.created",
+            "once:delta:Hel",
+            "generic:response.output_text.delta",
+            "generic:response.output_text.delta",
+        ]
+    );
 }

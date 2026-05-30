@@ -9,7 +9,7 @@ pub use client::{
     RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
     RealtimeCallRejectParams, RealtimeClientSecret, RealtimeClientSecretCreateParams,
     RealtimeClientSecretCreateResponse, RealtimeConnectOptions, RealtimeConnection,
-    RealtimeConversationItemResource, RealtimeConversationResource,
+    RealtimeConversationItemResource, RealtimeConversationResource, RealtimeEventHandlerId,
     RealtimeInputAudioBufferResource, RealtimeOutputAudioBufferResource, RealtimeResponseResource,
     RealtimeSessionResource, RealtimeSessionTTL,
 };

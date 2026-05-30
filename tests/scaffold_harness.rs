@@ -15,7 +15,10 @@ fn client_scaffold_exposes_primary_resource_families() {
     let _ = client.conversations();
     let _ = client.chat();
     let _ = client.images();
-    let _ = client.audio();
+    let audio = client.audio();
+    let _ = audio.transcriptions();
+    let _ = audio.translations();
+    let _ = audio.speech();
     let _ = client.files();
     let _ = client.uploads();
     let _ = client.vector_stores();

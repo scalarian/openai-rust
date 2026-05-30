@@ -42,6 +42,21 @@ impl Audio {
             speech: Speech::new(runtime),
         }
     }
+
+    /// Returns the audio transcription helper surface.
+    pub fn transcriptions(&self) -> &Transcriptions {
+        &self.transcriptions
+    }
+
+    /// Returns the audio translation helper surface.
+    pub fn translations(&self) -> &Translations {
+        &self.translations
+    }
+
+    /// Returns the audio speech helper surface.
+    pub fn speech(&self) -> &Speech {
+        &self.speech
+    }
 }
 
 /// Uploadable audio input.

@@ -235,9 +235,87 @@ pub struct ResponsesConnectionEvent {
     pub payload: Value,
 }
 
+/// Registered Responses websocket event handler identifier.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ResponsesEventHandlerId(u64);
+
+struct ResponsesEventHandler {
+    id: ResponsesEventHandlerId,
+    once: bool,
+    handler: Box<dyn FnMut(&ResponsesConnectionEvent) + Send>,
+}
+
+#[derive(Default)]
+struct ResponsesEventHandlerRegistry {
+    next_id: u64,
+    handlers: BTreeMap<String, Vec<ResponsesEventHandler>>,
+}
+
+impl ResponsesEventHandlerRegistry {
+    fn add<F>(
+        &mut self,
+        event_type: impl Into<String>,
+        handler: F,
+        once: bool,
+    ) -> ResponsesEventHandlerId
+    where
+        F: FnMut(&ResponsesConnectionEvent) + Send + 'static,
+    {
+        let id = ResponsesEventHandlerId(self.next_id);
+        self.next_id += 1;
+        self.handlers
+            .entry(event_type.into())
+            .or_default()
+            .push(ResponsesEventHandler {
+                id,
+                once,
+                handler: Box::new(handler),
+            });
+        id
+    }
+
+    fn remove(&mut self, event_type: &str, id: ResponsesEventHandlerId) -> bool {
+        let Some(handlers) = self.handlers.get_mut(event_type) else {
+            return false;
+        };
+        let Some(index) = handlers.iter().position(|handler| handler.id == id) else {
+            return false;
+        };
+        let _ = handlers.remove(index);
+        if handlers.is_empty() {
+            self.handlers.remove(event_type);
+        }
+        true
+    }
+
+    fn has_handlers(&self, event_type: &str) -> bool {
+        self.handlers
+            .get(event_type)
+            .is_some_and(|handlers| !handlers.is_empty())
+    }
+
+    fn dispatch(&mut self, event_type: &str, event: &ResponsesConnectionEvent) {
+        let Some(handlers) = self.handlers.get_mut(event_type) else {
+            return;
+        };
+
+        let mut index = 0;
+        while index < handlers.len() {
+            let once = handlers[index].once;
+            (handlers[index].handler)(event);
+            if once {
+                let _ = handlers.remove(index);
+            } else {
+                index += 1;
+            }
+        }
+    }
+}
+
 /// Minimal async websocket connection for the persistent Responses API.
 pub struct ResponsesConnection {
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    event_handlers: ResponsesEventHandlerRegistry,
     closed: bool,
 }
 
@@ -279,6 +357,7 @@ impl ResponsesConnection {
 
         Ok(Self {
             socket,
+            event_handlers: ResponsesEventHandlerRegistry::default(),
             closed: false,
         })
     }
@@ -377,6 +456,64 @@ impl ResponsesConnection {
                 Err(error) => return Some(Err(error)),
             }
         }
+    }
+
+    /// Converts a raw websocket message into a Responses connection event.
+    pub fn parse_event(
+        &self,
+        data: impl AsRef<[u8]>,
+    ) -> Result<ResponsesConnectionEvent, OpenAIError> {
+        let text = std::str::from_utf8(data.as_ref()).map_err(|error| {
+            OpenAIError::new(
+                ErrorKind::Parse,
+                format!("failed to decode Responses websocket event as UTF-8: {error}"),
+            )
+            .with_source(error)
+        })?;
+        parse_responses_ws_event(text)
+    }
+
+    /// Registers a handler for a specific event type.
+    pub fn on<F>(&mut self, event_type: impl Into<String>, handler: F) -> ResponsesEventHandlerId
+    where
+        F: FnMut(&ResponsesConnectionEvent) + Send + 'static,
+    {
+        self.event_handlers.add(event_type, handler, false)
+    }
+
+    /// Registers a handler that is removed after the first matching event.
+    pub fn once<F>(&mut self, event_type: impl Into<String>, handler: F) -> ResponsesEventHandlerId
+    where
+        F: FnMut(&ResponsesConnectionEvent) + Send + 'static,
+    {
+        self.event_handlers.add(event_type, handler, true)
+    }
+
+    /// Removes a previously registered event handler.
+    pub fn off(&mut self, event_type: &str, handler_id: ResponsesEventHandlerId) -> bool {
+        self.event_handlers.remove(event_type, handler_id)
+    }
+
+    /// Reads events until close, dispatching each one to registered handlers.
+    pub async fn dispatch_events(&mut self) -> Result<(), OpenAIError> {
+        while let Some(event) = self.recv().await {
+            let event = event?;
+            let event_type = event.event_type.as_deref().unwrap_or_default();
+            let has_specific_handlers = self.event_handlers.has_handlers(event_type);
+            let has_generic_handlers = self.event_handlers.has_handlers("event");
+
+            if event_type == "error" && !has_specific_handlers && !has_generic_handlers {
+                return Err(OpenAIError::new(
+                    ErrorKind::Api(ApiErrorKind::BadRequest),
+                    format!("Responses websocket error: {}", event.payload),
+                ));
+            }
+
+            self.event_handlers.dispatch(event_type, &event);
+            self.event_handlers.dispatch("event", &event);
+        }
+
+        Ok(())
     }
 
     pub async fn close(&mut self) -> Result<(), OpenAIError> {
