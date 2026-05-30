@@ -175,6 +175,10 @@ pub enum UploadPurpose {
     FineTune,
     #[serde(rename = "vision")]
     Vision,
+    #[serde(rename = "user_data")]
+    UserData,
+    #[serde(rename = "evals")]
+    Evals,
 }
 
 impl UploadPurpose {
@@ -184,6 +188,8 @@ impl UploadPurpose {
             Self::Batch => "batch",
             Self::FineTune => "fine-tune",
             Self::Vision => "vision",
+            Self::UserData => "user_data",
+            Self::Evals => "evals",
         }
     }
 }

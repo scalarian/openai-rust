@@ -53,7 +53,7 @@ fn lifecycle_and_chunking() {
             bytes: 12,
             filename: String::from("parts.jsonl"),
             mime_type: String::from("application/jsonl"),
-            purpose: UploadPurpose::Assistants,
+            purpose: UploadPurpose::UserData,
             expires_after: Some(FileExpiresAfter {
                 anchor: String::from("created_at"),
                 seconds: 3600,
@@ -61,6 +61,11 @@ fn lifecycle_and_chunking() {
         })
         .unwrap();
     assert_eq!(created.output.status, UploadStatus::Pending);
+    assert_eq!(created.output.purpose, Some(UploadPurpose::UserData));
+    assert_eq!(
+        serde_json::to_value(UploadPurpose::Evals).unwrap(),
+        json!("evals")
+    );
 
     let part = client
         .uploads()
@@ -104,7 +109,7 @@ fn lifecycle_and_chunking() {
             "bytes": 12,
             "filename": "parts.jsonl",
             "mime_type": "application/jsonl",
-            "purpose": "assistants",
+            "purpose": "user_data",
             "expires_after": {"anchor":"created_at","seconds":3600}
         })
     );
@@ -160,7 +165,7 @@ fn upload_payload(id: &str, status: &str, file: Option<serde_json::Value>) -> St
         "created_at": 1_717_171_717,
         "expires_at": 1_717_175_317,
         "filename": "parts.jsonl",
-        "purpose": "assistants",
+        "purpose": "user_data",
         "status": status,
         "file": file
     })
