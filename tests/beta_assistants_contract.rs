@@ -8,7 +8,9 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::beta::{
         BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
-        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions,
+        BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions, BetaThreadCreateParams,
+        BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
+        BetaThreadUpdateParams,
     },
 };
 use serde_json::json;
@@ -100,7 +102,20 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         threads
-            .create(json!({"metadata": {"case_id": "case_123"}}))
+            .create(BetaThreadCreateParams {
+                messages: Some(vec![BetaThreadMessageCreateParams {
+                    role: String::from("user"),
+                    content: json!("Hello"),
+                    attachments: None,
+                    metadata: Some(json!({"source": "contract"})),
+                }]),
+                metadata: Some(json!({"case_id": "case_123"})),
+                tool_resources: Some(json!({
+                    "code_interpreter": {
+                        "file_ids": ["file_123"]
+                    }
+                })),
+            })
             .unwrap()
             .output["id"],
         json!("thread_123")
@@ -111,7 +126,17 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         threads
-            .update("thread_123", json!({"metadata": {"priority": "high"}}))
+            .update(
+                "thread_123",
+                BetaThreadUpdateParams {
+                    metadata: Some(json!({"priority": "high"})),
+                    tool_resources: Some(json!({
+                        "file_search": {
+                            "vector_store_ids": ["vs_123"]
+                        }
+                    })),
+                },
+            )
             .unwrap()
             .output["id"],
         json!("thread_123")
@@ -136,7 +161,15 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         messages
             .create(
                 "thread_123",
-                json!({"role": "user", "content": "What is the status?"})
+                BetaThreadMessageCreateParams {
+                    role: String::from("user"),
+                    content: json!("What is the status?"),
+                    attachments: Some(vec![json!({
+                        "file_id": "file_123",
+                        "tools": [{"type": "code_interpreter"}]
+                    })]),
+                    metadata: Some(json!({"source": "customer"})),
+                },
             )
             .unwrap()
             .output["id"],
@@ -151,7 +184,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .update(
                 "thread_123",
                 "msg_123",
-                json!({"metadata": {"seen": "true"}})
+                BetaThreadMessageUpdateParams {
+                    metadata: Some(json!({"seen": "true"})),
+                },
             )
             .unwrap()
             .output["id"],
@@ -161,11 +196,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         messages
             .list(
                 "thread_123",
-                BetaQueryParams::new()
-                    .push("after", "msg_after")
-                    .push("limit", 3)
-                    .push("order", "desc")
-                    .push("run_id", "run_123")
+                BetaThreadMessageListParams {
+                    after: Some(String::from("msg_after")),
+                    before: Some(String::from("msg_before")),
+                    limit: Some(3),
+                    order: Some(String::from("desc")),
+                    run_id: Some(String::from("run_123")),
+                }
             )
             .unwrap()
             .output["data"][0]["id"],
@@ -285,7 +322,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(requests[13].path, "/v1/threads/thread_123/messages/msg_123");
     assert_eq!(
         requests[14].path,
-        "/v1/threads/thread_123/messages?after=msg_after&limit=3&order=desc&run_id=run_123"
+        "/v1/threads/thread_123/messages?after=msg_after&before=msg_before&limit=3&order=desc&run_id=run_123"
     );
     assert_eq!(requests[15].path, "/v1/threads/thread_123/messages/msg_123");
     assert_eq!(
@@ -334,8 +371,24 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     assert_eq!(assistant_update_body["reasoning_effort"], json!("minimal"));
     let empty_thread_body: serde_json::Value = serde_json::from_slice(&requests[5].body).unwrap();
     assert_eq!(empty_thread_body, json!({}));
+    let thread_body: serde_json::Value = serde_json::from_slice(&requests[6].body).unwrap();
+    assert_eq!(thread_body["messages"][0]["content"], json!("Hello"));
+    assert_eq!(
+        thread_body["tool_resources"]["code_interpreter"]["file_ids"][0],
+        json!("file_123")
+    );
+    let thread_update_body: serde_json::Value = serde_json::from_slice(&requests[8].body).unwrap();
+    assert_eq!(thread_update_body["metadata"]["priority"], json!("high"));
+    assert_eq!(
+        thread_update_body["tool_resources"]["file_search"]["vector_store_ids"][0],
+        json!("vs_123")
+    );
     let message_body: serde_json::Value = serde_json::from_slice(&requests[11].body).unwrap();
     assert_eq!(message_body["role"], json!("user"));
+    assert_eq!(message_body["attachments"][0]["file_id"], json!("file_123"));
+    let message_update_body: serde_json::Value =
+        serde_json::from_slice(&requests[13].body).unwrap();
+    assert_eq!(message_update_body["metadata"]["seen"], json!("true"));
     let run_body: serde_json::Value = serde_json::from_slice(&requests[16].body).unwrap();
     assert_eq!(run_body["assistant_id"], json!("asst_123"));
     let tool_outputs_body: serde_json::Value = serde_json::from_slice(&requests[21].body).unwrap();

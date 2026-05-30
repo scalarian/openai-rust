@@ -265,6 +265,26 @@ impl BetaThreads {
     }
 }
 
+/// Deprecated beta thread creation parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaThreadCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub messages: Option<Vec<BetaThreadMessageCreateParams>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_resources: Option<Value>,
+}
+
+/// Deprecated beta thread update parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaThreadUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_resources: Option<Value>,
+}
+
 /// Deprecated beta thread message endpoints.
 #[derive(Clone, Debug)]
 pub struct BetaThreadMessages {
@@ -324,13 +344,13 @@ impl BetaThreadMessages {
     pub fn list(
         &self,
         thread_id: &str,
-        params: BetaQueryParams,
+        params: impl Into<BetaQueryParams>,
     ) -> Result<ApiResponse<Value>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         assistants_beta_get_query(
             &self.runtime,
             format!("/threads/{thread_id}/messages"),
-            params.into_pairs(),
+            params.into().into_pairs(),
         )
     }
 
@@ -347,6 +367,34 @@ impl BetaThreadMessages {
             format!("/threads/{thread_id}/messages/{message_id}"),
         )
     }
+}
+
+/// Deprecated beta thread message creation parameters.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BetaThreadMessageCreateParams {
+    pub role: String,
+    pub content: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+/// Deprecated beta thread message update parameters.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct BetaThreadMessageUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+}
+
+/// Deprecated beta thread message list parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaThreadMessageListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
+    pub run_id: Option<String>,
 }
 
 /// Deprecated beta thread run endpoints.
@@ -710,6 +758,17 @@ impl From<BetaAssistantListParams> for BetaQueryParams {
             .push_opt("before", value.before)
             .push_opt("limit", value.limit)
             .push_opt("order", value.order)
+    }
+}
+
+impl From<BetaThreadMessageListParams> for BetaQueryParams {
+    fn from(value: BetaThreadMessageListParams) -> Self {
+        Self::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order)
+            .push_opt("run_id", value.run_id)
     }
 }
 
