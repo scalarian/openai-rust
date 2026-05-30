@@ -11,12 +11,13 @@ use openai_rust::{
         BetaAssistantResponseFormatJsonSchema, BetaAssistantStream, BetaAssistantTool,
         BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
         BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams, BetaThreadCreateParams,
+        BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool, BetaThreadMessageContent,
         BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
-        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
-        BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
-        BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
-        BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
-        BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
+        BetaThreadRunAdditionalMessage, BetaThreadRunCreateParams, BetaThreadRunListParams,
+        BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+        BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput, BetaThreadRunUpdateParams,
+        BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides,
+        BetaToolResources, BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
     },
 };
 use serde_json::json;
@@ -115,7 +116,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .create(BetaThreadCreateParams {
                 messages: Some(vec![BetaThreadMessageCreateParams {
                     role: String::from("user"),
-                    content: json!("Hello"),
+                    content: BetaThreadMessageContent::from("Hello"),
                     attachments: None,
                     metadata: Some(BTreeMap::from([(
                         String::from("source"),
@@ -185,7 +186,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 thread: Some(BetaThreadCreateParams {
                     messages: Some(vec![BetaThreadMessageCreateParams {
                         role: String::from("user"),
-                        content: json!("Hello"),
+                        content: BetaThreadMessageContent::from("Hello"),
                         attachments: None,
                         metadata: None,
                     }]),
@@ -205,11 +206,11 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 "thread_123",
                 BetaThreadMessageCreateParams {
                     role: String::from("user"),
-                    content: json!("What is the status?"),
-                    attachments: Some(vec![json!({
-                        "file_id": "file_123",
-                        "tools": [{"type": "code_interpreter"}]
-                    })]),
+                    content: BetaThreadMessageContent::from("What is the status?"),
+                    attachments: Some(vec![BetaThreadMessageAttachment {
+                        file_id: Some(String::from("file_123")),
+                        tools: vec![BetaThreadMessageAttachmentTool::CodeInterpreter],
+                    }]),
                     metadata: Some(BTreeMap::from([(
                         String::from("source"),
                         String::from("customer"),
@@ -268,10 +269,12 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             BetaThreadRunCreateParams {
                 assistant_id: String::from("asst_123"),
                 additional_instructions: Some(String::from("Use the support playbook.")),
-                additional_messages: Some(vec![json!({
-                    "role": "user",
-                    "content": "Any update?"
-                })]),
+                additional_messages: Some(vec![BetaThreadRunAdditionalMessage {
+                    role: String::from("user"),
+                    content: BetaThreadMessageContent::from("Any update?"),
+                    attachments: None,
+                    metadata: None,
+                }]),
                 max_completion_tokens: Some(256),
                 parallel_tool_calls: Some(true),
                 reasoning_effort: Some(String::from("low")),

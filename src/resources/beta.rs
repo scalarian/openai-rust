@@ -724,11 +724,121 @@ impl BetaThreadMessages {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BetaThreadMessageCreateParams {
     pub role: String,
-    pub content: Value,
+    pub content: BetaThreadMessageContent,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<Value>>,
+    pub attachments: Option<Vec<BetaThreadMessageAttachment>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<BTreeMap<String, String>>,
+}
+
+/// Deprecated beta thread message content.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum BetaThreadMessageContent {
+    Text(String),
+    Parts(Vec<BetaThreadMessageContentPart>),
+}
+
+impl From<String> for BetaThreadMessageContent {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for BetaThreadMessageContent {
+    fn from(value: &str) -> Self {
+        Self::Text(value.into())
+    }
+}
+
+impl From<Vec<BetaThreadMessageContentPart>> for BetaThreadMessageContent {
+    fn from(value: Vec<BetaThreadMessageContentPart>) -> Self {
+        Self::Parts(value)
+    }
+}
+
+/// Deprecated beta thread message multimodal content part.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageContentPart {
+    Text {
+        text: String,
+    },
+    ImageFile {
+        image_file: BetaThreadMessageImageFile,
+    },
+    ImageUrl {
+        image_url: BetaThreadMessageImageUrl,
+    },
+}
+
+impl BetaThreadMessageContentPart {
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::Text { text: text.into() }
+    }
+
+    pub fn image_file(
+        file_id: impl Into<String>,
+        detail: Option<BetaThreadMessageImageDetail>,
+    ) -> Self {
+        Self::ImageFile {
+            image_file: BetaThreadMessageImageFile {
+                file_id: file_id.into(),
+                detail,
+            },
+        }
+    }
+
+    pub fn image_url(url: impl Into<String>, detail: Option<BetaThreadMessageImageDetail>) -> Self {
+        Self::ImageUrl {
+            image_url: BetaThreadMessageImageUrl {
+                url: url.into(),
+                detail,
+            },
+        }
+    }
+}
+
+/// Deprecated beta thread image detail control.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BetaThreadMessageImageDetail {
+    Auto,
+    Low,
+    High,
+}
+
+/// Deprecated beta thread message image-file descriptor.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct BetaThreadMessageImageFile {
+    pub file_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<BetaThreadMessageImageDetail>,
+}
+
+/// Deprecated beta thread message image-url descriptor.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct BetaThreadMessageImageUrl {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<BetaThreadMessageImageDetail>,
+}
+
+/// Deprecated beta thread message file attachment.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct BetaThreadMessageAttachment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tools: Vec<BetaThreadMessageAttachmentTool>,
+}
+
+/// Deprecated beta thread message attachment tool target.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageAttachmentTool {
+    CodeInterpreter,
+    FileSearch,
 }
 
 /// Deprecated beta thread message update parameters.
@@ -987,7 +1097,7 @@ pub struct BetaThreadRunCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub additional_messages: Option<Vec<Value>>,
+    pub additional_messages: Option<Vec<BetaThreadRunAdditionalMessage>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1016,6 +1126,17 @@ pub struct BetaThreadRunCreateParams {
     pub top_p: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation_strategy: Option<BetaTruncationStrategy>,
+}
+
+/// Additional message to add before creating a deprecated beta thread run.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BetaThreadRunAdditionalMessage {
+    pub role: String,
+    pub content: BetaThreadMessageContent,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<BetaThreadMessageAttachment>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BTreeMap<String, String>>,
 }
 
 /// Deprecated beta thread run update parameters.
