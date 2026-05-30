@@ -1056,7 +1056,7 @@ pub struct BetaThreadMessage {
     #[serde(default)]
     pub completed_at: Option<u64>,
     #[serde(default)]
-    pub content: Vec<Value>,
+    pub content: Vec<BetaThreadMessageContentBlock>,
     #[serde(default)]
     pub incomplete_at: Option<u64>,
     #[serde(default)]
@@ -1075,6 +1075,72 @@ pub struct BetaThreadMessage {
 
 /// Deprecated beta thread message list response.
 pub type BetaThreadMessageListResponse = BetaCursorPage<BetaThreadMessage>;
+
+/// Deprecated beta thread message content block.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageContentBlock {
+    Text {
+        text: BetaThreadMessageText,
+    },
+    ImageFile {
+        image_file: BetaThreadMessageImageFile,
+    },
+    ImageUrl {
+        image_url: BetaThreadMessageImageUrl,
+    },
+    Refusal {
+        refusal: String,
+    },
+}
+
+/// Text content returned on deprecated beta thread messages.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessageText {
+    #[serde(default)]
+    pub annotations: Vec<BetaThreadMessageAnnotation>,
+    pub value: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Annotation returned on deprecated beta thread message text.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageAnnotation {
+    FileCitation {
+        end_index: u64,
+        file_citation: BetaThreadMessageFileCitation,
+        start_index: u64,
+        text: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    FilePath {
+        end_index: u64,
+        file_path: BetaThreadMessageFilePath,
+        start_index: u64,
+        text: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// File citation annotation payload.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessageFileCitation {
+    pub file_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File path annotation payload.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadMessageFilePath {
+    pub file_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
 
 /// Deprecated beta thread message deletion response.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
@@ -1168,7 +1234,7 @@ impl BetaThreadMessageContentPart {
 }
 
 /// Deprecated beta thread image detail control.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaThreadMessageImageDetail {
     Auto,
@@ -1177,7 +1243,7 @@ pub enum BetaThreadMessageImageDetail {
 }
 
 /// Deprecated beta thread message image-file descriptor.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BetaThreadMessageImageFile {
     pub file_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1185,7 +1251,7 @@ pub struct BetaThreadMessageImageFile {
 }
 
 /// Deprecated beta thread message image-url descriptor.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BetaThreadMessageImageUrl {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]

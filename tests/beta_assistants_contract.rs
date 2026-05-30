@@ -16,14 +16,14 @@ use openai_rust::{
             BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
             BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
             BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
-            BetaThreadMessageContent, BetaThreadMessageCreateParams, BetaThreadMessageListParams,
-            BetaThreadMessageRole, BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
-            BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStatus,
-            BetaThreadRunStepInclude, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
-            BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
-            BetaThreadRunUpdateParams, BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides,
-            BetaToolResourceOverrides, BetaToolResources, BetaToolResourcesCodeInterpreter,
-            BetaTruncationStrategy,
+            BetaThreadMessageContent, BetaThreadMessageContentBlock, BetaThreadMessageCreateParams,
+            BetaThreadMessageListParams, BetaThreadMessageRole, BetaThreadMessageUpdateParams,
+            BetaThreadRunAdditionalMessage, BetaThreadRunCreateParams, BetaThreadRunListParams,
+            BetaThreadRunStatus, BetaThreadRunStepInclude, BetaThreadRunStepListParams,
+            BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
+            BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
+            BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
+            BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
         },
         common::{ListOrder, ReasoningEffort},
     },
@@ -221,27 +221,31 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
 
     let messages = threads.messages();
-    assert_eq!(
-        messages
-            .create(
-                "thread_123",
-                BetaThreadMessageCreateParams {
-                    role: BetaThreadMessageRole::User,
-                    content: BetaThreadMessageContent::from("What is the status?"),
-                    attachments: Some(vec![BetaThreadMessageAttachment {
-                        file_id: Some(String::from("file_123")),
-                        tools: vec![BetaThreadMessageAttachmentTool::CodeInterpreter],
-                    }]),
-                    metadata: Some(BTreeMap::from([(
-                        String::from("source"),
-                        String::from("customer"),
-                    )])),
-                },
-            )
-            .unwrap()
-            .output
-            .id,
-        "msg_123"
+    let created_message = messages
+        .create(
+            "thread_123",
+            BetaThreadMessageCreateParams {
+                role: BetaThreadMessageRole::User,
+                content: BetaThreadMessageContent::from("What is the status?"),
+                attachments: Some(vec![BetaThreadMessageAttachment {
+                    file_id: Some(String::from("file_123")),
+                    tools: vec![BetaThreadMessageAttachmentTool::CodeInterpreter],
+                }]),
+                metadata: Some(BTreeMap::from([(
+                    String::from("source"),
+                    String::from("customer"),
+                )])),
+            },
+        )
+        .unwrap();
+    assert_eq!(created_message.output.id, "msg_123");
+    assert!(
+        matches!(
+            created_message.output.content.first(),
+            Some(BetaThreadMessageContentBlock::Text { text })
+                if text.value == "hello" && text.annotations.is_empty()
+        ),
+        "expected typed text message content block"
     );
     assert_eq!(
         messages
