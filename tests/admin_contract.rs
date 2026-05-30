@@ -311,6 +311,51 @@ fn project_rate_limit_json(id: &str, max_requests_per_1_minute: u64) -> Value {
     })
 }
 
+fn usage_page_json(result_object: &str) -> Value {
+    json!({
+        "object": "page",
+        "data": [
+            {
+                "object": "bucket",
+                "start_time": 1_717_171_700u64,
+                "end_time": 1_717_258_100u64,
+                "results": [
+                    {
+                        "object": result_object,
+                        "amount": {
+                            "currency": "usd",
+                            "value": 12.5
+                        },
+                        "api_key_id": "key_ops",
+                        "batch": false,
+                        "context_level": "high",
+                        "images": 4u64,
+                        "input_audio_tokens": 20u64,
+                        "input_cached_tokens": 30u64,
+                        "input_tokens": 100u64,
+                        "line_item": "responses",
+                        "model": "gpt-5",
+                        "num_model_requests": 3u64,
+                        "num_requests": 5u64,
+                        "num_sessions": 2u64,
+                        "output_audio_tokens": 10u64,
+                        "output_tokens": 80u64,
+                        "project_id": "proj_research",
+                        "seconds": 60u64,
+                        "service_tier": "default",
+                        "size": "1024x1024",
+                        "source": "image.generation",
+                        "usage_bytes": 2048u64,
+                        "user_id": "user_admin",
+                        "vector_store_id": "vs_research"
+                    }
+                ]
+            }
+        ],
+        "next_page": "cursor_next"
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -404,6 +449,9 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     responses.extend(
         (4..23).map(|index| json_response(json!({"id": format!("admin_{index}")}).to_string())),
     );
+    responses[4] =
+        json_response(usage_page_json("organization.usage.completions.result").to_string());
+    responses[5] = json_response(usage_page_json("organization.costs.result").to_string());
     responses[6] =
         json_response(organization_user_role_create_json("user_admin", "role_viewer").to_string());
     responses[17] = json_response(project_api_key_json("key_project").to_string());
@@ -520,7 +568,8 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         AdminApiKeyDeletedObject::OrganizationAdminApiKeyDeleted
     );
 
-    org.usage()
+    let completions_usage = org
+        .usage()
         .completions(AdminUsageCompletionsParams {
             start_time: Some(1_717_171_700),
             bucket_width: Some(AdminUsageBucketWidth::OneDay),
@@ -528,7 +577,17 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             ..Default::default()
         })
         .unwrap();
-    org.usage()
+    assert_eq!(completions_usage.output.object, AdminUsagePageObject::Page);
+    assert_eq!(
+        completions_usage.output.data[0].results[0].object,
+        AdminUsageResultObject::Completions
+    );
+    assert_eq!(
+        completions_usage.output.data[0].results[0].input_tokens,
+        Some(100)
+    );
+    let costs_usage = org
+        .usage()
         .costs(AdminUsageCostsParams {
             start_time: Some(1_717_171_700),
             bucket_width: Some(AdminUsageCostsBucketWidth::OneDay),
@@ -539,6 +598,17 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             ..Default::default()
         })
         .unwrap();
+    assert_eq!(
+        costs_usage.output.data[0].results[0].object,
+        AdminUsageResultObject::Costs
+    );
+    assert_eq!(
+        costs_usage.output.data[0].results[0]
+            .amount
+            .as_ref()
+            .and_then(|amount| amount.currency.as_deref()),
+        Some("usd")
+    );
 
     org.users()
         .roles()
@@ -2594,16 +2664,29 @@ fn admin_certificate_delete_returns_typed_response() {
 
 #[test]
 fn admin_organization_usage_categories_match_upstream_paths() {
+    let usage_result_objects = [
+        "organization.usage.audio_speeches.result",
+        "organization.usage.audio_transcriptions.result",
+        "organization.usage.code_interpreter_sessions.result",
+        "organization.usage.completions.result",
+        "organization.usage.embeddings.result",
+        "organization.usage.file_searches.result",
+        "organization.usage.images.result",
+        "organization.usage.moderations.result",
+        "organization.usage.vector_stores.result",
+        "organization.usage.web_searches.result",
+    ];
     let server = mock_http::MockHttpServer::spawn_sequence(
-        (0..10)
-            .map(|index| json_response(json!({"id": format!("usage_{index}")}).to_string()))
+        usage_result_objects
+            .into_iter()
+            .map(|object| json_response(usage_page_json(object).to_string()))
             .collect(),
     )
     .unwrap();
     let client = client(&server.url());
     let usage = client.admin().organization().usage();
 
-    usage
+    let audio_speeches = usage
         .audio_speeches(AdminUsageAudioSpeechesParams {
             start_time: Some(1_717_171_700),
             bucket_width: Some(AdminUsageBucketWidth::OneDay),
@@ -2612,6 +2695,10 @@ fn admin_organization_usage_categories_match_upstream_paths() {
             ..Default::default()
         })
         .unwrap();
+    assert_eq!(
+        audio_speeches.output.data[0].results[0].object,
+        AdminUsageResultObject::AudioSpeeches
+    );
     usage
         .audio_transcriptions(AdminUsageAudioTranscriptionsParams {
             start_time: Some(1_717_171_700),
@@ -2686,7 +2773,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
             ..Default::default()
         })
         .unwrap();
-    usage
+    let web_searches = usage
         .web_search_calls(AdminUsageWebSearchCallsParams {
             start_time: Some(1_717_171_700),
             bucket_width: Some(AdminUsageBucketWidth::OneDay),
@@ -2696,6 +2783,14 @@ fn admin_organization_usage_categories_match_upstream_paths() {
             ..Default::default()
         })
         .unwrap();
+    assert_eq!(
+        web_searches.output.data[0].results[0].object,
+        AdminUsageResultObject::WebSearches
+    );
+    assert_eq!(
+        web_searches.output.next_page.as_deref(),
+        Some("cursor_next")
+    );
 
     let requests = server.captured_requests(10).unwrap();
     let paths = requests

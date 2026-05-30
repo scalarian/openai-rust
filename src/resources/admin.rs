@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::{
@@ -661,6 +661,37 @@ admin_string_literal_enum! {
     }
 }
 
+admin_string_literal_enum! {
+    /// Object type returned by organization usage page responses.
+    pub enum AdminUsagePageObject {
+        Page => "page",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Object type returned by organization usage buckets.
+    pub enum AdminUsageBucketObject {
+        Bucket => "bucket",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Object type returned by organization usage result entries.
+    pub enum AdminUsageResultObject {
+        Completions => "organization.usage.completions.result",
+        Embeddings => "organization.usage.embeddings.result",
+        Moderations => "organization.usage.moderations.result",
+        Images => "organization.usage.images.result",
+        AudioSpeeches => "organization.usage.audio_speeches.result",
+        AudioTranscriptions => "organization.usage.audio_transcriptions.result",
+        VectorStores => "organization.usage.vector_stores.result",
+        CodeInterpreterSessions => "organization.usage.code_interpreter_sessions.result",
+        FileSearches => "organization.usage.file_searches.result",
+        WebSearches => "organization.usage.web_searches.result",
+        Costs => "organization.costs.result",
+    }
+}
+
 /// Query parameters for admin endpoints.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminQueryParams {
@@ -740,6 +771,105 @@ impl From<Vec<(String, String)>> for AdminQueryParams {
         Self { pairs }
     }
 }
+
+/// Monetary value in its associated currency for organization costs.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminUsageCostsAmount {
+    #[serde(default)]
+    pub currency: Option<String>,
+    #[serde(default)]
+    pub value: Option<f64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Aggregated organization usage or costs for a specific time bucket.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminUsageResult {
+    pub object: AdminUsageResultObject,
+    #[serde(default)]
+    pub amount: Option<AdminUsageCostsAmount>,
+    #[serde(default)]
+    pub api_key_id: Option<String>,
+    #[serde(default)]
+    pub batch: Option<bool>,
+    #[serde(default)]
+    pub context_level: Option<String>,
+    #[serde(default)]
+    pub images: Option<u64>,
+    #[serde(default)]
+    pub input_audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub input_cached_tokens: Option<u64>,
+    #[serde(default)]
+    pub input_tokens: Option<u64>,
+    #[serde(default)]
+    pub line_item: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub num_model_requests: Option<u64>,
+    #[serde(default)]
+    pub num_requests: Option<u64>,
+    #[serde(default)]
+    pub num_sessions: Option<u64>,
+    #[serde(default)]
+    pub output_audio_tokens: Option<u64>,
+    #[serde(default)]
+    pub output_tokens: Option<u64>,
+    #[serde(default)]
+    pub project_id: Option<String>,
+    #[serde(default)]
+    pub seconds: Option<u64>,
+    #[serde(default)]
+    pub service_tier: Option<String>,
+    #[serde(default)]
+    pub size: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub usage_bytes: Option<u64>,
+    #[serde(default)]
+    pub user_id: Option<String>,
+    #[serde(default)]
+    pub vector_store_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Time bucket returned by organization usage and cost endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminUsageBucket {
+    pub end_time: u64,
+    pub object: AdminUsageBucketObject,
+    pub results: Vec<AdminUsageResult>,
+    pub start_time: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Page returned by organization usage and cost endpoints.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminUsagePage {
+    pub data: Vec<AdminUsageBucket>,
+    #[serde(default)]
+    pub next_page: Option<String>,
+    pub object: AdminUsagePageObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminUsageAudioSpeechesResponse = AdminUsagePage;
+pub type AdminUsageAudioTranscriptionsResponse = AdminUsagePage;
+pub type AdminUsageCodeInterpreterSessionsResponse = AdminUsagePage;
+pub type AdminUsageCompletionsResponse = AdminUsagePage;
+pub type AdminUsageCostsResponse = AdminUsagePage;
+pub type AdminUsageEmbeddingsResponse = AdminUsagePage;
+pub type AdminUsageFileSearchCallsResponse = AdminUsagePage;
+pub type AdminUsageImagesResponse = AdminUsagePage;
+pub type AdminUsageModerationsResponse = AdminUsagePage;
+pub type AdminUsageVectorStoresResponse = AdminUsagePage;
+pub type AdminUsageWebSearchCallsResponse = AdminUsagePage;
 
 /// Organization audit-log effective-time filter.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -2820,14 +2950,14 @@ impl OrganizationUsage {
     pub fn audio_speeches(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageAudioSpeechesResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/audio_speeches", params)
     }
 
     pub fn audio_transcriptions(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageAudioTranscriptionsResponse>, OpenAIError> {
         get_query(
             &self.runtime,
             "/organization/usage/audio_transcriptions",
@@ -2838,7 +2968,7 @@ impl OrganizationUsage {
     pub fn code_interpreter_sessions(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageCodeInterpreterSessionsResponse>, OpenAIError> {
         get_query(
             &self.runtime,
             "/organization/usage/code_interpreter_sessions",
@@ -2849,28 +2979,28 @@ impl OrganizationUsage {
     pub fn completions(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageCompletionsResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/completions", params)
     }
 
     pub fn costs(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageCostsResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/costs", params)
     }
 
     pub fn embeddings(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageEmbeddingsResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/embeddings", params)
     }
 
     pub fn file_search_calls(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageFileSearchCallsResponse>, OpenAIError> {
         get_query(
             &self.runtime,
             "/organization/usage/file_search_calls",
@@ -2881,28 +3011,28 @@ impl OrganizationUsage {
     pub fn images(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageImagesResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/images", params)
     }
 
     pub fn moderations(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageModerationsResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/moderations", params)
     }
 
     pub fn vector_stores(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageVectorStoresResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/usage/vector_stores", params)
     }
 
     pub fn web_search_calls(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminUsageWebSearchCallsResponse>, OpenAIError> {
         get_query(
             &self.runtime,
             "/organization/usage/web_search_calls",
@@ -4539,17 +4669,17 @@ fn path_with_query(base: impl Into<String>, params: impl Into<AdminQueryParams>)
     format!("{base}?{}", serializer.finish())
 }
 
-fn get(
+fn get<T: DeserializeOwned>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
-) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError> {
     runtime.execute_json("GET", path, RequestOptions::default())
 }
 
-fn get_query(
+fn get_query<T: DeserializeOwned>(
     runtime: &ClientRuntime,
     base: impl Into<String>,
     params: impl Into<AdminQueryParams>,
-) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+) -> Result<ApiResponse<T>, OpenAIError> {
     get(runtime, path_with_query(base, params))
 }
