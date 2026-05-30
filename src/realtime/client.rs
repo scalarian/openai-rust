@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, collections::VecDeque, fmt::Write as _, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    collections::VecDeque,
+    fmt::{self, Write as _},
+    sync::Arc,
+};
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -24,15 +29,118 @@ use crate::{
 };
 
 use super::events::{
-    RealtimeClientEvent, RealtimeConversationItem, RealtimeOutputModality,
+    RealtimeClientEvent, RealtimeConversationItem, RealtimeInclude, RealtimeOutputModality,
     RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType,
     decode_server_event_text,
 };
 
+/// Realtime client-secret expiration anchor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeSessionTTLAnchor {
+    CreatedAt,
+    Unknown(String),
+}
+
+impl RealtimeSessionTTLAnchor {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::CreatedAt => "created_at",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for RealtimeSessionTTLAnchor {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::ops::Deref for RealtimeSessionTTLAnchor {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for RealtimeSessionTTLAnchor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Default for RealtimeSessionTTLAnchor {
+    fn default() -> Self {
+        Self::Unknown(String::new())
+    }
+}
+
+impl From<&str> for RealtimeSessionTTLAnchor {
+    fn from(value: &str) -> Self {
+        match value {
+            "created_at" => Self::CreatedAt,
+            _ => Self::Unknown(value.to_string()),
+        }
+    }
+}
+
+impl From<String> for RealtimeSessionTTLAnchor {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "created_at" => Self::CreatedAt,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+impl PartialEq<&str> for RealtimeSessionTTLAnchor {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<RealtimeSessionTTLAnchor> for &str {
+    fn eq(&self, other: &RealtimeSessionTTLAnchor) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<String> for RealtimeSessionTTLAnchor {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<RealtimeSessionTTLAnchor> for String {
+    fn eq(&self, other: &RealtimeSessionTTLAnchor) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Serialize for RealtimeSessionTTLAnchor {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeSessionTTLAnchor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(Self::from(value))
+    }
+}
+
 /// Realtime client-secret expiration settings.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeSessionTTL {
-    pub anchor: String,
+    pub anchor: RealtimeSessionTTLAnchor,
     pub seconds: u64,
 }
 
@@ -114,7 +222,7 @@ pub struct RealtimeCallAcceptParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub include: Option<Vec<String>>,
+    pub include: Option<Vec<RealtimeInclude>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

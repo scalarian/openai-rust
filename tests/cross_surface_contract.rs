@@ -19,7 +19,7 @@ use openai_rust::{
     error::ApiErrorKind,
     realtime::{
         RealtimeAuth, RealtimeConnectOptions, RealtimeServerEvent, RealtimeSessionConfig,
-        RealtimeSessionTTL,
+        RealtimeSessionTTL, RealtimeSessionTTLAnchor,
     },
     resources::{
         chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
@@ -349,7 +349,7 @@ fn rest_configuration_bootstraps_realtime_without_extra_glue() {
         .client_secrets()
         .create(openai_rust::realtime::RealtimeClientSecretCreateParams {
             expires_after: Some(RealtimeSessionTTL {
-                anchor: String::from("created_at"),
+                anchor: RealtimeSessionTTLAnchor::CreatedAt,
                 seconds: 60,
             }),
             session: Some(RealtimeSessionConfig {
@@ -992,7 +992,7 @@ fn mock_realtime_bootstrap_trace() -> MockRealtimeBootstrapTrace {
         .client_secrets()
         .create(openai_rust::realtime::RealtimeClientSecretCreateParams {
             expires_after: Some(RealtimeSessionTTL {
-                anchor: String::from("created_at"),
+                anchor: RealtimeSessionTTLAnchor::CreatedAt,
                 seconds: 60,
             }),
             session: Some(RealtimeSessionConfig {

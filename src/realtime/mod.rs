@@ -11,11 +11,12 @@ pub use client::{
     RealtimeClientSecretCreateResponse, RealtimeConnectOptions, RealtimeConnection,
     RealtimeConversationItemResource, RealtimeConversationResource, RealtimeEventHandlerId,
     RealtimeInputAudioBufferResource, RealtimeOutputAudioBufferResource, RealtimeResponseResource,
-    RealtimeSessionResource, RealtimeSessionTTL,
+    RealtimeSessionResource, RealtimeSessionTTL, RealtimeSessionTTLAnchor,
 };
 pub use events::{
     RealtimeClientEvent, RealtimeConversationItem, RealtimeConversationMessageContentPart,
-    RealtimeErrorInfo, RealtimeOutputModality, RealtimeResponseCreateParams, RealtimeServerEvent,
-    RealtimeSessionConfig, RealtimeSessionType, decode_server_event, decode_server_event_text,
+    RealtimeErrorInfo, RealtimeInclude, RealtimeOutputModality, RealtimeResponseCreateParams,
+    RealtimeServerEvent, RealtimeSessionConfig, RealtimeSessionType, decode_server_event,
+    decode_server_event_text,
 };
 pub use state::{RealtimeAudioBufferState, RealtimeEventState, RealtimeResponseState};

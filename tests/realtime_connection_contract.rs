@@ -428,7 +428,7 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         .create_params(
             RealtimeResponseCreateParams {
                 metadata: Some(json!({"source": "test"})),
-                output_modalities: Some(vec![String::from("text")]),
+                output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 ..Default::default()
             },
             Some(String::from("evt_response")),

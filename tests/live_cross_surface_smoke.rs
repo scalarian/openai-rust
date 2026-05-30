@@ -5,7 +5,7 @@ use openai_rust::{
     OpenAI,
     realtime::{
         RealtimeAuth, RealtimeConnectOptions, RealtimeServerEvent, RealtimeSessionConfig,
-        RealtimeSessionTTL,
+        RealtimeSessionTTL, RealtimeSessionTTLAnchor,
     },
     resources::{
         chat::{ChatCompletionCreateParams, ChatCompletionMessageParam},
@@ -76,7 +76,7 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
         .client_secrets()
         .create(openai_rust::realtime::RealtimeClientSecretCreateParams {
             expires_after: Some(RealtimeSessionTTL {
-                anchor: String::from("created_at"),
+                anchor: RealtimeSessionTTLAnchor::CreatedAt,
                 seconds: 60,
             }),
             session: Some(RealtimeSessionConfig {

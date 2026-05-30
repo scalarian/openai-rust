@@ -30,7 +30,7 @@ async fn live_realtime_text_smoke_uses_client_secret_and_ga_text_events() {
             issuer_client.realtime().client_secrets().create(
                 openai_rust::realtime::RealtimeClientSecretCreateParams {
                     expires_after: Some(openai_rust::realtime::RealtimeSessionTTL {
-                        anchor: String::from("created_at"),
+                        anchor: openai_rust::realtime::RealtimeSessionTTLAnchor::CreatedAt,
                         seconds: 60,
                     }),
                     session: Some(RealtimeSessionConfig {

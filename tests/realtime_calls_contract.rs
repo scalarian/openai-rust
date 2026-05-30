@@ -2,8 +2,9 @@ use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
-        RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeOutputModality,
-        RealtimeSessionConfig, RealtimeSessionTTL, RealtimeSessionType,
+        RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
+        RealtimeOutputModality, RealtimeSessionConfig, RealtimeSessionTTL,
+        RealtimeSessionTTLAnchor, RealtimeSessionType,
     },
 };
 use serde_json::json;
@@ -51,13 +52,14 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         .client_secrets()
         .create(RealtimeClientSecretCreateParams {
             expires_after: Some(RealtimeSessionTTL {
-                anchor: String::from("created_at"),
+                anchor: RealtimeSessionTTLAnchor::CreatedAt,
                 seconds: 60,
             }),
             session: Some(RealtimeSessionConfig {
                 session_type: RealtimeSessionType::Realtime,
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
                 ..Default::default()
             }),
@@ -113,6 +115,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 session_type: RealtimeSessionType::Realtime,
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Stay concise.")),
                 parallel_tool_calls: Some(true),
                 reasoning: Some(json!({"effort": "low"})),
@@ -157,6 +160,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         client_secret_body["session"]["output_modalities"][0],
         "text"
+    );
+    assert_eq!(
+        client_secret_body["session"]["include"][0],
+        "item.input_audio_transcription.logprobs"
     );
 
     assert_eq!(requests[1].path, "/v1/realtime/calls");
@@ -206,6 +213,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     );
     assert_eq!(accept_body["type"], "realtime");
     assert_eq!(accept_body["output_modalities"][0], "text");
+    assert_eq!(
+        accept_body["include"][0],
+        "item.input_audio_transcription.logprobs"
+    );
     assert_eq!(accept_body["parallel_tool_calls"], true);
     assert_eq!(accept_body["reasoning"]["effort"], "low");
 
