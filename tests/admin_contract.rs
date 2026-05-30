@@ -935,6 +935,8 @@ fn admin_organization_usage_categories_match_upstream_paths() {
             bucket_width: Some(AdminUsageBucketWidth::OneDay),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
+            sizes: Some(vec![AdminUsageImagesSize::Size1024x1024]),
+            sources: Some(vec![AdminUsageImagesSource::Generation]),
             ..Default::default()
         })
         .unwrap();
@@ -960,6 +962,7 @@ fn admin_organization_usage_categories_match_upstream_paths() {
         .web_search_calls(AdminUsageWebSearchCallsParams {
             start_time: Some(1_717_171_700),
             bucket_width: Some(AdminUsageBucketWidth::OneDay),
+            context_levels: Some(vec![AdminUsageWebSearchContextLevel::High]),
             limit: Some(1),
             page: Some(String::from("cursor_123")),
             ..Default::default()
@@ -980,10 +983,10 @@ fn admin_organization_usage_categories_match_upstream_paths() {
             "/v1/organization/usage/completions?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
             "/v1/organization/usage/embeddings?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
             "/v1/organization/usage/file_search_calls?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
-            "/v1/organization/usage/images?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/images?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123&sizes=1024x1024&sources=image.generation",
             "/v1/organization/usage/moderations?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
             "/v1/organization/usage/vector_stores?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
-            "/v1/organization/usage/web_search_calls?start_time=1717171700&bucket_width=1d&limit=1&page=cursor_123",
+            "/v1/organization/usage/web_search_calls?start_time=1717171700&bucket_width=1d&context_levels=high&limit=1&page=cursor_123",
         ]
     );
     assert!(requests.iter().all(|request| request.method == "GET"));

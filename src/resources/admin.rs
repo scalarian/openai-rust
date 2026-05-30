@@ -279,6 +279,26 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Image size filters for images usage.
+    pub enum AdminUsageImagesSize {
+        Size256x256 => "256x256",
+        Size512x512 => "512x512",
+        Size1024x1024 => "1024x1024",
+        Size1792x1792 => "1792x1792",
+        Size1024x1792 => "1024x1792",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Image source filters for images usage.
+    pub enum AdminUsageImagesSource {
+        Generation => "image.generation",
+        Edit => "image.edit",
+        Variation => "image.variation",
+    }
+}
+
+admin_string_literal_enum! {
     /// Group-by dimensions for web-search-call usage.
     pub enum AdminUsageWebSearchCallsGroupBy {
         ProjectId => "project_id",
@@ -286,6 +306,15 @@ admin_string_literal_enum! {
         ApiKeyId => "api_key_id",
         Model => "model",
         ContextLevel => "context_level",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Context-level filters for web-search-call usage.
+    pub enum AdminUsageWebSearchContextLevel {
+        Low => "low",
+        Medium => "medium",
+        High => "high",
     }
 }
 
@@ -1321,8 +1350,8 @@ pub struct AdminUsageImagesParams {
     pub models: Option<Vec<String>>,
     pub page: Option<String>,
     pub project_ids: Option<Vec<String>>,
-    pub sizes: Option<Vec<String>>,
-    pub sources: Option<Vec<String>>,
+    pub sizes: Option<Vec<AdminUsageImagesSize>>,
+    pub sources: Option<Vec<AdminUsageImagesSource>>,
     pub user_ids: Option<Vec<String>>,
 }
 
@@ -1406,7 +1435,7 @@ pub struct AdminUsageWebSearchCallsParams {
     pub start_time: Option<i64>,
     pub api_key_ids: Option<Vec<String>>,
     pub bucket_width: Option<AdminUsageBucketWidth>,
-    pub context_levels: Option<Vec<String>>,
+    pub context_levels: Option<Vec<AdminUsageWebSearchContextLevel>>,
     pub end_time: Option<i64>,
     pub group_by: Option<Vec<AdminUsageWebSearchCallsGroupBy>>,
     pub limit: Option<u32>,
