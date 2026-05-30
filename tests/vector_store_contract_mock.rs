@@ -70,6 +70,7 @@ fn crud_and_errors() {
     let retrieved = client.vector_stores().retrieve("vs_123").unwrap();
     assert_eq!(retrieved.output.id, "vs_123");
     assert_eq!(retrieved.output.status, Some(VectorStoreStatus::Completed));
+    assert_eq!(retrieved.output.expires_at, Some(1_717_776_800));
 
     let updated = client
         .vector_stores()
@@ -213,6 +214,7 @@ fn vector_store_payload(id: &str, name: &str, status: &str) -> String {
         "last_active_at": 1_717_171_800,
         "metadata": {"env": "test"},
         "expires_after": {"anchor": "last_active_at", "days": 7},
+        "expires_at": 1_717_776_800,
         "file_counts": {
             "in_progress": 1,
             "completed": 2,

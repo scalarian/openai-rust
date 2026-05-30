@@ -915,6 +915,8 @@ pub struct VectorStore {
     pub usage_bytes: Option<u64>,
     #[serde(default)]
     pub expires_after: Option<VectorStoreExpiresAfter>,
+    #[serde(default)]
+    pub expires_at: Option<u64>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
