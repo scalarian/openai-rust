@@ -123,7 +123,7 @@ pub struct BetaAssistantCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -148,7 +148,7 @@ pub struct BetaAssistantUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -271,7 +271,7 @@ pub struct BetaThreadCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub messages: Option<Vec<BetaThreadMessageCreateParams>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
 }
@@ -280,7 +280,7 @@ pub struct BetaThreadCreateParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaThreadUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_resources: Option<Value>,
 }
@@ -296,7 +296,7 @@ pub struct BetaThreadCreateAndRunParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_prompt_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -413,14 +413,14 @@ pub struct BetaThreadMessageCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
 }
 
 /// Deprecated beta thread message update parameters.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaThreadMessageUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
 }
 
 /// Deprecated beta thread message list parameters.
@@ -680,7 +680,7 @@ pub struct BetaThreadRunCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_prompt_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -707,7 +707,7 @@ pub struct BetaThreadRunCreateParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaThreadRunUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
 }
 
 /// Deprecated beta thread run list parameters.

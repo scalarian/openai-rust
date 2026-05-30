@@ -1,7 +1,7 @@
 #[path = "support/mock_http.rs"]
 mod mock_http;
 
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 use openai_rust::{
     ErrorKind, OpenAI,
@@ -73,7 +73,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .update(
                 "asst_123",
                 BetaAssistantUpdateParams {
-                    metadata: Some(json!({"tier": "gold"})),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("tier"),
+                        String::from("gold"),
+                    )])),
                     reasoning_effort: Some(String::from("minimal")),
                     ..Default::default()
                 },
@@ -110,9 +113,15 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                     role: String::from("user"),
                     content: json!("Hello"),
                     attachments: None,
-                    metadata: Some(json!({"source": "contract"})),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("source"),
+                        String::from("contract"),
+                    )])),
                 }]),
-                metadata: Some(json!({"case_id": "case_123"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("case_id"),
+                    String::from("case_123"),
+                )])),
                 tool_resources: Some(json!({
                     "code_interpreter": {
                         "file_ids": ["file_123"]
@@ -132,7 +141,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .update(
                 "thread_123",
                 BetaThreadUpdateParams {
-                    metadata: Some(json!({"priority": "high"})),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("priority"),
+                        String::from("high"),
+                    )])),
                     tool_resources: Some(json!({
                         "file_search": {
                             "vector_store_ids": ["vs_123"]
@@ -182,7 +194,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                         "file_id": "file_123",
                         "tools": [{"type": "code_interpreter"}]
                     })]),
-                    metadata: Some(json!({"source": "customer"})),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("source"),
+                        String::from("customer"),
+                    )])),
                 },
             )
             .unwrap()
@@ -199,7 +214,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 "thread_123",
                 "msg_123",
                 BetaThreadMessageUpdateParams {
-                    metadata: Some(json!({"seen": "true"})),
+                    metadata: Some(BTreeMap::from([(
+                        String::from("seen"),
+                        String::from("true"),
+                    )])),
                 },
             )
             .unwrap()
@@ -259,7 +277,10 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             "thread_123",
             "run_123",
             BetaThreadRunUpdateParams {
-                metadata: Some(json!({"owner": "support"})),
+                metadata: Some(BTreeMap::from([(
+                    String::from("owner"),
+                    String::from("support"),
+                )])),
             },
         )
         .unwrap()
