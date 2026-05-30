@@ -311,6 +311,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Organization group deletion object type.
+    pub enum AdminGroupDeletedObject {
+        GroupDeleted => "group.deleted",
+    }
+}
+
+admin_string_literal_enum! {
     /// Include fields accepted by organization certificate retrieve.
     pub enum AdminCertificateInclude {
         Content => "content",
@@ -756,6 +763,34 @@ impl<T> AdminConversationCursorPage<T> {
     }
 }
 
+/// Next-token cursor page returned by admin list endpoints.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AdminNextCursorPage<T> {
+    #[serde(default)]
+    pub object: Option<String>,
+    pub data: Vec<T>,
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    #[serde(default)]
+    pub next: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl<T> AdminNextCursorPage<T> {
+    pub fn has_next_page(&self) -> bool {
+        self.has_more != Some(false) && self.next.is_some()
+    }
+
+    pub fn next_after(&self) -> Option<&str> {
+        if self.has_next_page() {
+            self.next.as_deref()
+        } else {
+            None
+        }
+    }
+}
+
 /// Organization invite creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct AdminInviteCreateParams {
@@ -1038,6 +1073,41 @@ impl From<AdminGroupListParams> for AdminQueryParams {
             .push_opt("order", value.order)
     }
 }
+
+/// Details about an organization group.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminGroup {
+    pub id: String,
+    pub created_at: u64,
+    pub group_type: AdminGroupType,
+    pub is_scim_managed: bool,
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Response returned after updating an organization group.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminGroupUpdateResponse {
+    pub id: String,
+    pub created_at: u64,
+    pub is_scim_managed: bool,
+    pub name: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Confirmation payload returned after deleting an organization group.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminGroupDeleteResponse {
+    pub id: String,
+    pub deleted: bool,
+    pub object: AdminGroupDeletedObject,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminGroupListResponse = AdminNextCursorPage<AdminGroup>;
 
 /// Organization group-user creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -2460,38 +2530,59 @@ impl OrganizationGroups {
         OrganizationGroupRoles::new(self.runtime.clone())
     }
 
-    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        post_body(&self.runtime, "/organization/groups", params)
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<AdminGroup>, OpenAIError> {
+        self.runtime.execute_json_with_body(
+            "POST",
+            "/organization/groups",
+            &params,
+            RequestOptions::default(),
+        )
     }
 
-    pub fn retrieve(&self, group_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn retrieve(&self, group_id: &str) -> Result<ApiResponse<AdminGroup>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
-        get(&self.runtime, format!("/organization/groups/{group_id}"))
+        self.runtime.execute_json(
+            "GET",
+            format!("/organization/groups/{group_id}"),
+            RequestOptions::default(),
+        )
     }
 
     pub fn update<B: Serialize>(
         &self,
         group_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminGroupUpdateResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/groups/{group_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-        get_query(&self.runtime, "/organization/groups", params)
+    ) -> Result<ApiResponse<AdminGroupListResponse>, OpenAIError> {
+        self.runtime.execute_json(
+            "GET",
+            path_with_query("/organization/groups", params),
+            RequestOptions::default(),
+        )
     }
 
-    pub fn delete(&self, group_id: &str) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    pub fn delete(
+        &self,
+        group_id: &str,
+    ) -> Result<ApiResponse<AdminGroupDeleteResponse>, OpenAIError> {
         let group_id = path_id("group_id", group_id)?;
-        delete(&self.runtime, format!("/organization/groups/{group_id}"))
+        self.runtime.execute_json(
+            "DELETE",
+            format!("/organization/groups/{group_id}"),
+            RequestOptions::default(),
+        )
     }
 }
 

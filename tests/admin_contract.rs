@@ -104,6 +104,25 @@ fn organization_user_json(id: &str) -> Value {
     })
 }
 
+fn organization_group_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_172_100u64,
+        "group_type": "group",
+        "is_scim_managed": false,
+        "name": "Engineering"
+    })
+}
+
+fn organization_group_update_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "created_at": 1_717_172_100u64,
+        "is_scim_managed": false,
+        "name": "Product Engineering"
+    })
+}
+
 #[test]
 fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
     let key_owner = json!({
@@ -494,6 +513,16 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         .to_string(),
     );
     responses[4] = json_response(organization_user_json("user_admin").to_string());
+    responses[6] = json_response(organization_group_json("grp_eng").to_string());
+    responses[7] = json_response(organization_group_update_json("grp_eng").to_string());
+    responses[8] = json_response(
+        json!({
+            "data": [organization_group_json("grp_eng")],
+            "has_more": true,
+            "next": "grp_eng"
+        })
+        .to_string(),
+    );
     responses[15] =
         json_response(organization_data_retention_json("zero_data_retention").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -590,12 +619,16 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
         )
         .unwrap();
 
-    org.groups()
+    let group = org
+        .groups()
         .create(AdminGroupCreateParams {
             name: String::from("Engineering"),
         })
         .unwrap();
-    org.groups()
+    assert_eq!(group.output.group_type, AdminGroupType::Group);
+    assert_eq!(group.output.name, "Engineering");
+    let updated_group = org
+        .groups()
         .update(
             "grp_eng",
             AdminGroupUpdateParams {
@@ -603,13 +636,17 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    org.groups()
+    assert_eq!(updated_group.output.name, "Product Engineering");
+    let groups = org
+        .groups()
         .list(AdminGroupListParams {
             after: Some(String::from("group_after")),
             limit: Some(9),
             order: Some(ListOrder::Asc),
         })
         .unwrap();
+    assert_eq!(groups.output.data[0].id, "grp_eng");
+    assert_eq!(groups.output.next_after(), Some("grp_eng"));
     org.groups()
         .users()
         .create(
@@ -1239,6 +1276,37 @@ fn admin_user_retrieve_and_delete_return_typed_responses() {
     assert_eq!(requests[0].path, "/v1/organization/users/user_admin");
     assert_eq!(requests[1].method, "DELETE");
     assert_eq!(requests[1].path, "/v1/organization/users/user_admin");
+}
+
+#[test]
+fn admin_group_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_group_json("grp_eng").to_string()),
+        json_response(
+            json!({
+                "id": "grp_eng",
+                "deleted": true,
+                "object": "group.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let groups = client.admin().organization().groups();
+
+    let group = groups.retrieve("grp_eng").unwrap();
+    assert_eq!(group.output.group_type, AdminGroupType::Group);
+    assert_eq!(group.output.name, "Engineering");
+
+    let deleted = groups.delete("grp_eng").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, AdminGroupDeletedObject::GroupDeleted);
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(requests[0].path, "/v1/organization/groups/grp_eng");
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(requests[1].path, "/v1/organization/groups/grp_eng");
 }
 
 #[test]
