@@ -573,7 +573,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -676,7 +676,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -772,7 +772,7 @@ impl ResponseParseParams {
 /// Query parameters for non-streamed response retrieval.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ResponseRetrieveParams {
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     pub include_obfuscation: Option<bool>,
     pub starting_after: Option<u64>,
     pub stream: Option<bool>,
@@ -782,7 +782,7 @@ impl ResponseRetrieveParams {
     fn to_query_pairs(&self) -> Vec<(String, String)> {
         let mut pairs = Vec::new();
         for include in &self.include {
-            pairs.push((String::from("include"), include.clone()));
+            pairs.push((String::from("include"), include.as_str().to_string()));
         }
         if let Some(include_obfuscation) = self.include_obfuscation {
             pairs.push((
@@ -905,7 +905,7 @@ impl ResponseInputTokensCountParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ResponseInputItemsListParams {
     pub after: Option<String>,
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     pub limit: Option<u32>,
     pub order: Option<ListOrder>,
 }
@@ -917,7 +917,7 @@ impl ResponseInputItemsListParams {
             pairs.push((String::from("after"), after.clone()));
         }
         for include in &self.include {
-            pairs.push((String::from("include"), include.clone()));
+            pairs.push((String::from("include"), include.as_str().to_string()));
         }
         if let Some(limit) = self.limit {
             pairs.push((String::from("limit"), limit.to_string()));
@@ -1354,6 +1354,54 @@ impl<'de> Deserialize<'de> for ResponseStatus {
             "incomplete" => Self::Incomplete,
             _ => Self::Unknown(value),
         })
+    }
+}
+
+/// Additional response fields that can be requested with `include`.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ResponseIncludable {
+    #[serde(rename = "file_search_call.results")]
+    FileSearchCallResults,
+    #[serde(rename = "web_search_call.results")]
+    WebSearchCallResults,
+    #[serde(rename = "web_search_call.action.sources")]
+    WebSearchCallActionSources,
+    #[serde(rename = "message.input_image.image_url")]
+    MessageInputImageImageUrl,
+    #[serde(rename = "computer_call_output.output.image_url")]
+    ComputerCallOutputOutputImageUrl,
+    #[serde(rename = "code_interpreter_call.outputs")]
+    CodeInterpreterCallOutputs,
+    #[serde(rename = "reasoning.encrypted_content")]
+    ReasoningEncryptedContent,
+    #[serde(rename = "message.output_text.logprobs")]
+    MessageOutputTextLogprobs,
+}
+
+impl ResponseIncludable {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::FileSearchCallResults => "file_search_call.results",
+            Self::WebSearchCallResults => "web_search_call.results",
+            Self::WebSearchCallActionSources => "web_search_call.action.sources",
+            Self::MessageInputImageImageUrl => "message.input_image.image_url",
+            Self::ComputerCallOutputOutputImageUrl => "computer_call_output.output.image_url",
+            Self::CodeInterpreterCallOutputs => "code_interpreter_call.outputs",
+            Self::ReasoningEncryptedContent => "reasoning.encrypted_content",
+            Self::MessageOutputTextLogprobs => "message.output_text.logprobs",
+        }
+    }
+}
+
+impl AsRef<str> for ResponseIncludable {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for ResponseIncludable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

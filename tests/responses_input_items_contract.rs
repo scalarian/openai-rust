@@ -1,4 +1,7 @@
-use openai_rust::{ErrorKind, OpenAI, resources::common::ListOrder};
+use openai_rust::{
+    ErrorKind, OpenAI,
+    resources::{common::ListOrder, responses::ResponseIncludable},
+};
 use serde_json::json;
 
 #[path = "support/mock_http.rs"]
@@ -25,7 +28,7 @@ fn input_items_list_exposes_typed_items_and_cursor_termination() {
             "resp_123",
             openai_rust::resources::responses::ResponseInputItemsListParams {
                 after: Some("item_0".into()),
-                include: vec!["message.input_image.image_url".into()],
+                include: vec![ResponseIncludable::MessageInputImageImageUrl],
                 limit: Some(2),
                 order: Some(ListOrder::Asc),
             },

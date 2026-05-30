@@ -4,7 +4,8 @@ use openai_rust::{
         common::{PromptCacheRetention, ServiceTier},
         responses::{
             FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-            ResponseInput, ResponseParseParams, ResponseTextConfig, ResponseTool,
+            ResponseIncludable, ResponseInput, ResponseParseParams, ResponseTextConfig,
+            ResponseTool,
         },
     },
 };
@@ -37,7 +38,7 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
         .responses()
         .parse::<Scorecard>(ResponseParseParams {
             model: "gpt-4.1-nano".into(),
-            include: vec![String::from("message.output_text.logprobs")],
+            include: vec![ResponseIncludable::MessageOutputTextLogprobs],
             input: Some(ResponseInput::text("who won?")),
             max_output_tokens: Some(128),
             prompt_cache_key: Some(String::from("parse-cache")),

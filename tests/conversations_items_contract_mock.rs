@@ -3,9 +3,9 @@ use openai_rust::{
     resources::{
         common::{ListOrder, SearchContextSize},
         responses::{
-            ResponseApplyPatchOperation, ResponseComputerAction, ResponseInputContentPart,
-            ResponseInputItem, ResponseInputText, ResponseItemAction, ResponseItemEnvironment,
-            ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
+            ResponseApplyPatchOperation, ResponseComputerAction, ResponseIncludable,
+            ResponseInputContentPart, ResponseInputItem, ResponseInputText, ResponseItemAction,
+            ResponseItemEnvironment, ResponseItemOutput, ResponseShellOutputOutcome, ResponseTool,
         },
     },
 };
@@ -62,8 +62,8 @@ fn routes_and_pagination() {
                     },
                 ],
                 include: vec![
-                    String::from("message.output_text.logprobs"),
-                    String::from("reasoning.encrypted_content/preview?x=y"),
+                    ResponseIncludable::MessageOutputTextLogprobs,
+                    ResponseIncludable::ReasoningEncryptedContent,
                 ],
                 ..Default::default()
             },
@@ -88,7 +88,7 @@ fn routes_and_pagination() {
             conversation_id,
             item_id,
             openai_rust::resources::conversations::ConversationItemRetrieveParams {
-                include: vec![String::from("message.output_text.logprobs/with space")],
+                include: vec![ResponseIncludable::MessageOutputTextLogprobs],
             },
         )
         .unwrap();
@@ -102,7 +102,7 @@ fn routes_and_pagination() {
             conversation_id,
             openai_rust::resources::conversations::ConversationItemListParams {
                 after: Some(String::from("item_1")),
-                include: vec![String::from("message.output_text.logprobs/with space")],
+                include: vec![ResponseIncludable::MessageOutputTextLogprobs],
                 limit: Some(2),
                 order: Some(ListOrder::Asc),
             },
@@ -127,7 +127,7 @@ fn routes_and_pagination() {
     assert_eq!(requests[0].method, "POST");
     assert_eq!(
         requests[0].path,
-        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?include=message.output_text.logprobs&include=reasoning.encrypted_content%2Fpreview%3Fx%3Dy"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?include=message.output_text.logprobs&include=reasoning.encrypted_content"
     );
     let create_body: Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(create_body["items"][0]["content"][0]["text"], "hello");
@@ -136,13 +136,13 @@ fn routes_and_pagination() {
     assert_eq!(requests[1].method, "GET");
     assert_eq!(
         requests[1].path,
-        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items/item_1%2Fseed%20a%3Fx%3Dy?include=message.output_text.logprobs%2Fwith+space"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items/item_1%2Fseed%20a%3Fx%3Dy?include=message.output_text.logprobs"
     );
 
     assert_eq!(requests[2].method, "GET");
     assert_eq!(
         requests[2].path,
-        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?after=item_1&include=message.output_text.logprobs%2Fwith+space&limit=2&order=asc"
+        "/v1/conversations/conv_123%2Ftenant%20a%3Fx%3Dy/items?after=item_1&include=message.output_text.logprobs&limit=2&order=asc"
     );
 
     assert_eq!(requests[3].method, "DELETE");

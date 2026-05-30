@@ -11,9 +11,9 @@ use crate::{
         common::ListOrder,
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterOutput, ResponseComputerAction,
-            ResponseFileSearchResult, ResponseInputAudioData, ResponseInputItem,
-            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput, ResponseItemRole,
-            ResponseItemStatus, ResponseItemTool, ResponseMessagePhase,
+            ResponseFileSearchResult, ResponseIncludable, ResponseInputAudioData,
+            ResponseInputItem, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+            ResponseItemRole, ResponseItemStatus, ResponseItemTool, ResponseMessagePhase,
             ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
         },
     },
@@ -193,7 +193,7 @@ pub struct ConversationItemCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub items: Vec<ResponseInputItem>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -214,7 +214,7 @@ impl ConversationItemCreateParams {
     fn to_query_pairs(&self) -> Vec<(String, String)> {
         self.include
             .iter()
-            .map(|include| (String::from("include"), include.clone()))
+            .map(|include| (String::from("include"), include.as_str().to_string()))
             .collect()
     }
 }
@@ -222,14 +222,14 @@ impl ConversationItemCreateParams {
 /// Retrieve-item query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConversationItemRetrieveParams {
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
 }
 
 impl ConversationItemRetrieveParams {
     fn to_query_pairs(&self) -> Vec<(String, String)> {
         self.include
             .iter()
-            .map(|include| (String::from("include"), include.clone()))
+            .map(|include| (String::from("include"), include.as_str().to_string()))
             .collect()
     }
 }
@@ -238,7 +238,7 @@ impl ConversationItemRetrieveParams {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConversationItemListParams {
     pub after: Option<String>,
-    pub include: Vec<String>,
+    pub include: Vec<ResponseIncludable>,
     pub limit: Option<u32>,
     pub order: Option<ListOrder>,
 }
@@ -250,7 +250,7 @@ impl ConversationItemListParams {
             pairs.push((String::from("after"), after.clone()));
         }
         for include in &self.include {
-            pairs.push((String::from("include"), include.clone()));
+            pairs.push((String::from("include"), include.as_str().to_string()));
         }
         if let Some(limit) = self.limit {
             pairs.push((String::from("limit"), limit.to_string()));
