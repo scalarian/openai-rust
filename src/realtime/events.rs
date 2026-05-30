@@ -398,6 +398,26 @@ impl<'de> Deserialize<'de> for RealtimeTracing {
     }
 }
 
+/// Configuration for reasoning-capable Realtime models.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeReasoning {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<RealtimeReasoningEffort>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime reasoning effort.
+    pub enum RealtimeReasoningEffort {
+        Minimal => "minimal",
+        Low => "low",
+        Medium => "medium",
+        High => "high",
+        XHigh => "xhigh",
+    }
+}
+
 impl Serialize for RealtimeToolChoice {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -586,7 +606,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<RealtimeReasoning>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -726,7 +746,7 @@ pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<RealtimeReasoning>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -3,10 +3,11 @@ use openai_rust::{
     realtime::{
         RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
         RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeInclude,
-        RealtimeMaxOutputTokens, RealtimeNullable, RealtimeOutputModality, RealtimeSessionConfig,
-        RealtimeSessionTTL, RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice,
-        RealtimeTracing, RealtimeTracingConfiguration, RealtimeTruncation,
-        RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits,
+        RealtimeMaxOutputTokens, RealtimeNullable, RealtimeOutputModality, RealtimeReasoning,
+        RealtimeReasoningEffort, RealtimeSessionConfig, RealtimeSessionTTL,
+        RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeToolChoice, RealtimeTracing,
+        RealtimeTracingConfiguration, RealtimeTruncation, RealtimeTruncationRetentionRatio,
+        RealtimeTruncationTokenLimits,
     },
 };
 use serde_json::json;
@@ -30,6 +31,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "model": "gpt-realtime-mini",
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
+                    "reasoning": {"effort": "xhigh"},
                     "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
                     "tracing": {"group_id": "grp_1", "workflow_name": "wf", "metadata": {"env": "test"}},
                     "truncation": "auto",
@@ -68,6 +70,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
+                reasoning: Some(RealtimeReasoning {
+                    effort: Some(RealtimeReasoningEffort::Medium),
+                    ..Default::default()
+                }),
                 tool_choice: Some(RealtimeToolChoice::Required),
                 tracing: Some(RealtimeNullable::Value(RealtimeTracing::Auto)),
                 truncation: Some(RealtimeTruncation::Disabled),
@@ -88,6 +94,13 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.max_output_tokens,
         Some(RealtimeMaxOutputTokens::Inf)
+    );
+    assert_eq!(
+        secret.output().session.reasoning,
+        Some(RealtimeReasoning {
+            effort: Some(RealtimeReasoningEffort::XHigh),
+            ..Default::default()
+        })
     );
     assert_eq!(
         secret.output().session.truncation,
@@ -133,7 +146,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
-                reasoning: Some(json!({"effort": "low"})),
+                reasoning: Some(RealtimeReasoning {
+                    effort: Some(RealtimeReasoningEffort::Low),
+                    ..Default::default()
+                }),
                 tool_choice: Some(RealtimeToolChoice::function("lookup_weather")),
                 tracing: Some(RealtimeNullable::Value(RealtimeTracing::configuration(
                     RealtimeTracingConfiguration {
@@ -171,7 +187,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 instructions: Some(String::from("Stay concise.")),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
-                reasoning: Some(json!({"effort": "low"})),
+                reasoning: Some(RealtimeReasoning {
+                    effort: Some(RealtimeReasoningEffort::High),
+                    ..Default::default()
+                }),
                 tool_choice: Some(RealtimeToolChoice::mcp("remote", None)),
                 tracing: Some(RealtimeNullable::Null),
                 truncation: Some(RealtimeTruncation::Auto),
@@ -222,6 +241,10 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         "item.input_audio_transcription.logprobs"
     );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
+    assert_eq!(
+        client_secret_body["session"]["reasoning"]["effort"],
+        "medium"
+    );
     assert_eq!(client_secret_body["session"]["tool_choice"], "required");
     assert_eq!(client_secret_body["session"]["tracing"], "auto");
     assert_eq!(client_secret_body["session"]["truncation"], "disabled");
@@ -295,7 +318,7 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert!(accept_body["tracing"].is_null());
     assert_eq!(accept_body["truncation"], "auto");
     assert_eq!(accept_body["parallel_tool_calls"], true);
-    assert_eq!(accept_body["reasoning"]["effort"], "low");
+    assert_eq!(accept_body["reasoning"]["effort"], "high");
 
     assert_eq!(requests[4].path, "/v1/realtime/calls/call_hangup/hangup");
     assert!(requests[4].body.is_empty());
