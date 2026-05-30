@@ -3,10 +3,11 @@ use std::collections::BTreeMap;
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
     resources::responses::{
-        ResponseCodeInterpreterTool, ResponseComputerAction, ResponseConversation,
-        ResponseConversationObject, ResponseFormatTextConfig, ResponseItemAction,
-        ResponseItemEnvironment, ResponseItemOutput, ResponsePrompt, ResponseReasoning,
-        ResponseShellOutputOutcome, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+        ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
+        ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
+        ResponseFormatTextConfig, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+        ResponsePrompt, ResponseReasoning, ResponseShellOutputOutcome, ResponseTool,
+        ResponseToolChoice, ResponseWebSearchPreviewTool,
     },
 };
 use serde_json::{Value, json};
@@ -509,12 +510,22 @@ fn tool_and_refusal_fields_round_trip() {
             .find(|item| item.item_type == "file_search_call")
             .expect("file_search_call item");
         assert_eq!(file_search.queries, vec![String::from("docs")]);
+        let file_search_results = file_search.results.as_ref().unwrap();
+        assert_eq!(file_search_results[0].file_id.as_deref(), Some("file_1"));
+        assert_eq!(file_search_results[0].filename.as_deref(), Some("guide.md"));
+        assert_eq!(file_search_results[0].score, Some(0.9));
         assert_eq!(
-            file_search.results,
-            Some(vec![
-                json!({"file_id": "file_1", "filename": "guide.md", "score": 0.9})
-            ])
+            file_search_results[0].text.as_deref(),
+            Some("Relevant guide excerpt")
         );
+        assert!(matches!(
+            file_search_results[0]
+                .attributes
+                .as_ref()
+                .unwrap()
+                .get("section"),
+            Some(ResponseFileSearchAttributeValue::String(section)) if section == "intro"
+        ));
 
         let code_call = response
             .output
@@ -522,10 +533,16 @@ fn tool_and_refusal_fields_round_trip() {
             .find(|item| item.item_type == "code_interpreter_call")
             .expect("code_interpreter_call item");
         assert_eq!(code_call.container_id.as_deref(), Some("cntr_123"));
-        assert_eq!(
-            code_call.outputs,
-            Some(vec![json!({"type": "logs", "logs": "ok"})])
-        );
+        let code_outputs = code_call.outputs.as_ref().unwrap();
+        assert!(matches!(
+            &code_outputs[0],
+            ResponseCodeInterpreterOutput::Logs(logs) if logs.logs == "ok"
+        ));
+        assert!(matches!(
+            &code_outputs[1],
+            ResponseCodeInterpreterOutput::Image(image)
+                if image.url == "https://example.com/output.png"
+        ));
 
         let mcp_call = response
             .output
@@ -1014,14 +1031,23 @@ fn response_payload_with_tool_and_refusal(id: &str) -> String {
                 "type": "file_search_call",
                 "queries": ["docs"],
                 "status": "completed",
-                "results": [{"file_id": "file_1", "filename": "guide.md", "score": 0.9}]
+                "results": [{
+                    "file_id": "file_1",
+                    "filename": "guide.md",
+                    "score": 0.9,
+                    "text": "Relevant guide excerpt",
+                    "attributes": {"section": "intro", "rank": 1}
+                }]
             },
             {
                 "id": "ci_123",
                 "type": "code_interpreter_call",
                 "container_id": "cntr_123",
                 "code": "print('ok')",
-                "outputs": [{"type": "logs", "logs": "ok"}],
+                "outputs": [
+                    {"type": "logs", "logs": "ok"},
+                    {"type": "image", "url": "https://example.com/output.png"}
+                ],
                 "status": "completed"
             },
             {

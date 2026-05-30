@@ -8,7 +8,8 @@ use crate::{
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     error::ErrorKind,
     resources::responses::{
-        ResponseComputerAction, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+        ResponseCodeInterpreterOutput, ResponseComputerAction, ResponseFileSearchResult,
+        ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
     },
 };
 
@@ -329,7 +330,7 @@ pub struct ConversationItem {
     pub output: Option<ResponseItemOutput>,
     pub result: Option<String>,
     pub queries: Vec<String>,
-    pub results: Option<Vec<Value>>,
+    pub results: Option<Vec<ResponseFileSearchResult>>,
     pub server_label: Option<String>,
     pub approval_request_id: Option<String>,
     pub approve: Option<bool>,
@@ -339,7 +340,7 @@ pub struct ConversationItem {
     pub summary: Vec<Value>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
-    pub outputs: Option<Vec<Value>>,
+    pub outputs: Option<Vec<ResponseCodeInterpreterOutput>>,
     pub max_output_length: Option<u64>,
     pub pending_safety_checks: Vec<ConversationComputerSafetyCheck>,
     pub acknowledged_safety_checks: Vec<ConversationComputerSafetyCheck>,
@@ -426,7 +427,7 @@ struct WireConversationItem {
     #[serde(default)]
     queries: Vec<String>,
     #[serde(default)]
-    results: Option<Vec<Value>>,
+    results: Option<Vec<ResponseFileSearchResult>>,
     #[serde(default)]
     server_label: Option<String>,
     #[serde(default)]
@@ -446,7 +447,7 @@ struct WireConversationItem {
     #[serde(default)]
     container_id: Option<String>,
     #[serde(default)]
-    outputs: Option<Vec<Value>>,
+    outputs: Option<Vec<ResponseCodeInterpreterOutput>>,
     #[serde(default)]
     max_output_length: Option<u64>,
     #[serde(default)]
