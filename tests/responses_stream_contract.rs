@@ -3,8 +3,8 @@ use openai_rust::{
     core::metadata::ResponseMetadata,
     resources::responses::{
         ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-        ResponseRetrieveParams, ResponseStream, ResponseStreamEvent, ResponseStreamTerminal,
-        ResponseTextAnnotation, ResponseTextConfig,
+        ResponseInput, ResponseRetrieveParams, ResponseStream, ResponseStreamEvent,
+        ResponseStreamTerminal, ResponseTextAnnotation, ResponseTextConfig,
     },
 };
 use serde_json::json;
@@ -31,7 +31,7 @@ fn text_and_reasoning_accumulate() {
         .responses()
         .stream(ResponseCreateParams {
             model: String::from("gpt-4.1-mini"),
-            input: Some(json!("say hi")),
+            input: Some(ResponseInput::text("say hi")),
             ..Default::default()
         })
         .expect("stream should start");
@@ -156,7 +156,7 @@ fn incremental_delivery_and_abort() {
         .responses()
         .stream(ResponseCreateParams {
             model: String::from("gpt-4.1-mini"),
-            input: Some(json!("say hi")),
+            input: Some(ResponseInput::text("say hi")),
             ..Default::default()
         })
         .expect("stream should start");

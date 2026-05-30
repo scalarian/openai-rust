@@ -15,7 +15,7 @@ Responses is the primary surface for new code.
 
 ```rust
 use openai_rust::resources::chat::ChatCompletionCreateParams;
-use openai_rust::resources::responses::ResponseCreateParams;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 use serde_json::json;
 
 let compatibility = ChatCompletionCreateParams {
@@ -26,7 +26,7 @@ let compatibility = ChatCompletionCreateParams {
 
 let preferred = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello")),
+    input: Some(ResponseInput::text("Say hello")),
     ..Default::default()
 };
 
@@ -39,7 +39,7 @@ let _ = (compatibility, preferred);
 
 ```rust
 use openai_rust::resources::completions::CompletionCreateParams;
-use openai_rust::resources::responses::ResponseCreateParams;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 use serde_json::json;
 
 let legacy = CompletionCreateParams {
@@ -50,7 +50,7 @@ let legacy = CompletionCreateParams {
 
 let preferred = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello")),
+    input: Some(ResponseInput::text("Say hello")),
     ..Default::default()
 };
 

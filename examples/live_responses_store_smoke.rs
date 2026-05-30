@@ -1,12 +1,16 @@
-use openai_rust::{ApiErrorKind, ErrorKind, OpenAI, resources::responses::ResponseCreateParams};
-use serde_json::json;
+use openai_rust::{
+    ApiErrorKind, ErrorKind, OpenAI,
+    resources::responses::{ResponseCreateParams, ResponseInput},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let stored = client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!("Reply with exactly: stored response smoke")),
+        input: Some(ResponseInput::text(
+            "Reply with exactly: stored response smoke",
+        )),
         store: Some(true),
         ..Default::default()
     })?;
@@ -27,7 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let unstored = client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!("Reply with exactly: ephemeral response smoke")),
+        input: Some(ResponseInput::text(
+            "Reply with exactly: ephemeral response smoke",
+        )),
         store: Some(false),
         ..Default::default()
     })?;

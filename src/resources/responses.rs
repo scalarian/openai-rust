@@ -564,7 +564,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub include: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<Value>,
+    pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -624,7 +624,10 @@ impl ResponseCreateParams {
     where
         T: Serialize,
     {
-        self.input = Some(serialize_json_value("responses.input", input)?);
+        self.input = Some(ResponseInput::Json(serialize_json_value(
+            "responses.input",
+            input,
+        )?));
         Ok(self)
     }
 
@@ -664,7 +667,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub include: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<Value>,
+    pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -791,7 +794,7 @@ impl ResponseRetrieveParams {
 pub struct ResponseCompactParams {
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<Value>,
+    pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -812,7 +815,7 @@ pub struct ResponseInputTokensCountParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<Value>,
+    pub input: Option<ResponseInput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -844,7 +847,10 @@ impl ResponseInputTokensCountParams {
     where
         T: Serialize,
     {
-        self.input = Some(serialize_json_value("responses.input_tokens.input", input)?);
+        self.input = Some(ResponseInput::Json(serialize_json_value(
+            "responses.input_tokens.input",
+            input,
+        )?));
         Ok(self)
     }
 
@@ -959,6 +965,210 @@ pub struct ResponseConversationObject {
     pub id: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Text or structured input items for a Responses request.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseInput {
+    Text(String),
+    Items(Vec<ResponseInputItem>),
+    Json(Value),
+}
+
+impl ResponseInput {
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::Text(text.into())
+    }
+
+    pub fn items(items: Vec<ResponseInputItem>) -> Self {
+        Self::Items(items)
+    }
+}
+
+impl From<String> for ResponseInput {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ResponseInput {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ResponseInputItem>> for ResponseInput {
+    fn from(value: Vec<ResponseInputItem>) -> Self {
+        Self::Items(value)
+    }
+}
+
+/// Generic input item shape accepted by Responses request inputs.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct ResponseInputItem {
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub item_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ResponseInputMessageContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<ResponseInputItemOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypted_content: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseInputItem {
+    pub fn message(
+        role: impl Into<String>,
+        content: impl Into<ResponseInputMessageContent>,
+    ) -> Self {
+        Self {
+            item_type: Some(String::from("message")),
+            role: Some(role.into()),
+            content: Some(content.into()),
+            ..Default::default()
+        }
+    }
+}
+
+/// Message content for Responses input items.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseInputMessageContent {
+    Text(String),
+    Parts(Vec<ResponseInputContentPart>),
+}
+
+impl From<String> for ResponseInputMessageContent {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&str> for ResponseInputMessageContent {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl From<Vec<ResponseInputContentPart>> for ResponseInputMessageContent {
+    fn from(value: Vec<ResponseInputContentPart>) -> Self {
+        Self::Parts(value)
+    }
+}
+
+/// Function/tool output payload for Responses input items.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseInputItemOutput {
+    Text(String),
+    Content(Vec<ResponseInputContentPart>),
+    Json(Value),
+}
+
+/// Content part used inside Responses message inputs.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseInputContentPart {
+    Text(ResponseInputText),
+    Image(ResponseInputImage),
+    File(ResponseInputFile),
+    Json(Value),
+}
+
+/// Text input content part.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResponseInputText {
+    #[serde(rename = "type")]
+    pub content_type: String,
+    pub text: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseInputText {
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            content_type: String::from("input_text"),
+            text: text.into(),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// Image input content part.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResponseInputImage {
+    #[serde(rename = "type")]
+    pub content_type: String,
+    pub detail: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseInputImage {
+    pub fn url(image_url: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self {
+            content_type: String::from("input_image"),
+            detail: detail.into(),
+            file_id: None,
+            image_url: Some(image_url.into()),
+            extra: BTreeMap::new(),
+        }
+    }
+}
+
+/// File input content part.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResponseInputFile {
+    #[serde(rename = "type")]
+    pub content_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl ResponseInputFile {
+    pub fn file_id(file_id: impl Into<String>) -> Self {
+        Self {
+            content_type: String::from("input_file"),
+            detail: None,
+            file_data: None,
+            file_id: Some(file_id.into()),
+            file_url: None,
+            filename: None,
+            extra: BTreeMap::new(),
+        }
+    }
 }
 
 /// Context management entry for Responses creation requests.

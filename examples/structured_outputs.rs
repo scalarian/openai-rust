@@ -1,5 +1,5 @@
 use openai_rust::resources::responses::{
-    FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
+    FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig, ResponseInput,
     ResponseParseParams, ResponseTextConfig, ResponseTool,
 };
 use serde_json::json;
@@ -7,7 +7,7 @@ use serde_json::json;
 fn main() {
     let params = ResponseParseParams {
         model: "gpt-5.5".into(),
-        input: Some(json!("Return {\"language\":\"rust\"}")),
+        input: Some(ResponseInput::text("Return {\"language\":\"rust\"}")),
         text: Some(ResponseTextConfig {
             format: Some(ResponseFormatTextConfig::JsonSchema(
                 ResponseFormatTextJSONSchemaConfig {

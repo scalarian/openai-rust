@@ -5,7 +5,8 @@ use openai_rust::{
     resources::responses::{
         FunctionTool, ResponseFileSearchFilter, ResponseFileSearchFilterArrayValue,
         ResponseFileSearchFilterValue, ResponseFileSearchTool, ResponseFormatTextConfig,
-        ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
+        ResponseInput, ResponseInputContentPart, ResponseInputImage, ResponseInputItem,
+        ResponseInputText, ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
     },
 };
 use serde_json::{Value, json};
@@ -38,16 +39,16 @@ fn input_tokens_count_forwards_modalities_and_tools() {
         .input_tokens()
         .count(ResponseInputTokensCountParams {
             model: Some("gpt-4.1-nano".into()),
-            input: Some(json!([
-                {
-                    "type": "message",
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": "describe this"},
-                        {"type": "input_image", "image_url": "https://example.com/cat.png"}
-                    ]
-                }
-            ])),
+            input: Some(ResponseInput::items(vec![ResponseInputItem::message(
+                "user",
+                vec![
+                    ResponseInputContentPart::Text(ResponseInputText::new("describe this")),
+                    ResponseInputContentPart::Image(ResponseInputImage::url(
+                        "https://example.com/cat.png",
+                        "auto",
+                    )),
+                ],
+            )])),
             instructions: Some("Be brief".into()),
             parallel_tool_calls: Some(true),
             text: Some(ResponseTextConfig {

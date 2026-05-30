@@ -1,16 +1,15 @@
 use openai_rust::{
     OpenAI,
-    resources::responses::{ResponseCompactParams, ResponseCreateParams},
+    resources::responses::{ResponseCompactParams, ResponseCreateParams, ResponseInput},
 };
-use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let seed = client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!(
-            "In one short sentence, describe what compaction does for long conversations."
+        input: Some(ResponseInput::text(
+            "In one short sentence, describe what compaction does for long conversations.",
         )),
         store: Some(true),
         ..Default::default()

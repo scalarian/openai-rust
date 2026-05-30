@@ -1,15 +1,14 @@
 use openai_rust::{
     ApiErrorKind, ErrorKind, OpenAI,
-    resources::responses::{ResponseConversation, ResponseCreateParams},
+    resources::responses::{ResponseConversation, ResponseCreateParams, ResponseInput},
 };
-use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let seed = client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!("Reply with exactly: continuity seed")),
+        input: Some(ResponseInput::text("Reply with exactly: continuity seed")),
         store: Some(true),
         ..Default::default()
     })?;
@@ -18,8 +17,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!(
-            "This request should fail because it mixes continuity modes."
+        input: Some(ResponseInput::text(
+            "This request should fail because it mixes continuity modes.",
         )),
         previous_response_id: Some(response_id),
         conversation: Some(ResponseConversation::Id(String::from(

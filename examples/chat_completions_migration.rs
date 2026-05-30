@@ -1,6 +1,7 @@
 use openai_rust::resources::{
-    chat::ChatCompletionCreateParams, completions::CompletionCreateParams,
-    responses::ResponseCreateParams,
+    chat::ChatCompletionCreateParams,
+    completions::CompletionCreateParams,
+    responses::{ResponseCreateParams, ResponseInput},
 };
 use serde_json::json;
 
@@ -19,7 +20,7 @@ fn main() {
 
     let responses = ResponseCreateParams {
         model: "gpt-5.5".into(),
-        input: Some(json!("Say hello")),
+        input: Some(ResponseInput::text("Say hello")),
         ..Default::default()
     };
 

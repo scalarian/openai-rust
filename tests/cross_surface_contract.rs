@@ -27,7 +27,7 @@ use openai_rust::{
         multimodal::{ResponseInputMessage, ResponseInputPart},
         responses::{
             ResponseCreateParams, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
-            ResponseParseParams, ResponseTextConfig,
+            ResponseInput, ResponseParseParams, ResponseTextConfig,
         },
         webhooks::{WebhookEvent, WebhookHeaders},
     },
@@ -83,7 +83,7 @@ fn env_loaded_client_reaches_multiple_subsystems_without_per_endpoint_reconfigur
                 .responses()
                 .create(ResponseCreateParams {
                     model: String::from("gpt-4.1-mini"),
-                    input: Some(json!("Say hi")),
+                    input: Some(ResponseInput::text("Say hi")),
                     ..Default::default()
                 })
                 .unwrap();
@@ -144,7 +144,7 @@ fn request_ids_and_typed_errors_stay_consistent_across_result_forms() {
         .responses()
         .create(ResponseCreateParams {
             model: String::from("gpt-4.1-mini"),
-            input: Some(json!("score update")),
+            input: Some(ResponseInput::text("score update")),
             ..Default::default()
         })
         .unwrap();
@@ -206,7 +206,7 @@ fn request_ids_and_typed_errors_stay_consistent_across_result_forms() {
         .responses()
         .stream(ResponseCreateParams {
             model: String::from("gpt-4.1-mini"),
-            input: Some(json!("Say hello")),
+            input: Some(ResponseInput::text("Say hello")),
             ..Default::default()
         })
         .unwrap();
@@ -524,7 +524,7 @@ fn client(base_url: &str) -> OpenAI {
 fn parse_params() -> ResponseParseParams {
     ResponseParseParams {
         model: String::from("gpt-4.1-mini"),
-        input: Some(json!("who won?")),
+        input: Some(ResponseInput::text("who won?")),
         text: parse_text_config(),
         ..Default::default()
     }
@@ -813,7 +813,7 @@ fn mock_publish_ready_equivalence_report() -> cross_surface::NormalizedCrossSurf
                 .responses()
                 .create(ResponseCreateParams {
                     model: String::from("gpt-4.1-mini"),
-                    input: Some(json!("Reply with exactly hi.")),
+                    input: Some(ResponseInput::text("Reply with exactly hi.")),
                     ..Default::default()
                 })
                 .expect("mock responses.create");

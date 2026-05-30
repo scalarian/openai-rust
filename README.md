@@ -14,15 +14,14 @@ cargo add scalarian-openai-rust
 
 ```rust,no_run
 use openai_rust::OpenAI;
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let response = client.responses().create(ResponseCreateParams {
         model: "gpt-5.5".into(),
-        input: Some(json!("Say hello from Rust.")),
+        input: Some(ResponseInput::text("Say hello from Rust.")),
         ..Default::default()
     })?;
 

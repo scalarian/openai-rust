@@ -6,7 +6,7 @@ use openai_rust::{
     OpenAI,
     blocking::OpenAI as BlockingOpenAI,
     resources::{
-        responses::{ResponseCreateParams, ResponseStreamEvent},
+        responses::{ResponseCreateParams, ResponseInput, ResponseStreamEvent},
         uploads::{ChunkedUploadSource, UploadChunkedParams, UploadPurpose},
     },
 };
@@ -25,7 +25,7 @@ fn blocking_responses_create_matches_async_results_and_metadata() {
     let blocking_client = blocking_client(&blocking_server.url());
     let params = ResponseCreateParams {
         model: String::from("gpt-4.1-mini"),
-        input: Some(json!("say hi")),
+        input: Some(ResponseInput::text("say hi")),
         ..Default::default()
     };
 
@@ -70,7 +70,7 @@ fn blocking_stream_consumption_matches_async_terminal_output() {
     let blocking_client = blocking_client(&blocking_server.url());
     let params = ResponseCreateParams {
         model: String::from("gpt-4.1-mini"),
-        input: Some(json!("say hi")),
+        input: Some(ResponseInput::text("say hi")),
         ..Default::default()
     };
 

@@ -10,7 +10,7 @@ use openai_rust::{
     resources::{
         chat::ChatCompletionCreateParams,
         files::{FileCreateParams, FileCreatePurpose, FileUpload},
-        responses::ResponseCreateParams,
+        responses::{ResponseCreateParams, ResponseInput},
     },
 };
 use serde::Serialize;
@@ -43,7 +43,7 @@ fn live_cross_surface_smoke_proves_env_only_multi_surface_and_realtime_bootstrap
         .responses()
         .create(ResponseCreateParams {
             model: String::from("gpt-4.1-mini"),
-            input: Some(serde_json::json!("Reply with exactly hi.")),
+            input: Some(ResponseInput::text("Reply with exactly hi.")),
             ..Default::default()
         })
         .expect("live responses call should succeed");

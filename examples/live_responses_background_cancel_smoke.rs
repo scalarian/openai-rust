@@ -1,13 +1,15 @@
-use openai_rust::{OpenAI, resources::responses::ResponseCreateParams};
-use serde_json::json;
+use openai_rust::{
+    OpenAI,
+    resources::responses::{ResponseCreateParams, ResponseInput},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let created = client.responses().create(ResponseCreateParams {
         model: String::from("gpt-4.1-nano"),
-        input: Some(json!(
-            "Write the numbers 1 through 400, one per line, with no commentary."
+        input: Some(ResponseInput::text(
+            "Write the numbers 1 through 400, one per line, with no commentary.",
         )),
         background: Some(true),
         store: Some(true),

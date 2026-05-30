@@ -30,13 +30,12 @@ Export `OPENAI_API_KEY`, then use the `Responses` family:
 
 ```rust
 use openai_rust::OpenAI;
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 let client = OpenAI::builder().build();
 let params = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello from Rust.")),
+    input: Some(ResponseInput::text("Say hello from Rust.")),
     ..Default::default()
 };
 

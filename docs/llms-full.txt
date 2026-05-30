@@ -23,15 +23,14 @@ cargo add scalarian-openai-rust
 
 ```rust,no_run
 use openai_rust::OpenAI;
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = OpenAI::builder().build();
 
     let response = client.responses().create(ResponseCreateParams {
         model: "gpt-5.5".into(),
-        input: Some(json!("Say hello from Rust.")),
+        input: Some(ResponseInput::text("Say hello from Rust.")),
         ..Default::default()
     })?;
 
@@ -238,13 +237,12 @@ Export `OPENAI_API_KEY`, then use the `Responses` family:
 
 ```rust
 use openai_rust::OpenAI;
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 let client = OpenAI::builder().build();
 let params = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello from Rust.")),
+    input: Some(ResponseInput::text("Say hello from Rust.")),
     ..Default::default()
 };
 
@@ -266,12 +264,11 @@ FILE: docs/responses-guide.md
 ## Basic request
 
 ```rust
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 let params = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Summarize the Rust ownership rules.")),
+    input: Some(ResponseInput::text("Summarize the Rust ownership rules.")),
     ..Default::default()
 };
 
@@ -330,7 +327,7 @@ Responses is the primary surface for new code.
 
 ```rust
 use openai_rust::resources::chat::ChatCompletionCreateParams;
-use openai_rust::resources::responses::ResponseCreateParams;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 use serde_json::json;
 
 let compatibility = ChatCompletionCreateParams {
@@ -341,7 +338,7 @@ let compatibility = ChatCompletionCreateParams {
 
 let preferred = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello")),
+    input: Some(ResponseInput::text("Say hello")),
     ..Default::default()
 };
 
@@ -354,7 +351,7 @@ let _ = (compatibility, preferred);
 
 ```rust
 use openai_rust::resources::completions::CompletionCreateParams;
-use openai_rust::resources::responses::ResponseCreateParams;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 use serde_json::json;
 
 let legacy = CompletionCreateParams {
@@ -365,7 +362,7 @@ let legacy = CompletionCreateParams {
 
 let preferred = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Say hello")),
+    input: Some(ResponseInput::text("Say hello")),
     ..Default::default()
 };
 
@@ -556,4 +553,3 @@ cargo run --example embeddings
 cargo run --example upload_to_vector_store
 cargo run --example chat_completions_migration
 ```
-

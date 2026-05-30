@@ -5,12 +5,11 @@
 ## Basic request
 
 ```rust
-use openai_rust::resources::responses::ResponseCreateParams;
-use serde_json::json;
+use openai_rust::resources::responses::{ResponseCreateParams, ResponseInput};
 
 let params = ResponseCreateParams {
     model: "gpt-5.5".into(),
-    input: Some(json!("Summarize the Rust ownership rules.")),
+    input: Some(ResponseInput::text("Summarize the Rust ownership rules.")),
     ..Default::default()
 };
 

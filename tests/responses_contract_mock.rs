@@ -10,8 +10,8 @@ use openai_rust::{
             ResponseContextManagement, ResponseConversation, ResponseConversationObject,
             ResponseCustomTool, ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
             ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
-            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseInstructions,
-            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseInput,
+            ResponseInstructions, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
             ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
             ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
             ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
@@ -52,7 +52,7 @@ fn create_populates_output_text_helper() {
                 extra: BTreeMap::new(),
             }],
             include: vec![String::from("message.output_text.logprobs")],
-            input: Some(json!("hello")),
+            input: Some(ResponseInput::text("hello")),
             instructions: Some(String::from("Be concise.")),
             max_output_tokens: Some(512),
             max_tool_calls: Some(4),
@@ -656,7 +656,7 @@ fn tool_and_refusal_fields_round_trip() {
         .responses()
         .create(openai_rust::resources::responses::ResponseCreateParams {
             model: "gpt-4.1-nano".into(),
-            input: Some(json!("hello")),
+            input: Some(ResponseInput::text("hello")),
             ..Default::default()
         })
         .unwrap();
@@ -934,7 +934,7 @@ fn compact_returns_compaction_object() {
         .responses()
         .compact(openai_rust::resources::responses::ResponseCompactParams {
             model: "gpt-4.1-nano".into(),
-            input: Some(json!("follow-up")),
+            input: Some(ResponseInput::text("follow-up")),
             previous_response_id: Some("resp_prev".into()),
             prompt_cache_key: Some(String::from("compact-cache")),
             prompt_cache_retention: Some(String::from("in_memory")),

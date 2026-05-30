@@ -1,7 +1,7 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     resources::responses::{
-        FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig,
+        FunctionTool, ResponseFormatTextConfig, ResponseFormatTextJSONSchemaConfig, ResponseInput,
         ResponseParseParams, ResponseTextConfig, ResponseTool,
     },
 };
@@ -35,7 +35,7 @@ fn parse_returns_typed_output_and_strict_tool_arguments() {
         .parse::<Scorecard>(ResponseParseParams {
             model: "gpt-4.1-nano".into(),
             include: vec![String::from("message.output_text.logprobs")],
-            input: Some(json!("who won?")),
+            input: Some(ResponseInput::text("who won?")),
             max_output_tokens: Some(128),
             prompt_cache_key: Some(String::from("parse-cache")),
             prompt_cache_retention: Some(String::from("24h")),
@@ -183,7 +183,7 @@ fn parse_surfaces_explicit_refusal_and_parse_failures() {
 fn parse_params() -> ResponseParseParams {
     ResponseParseParams {
         model: "gpt-4.1-nano".into(),
-        input: Some(json!("who won?")),
+        input: Some(ResponseInput::text("who won?")),
         text: Some(ResponseTextConfig {
             format: Some(ResponseFormatTextConfig::JsonSchema(
                 ResponseFormatTextJSONSchemaConfig {
