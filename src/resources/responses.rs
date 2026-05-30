@@ -36,6 +36,10 @@ use crate::{
             Verbosity,
         },
         containers::{ContainerMemoryLimit, ContainerNetworkPolicy, ContainerSkill},
+        images::{
+            ImageBackground, ImageGenerateSize, ImageInputFidelity, ImageModeration,
+            ImageOutputFormat, ImageStreamQuality,
+        },
     },
 };
 
@@ -4081,29 +4085,53 @@ impl<'de> Deserialize<'de> for ResponseCodeInterpreterContainer {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResponseImageGenerationTool {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action: Option<String>,
+    pub action: Option<ResponseImageGenerationAction>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub background: Option<String>,
+    pub background: Option<ImageBackground>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub input_fidelity: Option<String>,
+    pub input_fidelity: Option<ImageInputFidelity>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_image_mask: Option<ResponseImageGenerationInputImageMask>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub moderation: Option<String>,
+    pub moderation: Option<ImageModeration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_compression: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_format: Option<String>,
+    pub output_format: Option<ImageOutputFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partial_images: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub quality: Option<String>,
+    pub quality: Option<ImageStreamQuality>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<String>,
+    pub size: Option<ImageGenerateSize>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseImageGenerationAction {
+    Generate,
+    Edit,
+    Auto,
+}
+
+impl ResponseImageGenerationAction {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Generate => "generate",
+            Self::Edit => "edit",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ResponseImageGenerationAction {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

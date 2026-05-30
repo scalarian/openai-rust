@@ -1,4 +1,11 @@
-use openai_rust::OpenAI;
+use openai_rust::{
+    OpenAI,
+    resources::images::{
+        ImageBackground, ImageEditQuality, ImageEditSize, ImageGenerateQuality, ImageGenerateSize,
+        ImageInputFidelity, ImageModeration, ImageOutputFormat, ImageResponseBackground,
+        ImageResponseFormat, ImageResponseQuality, ImageResponseSize, ImageVariationSize,
+    },
+};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -26,26 +33,51 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
         .generate(openai_rust::resources::images::ImageGenerateParams {
             prompt: String::from("A stained glass lighthouse"),
             model: Some(String::from("gpt-image-1")),
-            background: Some(String::from("transparent")),
-            moderation: Some(String::from("low")),
+            background: Some(ImageBackground::Transparent),
+            moderation: Some(ImageModeration::Low),
             n: Some(1),
             output_compression: Some(80),
-            output_format: Some(String::from("png")),
+            output_format: Some(ImageOutputFormat::Png),
             partial_images: Some(1),
-            quality: Some(String::from("high")),
-            size: Some(String::from("1024x1024")),
+            quality: Some(ImageGenerateQuality::High),
+            size: Some(ImageGenerateSize::Size1024x1024),
             user: Some(String::from("user-123")),
             ..Default::default()
         })
         .unwrap();
     assert_eq!(generated.output().created, 1_717_171_717);
     assert_eq!(
-        generated.output().background.as_deref(),
+        generated
+            .output()
+            .background
+            .as_ref()
+            .map(ImageResponseBackground::as_str),
         Some("transparent")
     );
-    assert_eq!(generated.output().output_format.as_deref(), Some("png"));
-    assert_eq!(generated.output().quality.as_deref(), Some("high"));
-    assert_eq!(generated.output().size.as_deref(), Some("1024x1024"));
+    assert_eq!(
+        generated
+            .output()
+            .output_format
+            .as_ref()
+            .map(ImageOutputFormat::as_str),
+        Some("png")
+    );
+    assert_eq!(
+        generated
+            .output()
+            .quality
+            .as_ref()
+            .map(ImageResponseQuality::as_str),
+        Some("high")
+    );
+    assert_eq!(
+        generated
+            .output()
+            .size
+            .as_ref()
+            .map(ImageResponseSize::as_str),
+        Some("1024x1024")
+    );
     assert_eq!(generated.output().data.len(), 2);
     assert_eq!(
         generated.output().data[0].b64_json.as_deref(),
@@ -88,15 +120,15 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
             image: vec![first.clone(), second.clone()],
             prompt: String::from("Make it brighter"),
             mask: Some(mask.clone()),
-            background: Some(String::from("transparent")),
-            input_fidelity: Some(String::from("high")),
+            background: Some(ImageBackground::Transparent),
+            input_fidelity: Some(ImageInputFidelity::High),
             model: Some(String::from("gpt-image-1")),
             n: Some(1),
             output_compression: Some(55),
-            output_format: Some(String::from("png")),
+            output_format: Some(ImageOutputFormat::Png),
             partial_images: Some(2),
-            quality: Some(String::from("high")),
-            size: Some(String::from("1024x1024")),
+            quality: Some(ImageEditQuality::High),
+            size: Some(ImageEditSize::Size1024x1024),
             user: Some(String::from("user-456")),
             ..Default::default()
         })
@@ -113,8 +145,8 @@ fn images_generate_edit_and_variation_preserve_typed_and_multipart_contracts() {
             image: second.clone(),
             model: Some(String::from("dall-e-2")),
             n: Some(2),
-            response_format: Some(String::from("b64_json")),
-            size: Some(String::from("1024x1024")),
+            response_format: Some(ImageResponseFormat::B64Json),
+            size: Some(ImageVariationSize::Size1024x1024),
             user: Some(String::from("user-789")),
             ..Default::default()
         })

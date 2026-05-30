@@ -7,7 +7,7 @@ use std::{
     thread,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use serde_json::Value;
 use tokio::runtime::Builder;
 
@@ -162,34 +162,517 @@ impl ImageInput {
     }
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageBackground {
+    Transparent,
+    Opaque,
+    #[default]
+    Auto,
+}
+
+impl ImageBackground {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Transparent => "transparent",
+            Self::Opaque => "opaque",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageBackground {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageResponseBackground {
+    Transparent,
+    Opaque,
+}
+
+impl ImageResponseBackground {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Transparent => "transparent",
+            Self::Opaque => "opaque",
+        }
+    }
+}
+
+impl AsRef<str> for ImageResponseBackground {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageOutputFormat {
+    #[default]
+    Png,
+    Jpeg,
+    Webp,
+}
+
+impl ImageOutputFormat {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg => "jpeg",
+            Self::Webp => "webp",
+        }
+    }
+}
+
+impl AsRef<str> for ImageOutputFormat {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageModeration {
+    Low,
+    Auto,
+}
+
+impl ImageModeration {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageModeration {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageInputFidelity {
+    High,
+    Low,
+}
+
+impl ImageInputFidelity {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::High => "high",
+            Self::Low => "low",
+        }
+    }
+}
+
+impl AsRef<str> for ImageInputFidelity {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageGenerateQuality {
+    Standard,
+    Hd,
+    Low,
+    Medium,
+    High,
+    Auto,
+}
+
+impl ImageGenerateQuality {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Hd => "hd",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageGenerateQuality {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageEditQuality {
+    Standard,
+    Low,
+    Medium,
+    High,
+    Auto,
+}
+
+impl ImageEditQuality {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageEditQuality {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageResponseQuality {
+    Low,
+    Medium,
+    High,
+}
+
+impl ImageResponseQuality {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+impl AsRef<str> for ImageResponseQuality {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageStreamQuality {
+    Low,
+    Medium,
+    High,
+    #[default]
+    Auto,
+}
+
+impl ImageStreamQuality {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageStreamQuality {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageResponseFormat {
+    Url,
+    B64Json,
+}
+
+impl ImageResponseFormat {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Url => "url",
+            Self::B64Json => "b64_json",
+        }
+    }
+}
+
+impl AsRef<str> for ImageResponseFormat {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageStyle {
+    Vivid,
+    Natural,
+}
+
+impl ImageStyle {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Vivid => "vivid",
+            Self::Natural => "natural",
+        }
+    }
+}
+
+impl AsRef<str> for ImageStyle {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ImageGenerateSize {
+    Auto,
+    Size256x256,
+    Size512x512,
+    Size1024x1024,
+    Size1536x1024,
+    Size1024x1536,
+    Size1792x1024,
+    Size1024x1792,
+    Custom(String),
+}
+
+impl ImageGenerateSize {
+    pub fn custom(value: impl Into<String>) -> Self {
+        Self::Custom(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Auto => "auto",
+            Self::Size256x256 => "256x256",
+            Self::Size512x512 => "512x512",
+            Self::Size1024x1024 => "1024x1024",
+            Self::Size1536x1024 => "1536x1024",
+            Self::Size1024x1536 => "1024x1536",
+            Self::Size1792x1024 => "1792x1024",
+            Self::Size1024x1792 => "1024x1792",
+            Self::Custom(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ImageGenerateSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Serialize for ImageGenerateSize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ImageGenerateSize {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "auto" => Self::Auto,
+            "256x256" => Self::Size256x256,
+            "512x512" => Self::Size512x512,
+            "1024x1024" => Self::Size1024x1024,
+            "1536x1024" => Self::Size1536x1024,
+            "1024x1536" => Self::Size1024x1536,
+            "1792x1024" => Self::Size1792x1024,
+            "1024x1792" => Self::Size1024x1792,
+            _ if !value.is_empty() => Self::Custom(value),
+            _ => return Err(D::Error::custom("image size must not be empty")),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ImageEditSize {
+    Auto,
+    Size256x256,
+    Size512x512,
+    Size1024x1024,
+    Size1536x1024,
+    Size1024x1536,
+    Custom(String),
+}
+
+impl ImageEditSize {
+    pub fn custom(value: impl Into<String>) -> Self {
+        Self::Custom(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Auto => "auto",
+            Self::Size256x256 => "256x256",
+            Self::Size512x512 => "512x512",
+            Self::Size1024x1024 => "1024x1024",
+            Self::Size1536x1024 => "1536x1024",
+            Self::Size1024x1536 => "1024x1536",
+            Self::Custom(value) => value.as_str(),
+        }
+    }
+}
+
+impl AsRef<str> for ImageEditSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Serialize for ImageEditSize {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ImageEditSize {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "auto" => Self::Auto,
+            "256x256" => Self::Size256x256,
+            "512x512" => Self::Size512x512,
+            "1024x1024" => Self::Size1024x1024,
+            "1536x1024" => Self::Size1536x1024,
+            "1024x1536" => Self::Size1024x1536,
+            _ if !value.is_empty() => Self::Custom(value),
+            _ => return Err(D::Error::custom("image size must not be empty")),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ImageVariationSize {
+    #[serde(rename = "256x256")]
+    Size256x256,
+    #[serde(rename = "512x512")]
+    Size512x512,
+    #[serde(rename = "1024x1024")]
+    Size1024x1024,
+}
+
+impl ImageVariationSize {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Size256x256 => "256x256",
+            Self::Size512x512 => "512x512",
+            Self::Size1024x1024 => "1024x1024",
+        }
+    }
+}
+
+impl AsRef<str> for ImageVariationSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ImageResponseSize {
+    #[serde(rename = "1024x1024")]
+    Size1024x1024,
+    #[serde(rename = "1024x1536")]
+    Size1024x1536,
+    #[serde(rename = "1536x1024")]
+    Size1536x1024,
+}
+
+impl ImageResponseSize {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Size1024x1024 => "1024x1024",
+            Self::Size1024x1536 => "1024x1536",
+            Self::Size1536x1024 => "1536x1024",
+        }
+    }
+}
+
+impl AsRef<str> for ImageResponseSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ImageStreamSize {
+    #[serde(rename = "1024x1024")]
+    Size1024x1024,
+    #[serde(rename = "1024x1536")]
+    Size1024x1536,
+    #[serde(rename = "1536x1024")]
+    Size1536x1024,
+    #[serde(rename = "auto")]
+    #[default]
+    Auto,
+}
+
+impl ImageStreamSize {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Size1024x1024 => "1024x1024",
+            Self::Size1024x1536 => "1024x1536",
+            Self::Size1536x1024 => "1536x1024",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl AsRef<str> for ImageStreamSize {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 /// Image generation parameters.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ImageGenerateParams {
     pub prompt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub background: Option<String>,
+    pub background: Option<ImageBackground>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub moderation: Option<String>,
+    pub moderation: Option<ImageModeration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_compression: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_format: Option<String>,
+    pub output_format: Option<ImageOutputFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub partial_images: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub quality: Option<String>,
+    pub quality: Option<ImageGenerateQuality>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<String>,
+    pub response_format: Option<ImageResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<String>,
+    pub size: Option<ImageGenerateSize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub style: Option<String>,
+    pub style: Option<ImageStyle>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten)]
@@ -223,17 +706,17 @@ pub struct ImageEditParams {
     pub image: Vec<ImageInput>,
     pub images: Vec<ImageInput>,
     pub prompt: String,
-    pub background: Option<String>,
-    pub input_fidelity: Option<String>,
+    pub background: Option<ImageBackground>,
+    pub input_fidelity: Option<ImageInputFidelity>,
     pub mask: Option<ImageInput>,
     pub model: Option<String>,
     pub n: Option<u32>,
     pub output_compression: Option<u8>,
-    pub output_format: Option<String>,
+    pub output_format: Option<ImageOutputFormat>,
     pub partial_images: Option<u32>,
-    pub quality: Option<String>,
-    pub response_format: Option<String>,
-    pub size: Option<String>,
+    pub quality: Option<ImageEditQuality>,
+    pub response_format: Option<ImageResponseFormat>,
+    pub size: Option<ImageEditSize>,
     pub stream: Option<bool>,
     pub user: Option<String>,
     pub extra: BTreeMap<String, Value>,
@@ -270,8 +753,16 @@ impl ImageEditParams {
         if let Some(mask) = self.mask {
             builder.add_file("mask", mask.to_multipart_file());
         }
-        add_optional_text(&mut builder, "background", self.background);
-        add_optional_text(&mut builder, "input_fidelity", self.input_fidelity);
+        add_optional_text(
+            &mut builder,
+            "background",
+            optional_literal(self.background),
+        );
+        add_optional_text(
+            &mut builder,
+            "input_fidelity",
+            optional_literal(self.input_fidelity),
+        );
         add_optional_text(&mut builder, "model", self.model);
         add_optional_text(&mut builder, "n", self.n.map(|value| value.to_string()));
         add_optional_text(
@@ -279,15 +770,23 @@ impl ImageEditParams {
             "output_compression",
             self.output_compression.map(|value| value.to_string()),
         );
-        add_optional_text(&mut builder, "output_format", self.output_format);
+        add_optional_text(
+            &mut builder,
+            "output_format",
+            optional_literal(self.output_format),
+        );
         add_optional_text(
             &mut builder,
             "partial_images",
             self.partial_images.map(|value| value.to_string()),
         );
-        add_optional_text(&mut builder, "quality", self.quality);
-        add_optional_text(&mut builder, "response_format", self.response_format);
-        add_optional_text(&mut builder, "size", self.size);
+        add_optional_text(&mut builder, "quality", optional_literal(self.quality));
+        add_optional_text(
+            &mut builder,
+            "response_format",
+            optional_literal(self.response_format),
+        );
+        add_optional_text(&mut builder, "size", optional_literal(self.size));
         add_optional_text(&mut builder, "stream", Some(stream.to_string()));
         add_optional_text(&mut builder, "user", self.user);
         for (key, value) in self.extra {
@@ -303,8 +802,8 @@ pub struct ImageVariationParams {
     pub image: ImageInput,
     pub model: Option<String>,
     pub n: Option<u32>,
-    pub response_format: Option<String>,
-    pub size: Option<String>,
+    pub response_format: Option<ImageResponseFormat>,
+    pub size: Option<ImageVariationSize>,
     pub user: Option<String>,
     pub extra: BTreeMap<String, Value>,
 }
@@ -322,8 +821,12 @@ impl ImageVariationParams {
         builder.add_file("image", self.image.to_multipart_file());
         add_optional_text(&mut builder, "model", self.model);
         add_optional_text(&mut builder, "n", self.n.map(|value| value.to_string()));
-        add_optional_text(&mut builder, "response_format", self.response_format);
-        add_optional_text(&mut builder, "size", self.size);
+        add_optional_text(
+            &mut builder,
+            "response_format",
+            optional_literal(self.response_format),
+        );
+        add_optional_text(&mut builder, "size", optional_literal(self.size));
         add_optional_text(&mut builder, "user", self.user);
         for (key, value) in self.extra {
             add_jsonish_extra(&mut builder, key, value);
@@ -338,15 +841,15 @@ pub struct ImagesResponse {
     #[serde(default)]
     pub created: i64,
     #[serde(default)]
-    pub background: Option<String>,
+    pub background: Option<ImageResponseBackground>,
     #[serde(default)]
     pub data: Vec<ImageData>,
     #[serde(default)]
-    pub output_format: Option<String>,
+    pub output_format: Option<ImageOutputFormat>,
     #[serde(default)]
-    pub quality: Option<String>,
+    pub quality: Option<ImageResponseQuality>,
     #[serde(default)]
-    pub size: Option<String>,
+    pub size: Option<ImageResponseSize>,
     #[serde(default)]
     pub usage: Option<ImageUsage>,
     #[serde(flatten)]
@@ -410,15 +913,15 @@ pub struct ImageOutputTokenDetails {
 pub struct ImageGenerationPartialImageEvent {
     pub b64_json: String,
     #[serde(default)]
-    pub background: String,
+    pub background: ImageBackground,
     pub created_at: i64,
     #[serde(default)]
-    pub output_format: String,
+    pub output_format: ImageOutputFormat,
     pub partial_image_index: usize,
     #[serde(default)]
-    pub quality: String,
+    pub quality: ImageStreamQuality,
     #[serde(default)]
-    pub size: String,
+    pub size: ImageStreamSize,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -428,14 +931,14 @@ pub struct ImageGenerationPartialImageEvent {
 pub struct ImageGenerationCompletedEvent {
     pub b64_json: String,
     #[serde(default)]
-    pub background: String,
+    pub background: ImageBackground,
     pub created_at: i64,
     #[serde(default)]
-    pub output_format: String,
+    pub output_format: ImageOutputFormat,
     #[serde(default)]
-    pub quality: String,
+    pub quality: ImageStreamQuality,
     #[serde(default)]
-    pub size: String,
+    pub size: ImageStreamSize,
     #[serde(default)]
     pub usage: ImageUsage,
     #[serde(flatten)]
@@ -454,15 +957,15 @@ pub enum ImageGenerationStreamEvent {
 pub struct ImageEditPartialImageEvent {
     pub b64_json: String,
     #[serde(default)]
-    pub background: String,
+    pub background: ImageBackground,
     pub created_at: i64,
     #[serde(default)]
-    pub output_format: String,
+    pub output_format: ImageOutputFormat,
     pub partial_image_index: usize,
     #[serde(default)]
-    pub quality: String,
+    pub quality: ImageStreamQuality,
     #[serde(default)]
-    pub size: String,
+    pub size: ImageStreamSize,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -472,14 +975,14 @@ pub struct ImageEditPartialImageEvent {
 pub struct ImageEditCompletedEvent {
     pub b64_json: String,
     #[serde(default)]
-    pub background: String,
+    pub background: ImageBackground,
     pub created_at: i64,
     #[serde(default)]
-    pub output_format: String,
+    pub output_format: ImageOutputFormat,
     #[serde(default)]
-    pub quality: String,
+    pub quality: ImageStreamQuality,
     #[serde(default)]
-    pub size: String,
+    pub size: ImageStreamSize,
     #[serde(default)]
     pub usage: ImageUsage,
     #[serde(flatten)]
@@ -979,6 +1482,13 @@ fn add_optional_text(builder: &mut MultipartBuilder, name: &str, value: Option<S
     if let Some(value) = value {
         builder.add_text(name.to_string(), value);
     }
+}
+
+fn optional_literal<T>(value: Option<T>) -> Option<String>
+where
+    T: AsRef<str>,
+{
+    value.map(|value| value.as_ref().to_string())
 }
 
 fn add_jsonish_extra(builder: &mut MultipartBuilder, key: String, value: Value) {

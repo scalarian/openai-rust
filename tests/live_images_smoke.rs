@@ -1,4 +1,7 @@
-use openai_rust::OpenAI;
+use openai_rust::{
+    OpenAI,
+    resources::images::{ImageGenerateSize, ImageOutputFormat},
+};
 
 #[test]
 #[ignore = "requires live OpenAI credentials"]
@@ -11,9 +14,9 @@ fn live_image_stream_smoke_captures_request_id_and_completed_event() {
             prompt: String::from("A tiny monochrome icon of a lighthouse"),
             model: Some(String::from("gpt-image-1")),
             n: Some(1),
-            output_format: Some(String::from("png")),
+            output_format: Some(ImageOutputFormat::Png),
             partial_images: Some(1),
-            size: Some(String::from("1024x1024")),
+            size: Some(ImageGenerateSize::Size1024x1024),
             ..Default::default()
         })
         .expect("live image stream should start");

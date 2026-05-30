@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{ErrorKind, OpenAI, resources::images::ImageOutputFormat};
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -45,7 +45,7 @@ fn images_generate_and_edit_stream_surface_partial_and_completed_events() {
             prompt: String::from("Render a paper lantern"),
             model: Some(String::from("gpt-image-1")),
             partial_images: Some(1),
-            output_format: Some(String::from("png")),
+            output_format: Some(ImageOutputFormat::Png),
             ..Default::default()
         })
         .unwrap();
@@ -80,14 +80,14 @@ fn images_generate_and_edit_stream_surface_partial_and_completed_events() {
             )],
             prompt: String::from("Add soft reflections"),
             partial_images: Some(2),
-            output_format: Some(String::from("jpeg")),
+            output_format: Some(ImageOutputFormat::Jpeg),
             ..Default::default()
         })
         .unwrap();
     match edit_stream.next_event().expect("edit partial event") {
         openai_rust::resources::images::ImageEditStreamEvent::PartialImage(event) => {
             assert_eq!(event.partial_image_index, 1);
-            assert_eq!(event.output_format, "jpeg");
+            assert_eq!(event.output_format, ImageOutputFormat::Jpeg);
         }
         _ => panic!("expected edit partial image event"),
     }
@@ -268,7 +268,7 @@ fn image_edit_stream_yields_incremental_partial_events_before_terminal_tail_arri
             )],
             prompt: String::from("Add soft reflections"),
             partial_images: Some(2),
-            output_format: Some(String::from("jpeg")),
+            output_format: Some(ImageOutputFormat::Jpeg),
             ..Default::default()
         })
         .expect("stream should start");
@@ -316,7 +316,7 @@ fn image_edit_stream_rejects_eof_truncated_transcripts_without_completed_event()
             )],
             prompt: String::from("Add soft reflections"),
             partial_images: Some(2),
-            output_format: Some(String::from("jpeg")),
+            output_format: Some(ImageOutputFormat::Jpeg),
             ..Default::default()
         })
         .expect("stream should start before EOF validation");
