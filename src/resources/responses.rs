@@ -558,7 +558,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub context_management: Vec<Value>,
+    pub context_management: Vec<ResponseContextManagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -572,7 +572,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tool_calls: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -594,7 +594,7 @@ pub struct ResponseCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_options: Option<Value>,
+    pub stream_options: Option<ResponseStreamOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -658,7 +658,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub context_management: Vec<Value>,
+    pub context_management: Vec<ResponseContextManagement>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -672,7 +672,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tool_calls: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -692,7 +692,7 @@ pub struct ResponseParseParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_options: Option<Value>,
+    pub stream_options: Option<ResponseStreamOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -961,6 +961,26 @@ pub struct ResponseConversationObject {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Context management entry for Responses creation requests.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct ResponseContextManagement {
+    #[serde(rename = "type")]
+    pub context_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compact_threshold: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Streaming options for Responses creation requests.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct ResponseStreamOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_obfuscation: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Reference to a reusable prompt template and its variables.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ResponsePrompt {
@@ -1029,7 +1049,7 @@ pub struct Response {
     pub usage: Option<ResponseUsage>,
     pub error: Option<ResponseError>,
     pub incomplete_details: Option<ResponseIncompleteDetails>,
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     pub extra: BTreeMap<String, Value>,
     output_text: String,
 }
@@ -2275,7 +2295,7 @@ pub struct ParsedResponse<T> {
     pub usage: Option<ResponseUsage>,
     pub error: Option<ResponseError>,
     pub incomplete_details: Option<ResponseIncompleteDetails>,
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     pub extra: BTreeMap<String, Value>,
     output_text: String,
     output_parsed: Option<T>,
@@ -4364,7 +4384,7 @@ struct WireResponse {
     #[serde(default)]
     incomplete_details: Option<ResponseIncompleteDetails>,
     #[serde(default)]
-    metadata: Option<Value>,
+    metadata: Option<BTreeMap<String, String>>,
     #[serde(flatten)]
     extra: BTreeMap<String, Value>,
 }

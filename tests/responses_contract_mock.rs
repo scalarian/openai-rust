@@ -7,15 +7,16 @@ use openai_rust::{
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
             ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
-            ResponseConversation, ResponseConversationObject, ResponseCustomTool,
-            ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
+            ResponseContextManagement, ResponseConversation, ResponseConversationObject,
+            ResponseCustomTool, ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
             ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
             ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseInstructions,
             ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
             ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
             ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
             ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
-            ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseStreamOptions, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
+            ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -45,13 +46,20 @@ fn create_populates_output_text_helper() {
         .create(openai_rust::resources::responses::ResponseCreateParams {
             model: "gpt-4.1-nano".into(),
             background: Some(true),
-            context_management: vec![json!({"type": "auto"})],
+            context_management: vec![ResponseContextManagement {
+                context_type: String::from("compaction"),
+                compact_threshold: Some(2048),
+                extra: BTreeMap::new(),
+            }],
             include: vec![String::from("message.output_text.logprobs")],
             input: Some(json!("hello")),
             instructions: Some(String::from("Be concise.")),
             max_output_tokens: Some(512),
             max_tool_calls: Some(4),
-            metadata: Some(json!({"trace": "resp_create"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("trace"),
+                String::from("resp_create"),
+            )])),
             parallel_tool_calls: Some(false),
             previous_response_id: Some("resp_prev".into()),
             conversation: Some(ResponseConversation::Id(String::from("conv_123"))),
@@ -70,7 +78,10 @@ fn create_populates_output_text_helper() {
             service_tier: Some(String::from("priority")),
             store: Some(true),
             stream: Some(false),
-            stream_options: Some(json!({"include_usage": true})),
+            stream_options: Some(ResponseStreamOptions {
+                include_obfuscation: Some(false),
+                extra: BTreeMap::new(),
+            }),
             temperature: Some(0.2),
             tool_choice: Some(ResponseToolChoice::Function {
                 name: String::from("lookup_weather"),
@@ -164,7 +175,8 @@ fn create_populates_output_text_helper() {
     let body: Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(body["model"], "gpt-4.1-nano");
     assert_eq!(body["background"], true);
-    assert_eq!(body["context_management"][0]["type"], "auto");
+    assert_eq!(body["context_management"][0]["type"], "compaction");
+    assert_eq!(body["context_management"][0]["compact_threshold"], 2048);
     assert_eq!(body["include"], json!(["message.output_text.logprobs"]));
     assert_eq!(body["input"], "hello");
     assert_eq!(body["instructions"], "Be concise.");
@@ -182,7 +194,7 @@ fn create_populates_output_text_helper() {
     assert_eq!(body["safety_identifier"], "user_hash");
     assert_eq!(body["service_tier"], "priority");
     assert_eq!(body["store"], true);
-    assert_eq!(body["stream_options"]["include_usage"], true);
+    assert_eq!(body["stream_options"]["include_obfuscation"], false);
     assert_eq!(body["temperature"], 0.2);
     assert_eq!(body["tool_choice"]["type"], "function");
     assert_eq!(body["tool_choice"]["name"], "lookup_weather");
@@ -466,7 +478,10 @@ fn create_populates_output_text_helper() {
     assert_eq!(response.output().user.as_deref(), Some("legacy-user"));
     assert_eq!(
         response.output().metadata,
-        Some(json!({"trace": "response_payload"}))
+        Some(BTreeMap::from([(
+            String::from("trace"),
+            String::from("response_payload")
+        )]))
     );
     let usage = response.output().usage.as_ref().unwrap();
     assert_eq!(usage.input_tokens, Some(1));
