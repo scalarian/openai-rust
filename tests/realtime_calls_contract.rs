@@ -1,18 +1,24 @@
 use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
-        RealtimeCallAcceptParams, RealtimeCallCreateParams, RealtimeCallReferParams,
-        RealtimeCallRejectParams, RealtimeClientSecretCreateParams, RealtimeFunctionTool,
-        RealtimeInclude, RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpConnectorId,
+        RealtimeAudioConfig, RealtimeAudioFormat, RealtimeAudioInputConfig,
+        RealtimeAudioInputTurnDetection, RealtimeAudioOutputConfig, RealtimeAudioPcmFormat,
+        RealtimeAudioTranscription, RealtimeAudioTranscriptionDelay, RealtimeCallAcceptParams,
+        RealtimeCallCreateParams, RealtimeCallReferParams, RealtimeCallRejectParams,
+        RealtimeClientSecretCreateParams, RealtimeFunctionTool, RealtimeInclude,
+        RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpConnectorId,
         RealtimeMcpRequireApproval, RealtimeMcpRequireApprovalFilter, RealtimeMcpTool,
-        RealtimeMcpToolFilter, RealtimeNullable, RealtimeOutputModality, RealtimeReasoning,
-        RealtimeReasoningEffort, RealtimeSessionConfig, RealtimeSessionTTL,
+        RealtimeMcpToolFilter, RealtimeNoiseReduction, RealtimeNoiseReductionType,
+        RealtimeNullable, RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
+        RealtimeSemanticVadEagerness, RealtimeSemanticVadTurnDetection,
+        RealtimeServerVadTurnDetection, RealtimeSessionConfig, RealtimeSessionTTL,
         RealtimeSessionTTLAnchor, RealtimeSessionType, RealtimeTool, RealtimeToolChoice,
         RealtimeTracing, RealtimeTracingConfiguration, RealtimeTruncation,
-        RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits, ResponsePrompt,
+        RealtimeTruncationRetentionRatio, RealtimeTruncationTokenLimits, RealtimeVoice,
+        RealtimeVoiceId, ResponsePrompt,
     },
 };
-use serde_json::json;
+use serde_json::{Number, json};
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
@@ -33,6 +39,28 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                     "model": "gpt-realtime-mini",
                     "max_output_tokens": "inf",
                     "output_modalities": ["text"],
+                    "audio": {
+                        "input": {
+                            "format": {"type": "audio/pcm", "rate": 24000},
+                            "noise_reduction": {"type": "near_field"},
+                            "transcription": {
+                                "delay": "low",
+                                "language": "en",
+                                "model": "gpt-realtime-whisper",
+                                "prompt": "domain words"
+                            },
+                            "turn_detection": {
+                                "type": "server_vad",
+                                "threshold": 0.42,
+                                "idle_timeout_ms": 3000
+                            }
+                        },
+                        "output": {
+                            "format": {"type": "audio/pcmu"},
+                            "speed": 1.25,
+                            "voice": {"id": "voice_server"}
+                        }
+                    },
                     "prompt": {"id": "pmpt_server", "version": "2", "variables": {"topic": "parity"}},
                     "reasoning": {"effort": "xhigh"},
                     "tool_choice": {"type": "mcp", "server_label": "remote", "name": "lookup"},
@@ -94,6 +122,39 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Answer tersely.")),
+                audio: Some(RealtimeAudioConfig {
+                    input: Some(RealtimeAudioInputConfig {
+                        format: Some(RealtimeAudioFormat::Pcm(Box::new(RealtimeAudioPcmFormat {
+                            rate: Some(24_000),
+                            ..Default::default()
+                        }))),
+                        noise_reduction: Some(RealtimeNullable::Null),
+                        transcription: Some(RealtimeNullable::Value(RealtimeAudioTranscription {
+                            delay: Some(RealtimeAudioTranscriptionDelay::Minimal),
+                            language: Some(String::from("en")),
+                            model: Some(String::from("gpt-realtime-whisper")),
+                            ..Default::default()
+                        })),
+                        turn_detection: Some(RealtimeNullable::Value(
+                            RealtimeAudioInputTurnDetection::SemanticVad(Box::new(
+                                RealtimeSemanticVadTurnDetection {
+                                    create_response: Some(true),
+                                    eagerness: Some(RealtimeSemanticVadEagerness::Auto),
+                                    interrupt_response: Some(false),
+                                    ..Default::default()
+                                },
+                            )),
+                        )),
+                        ..Default::default()
+                    }),
+                    output: Some(RealtimeAudioOutputConfig {
+                        format: Some(RealtimeAudioFormat::pcmu()),
+                        speed: Some(Number::from_f64(1.25).unwrap()),
+                        voice: Some(RealtimeVoice::from("marin")),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(256)),
                 prompt: Some(ResponsePrompt {
                     id: String::from("pmpt_client_secret"),
@@ -126,6 +187,48 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         secret.output().session.max_output_tokens,
         Some(RealtimeMaxOutputTokens::Inf)
+    );
+    assert_eq!(
+        secret.output().session.audio,
+        Some(RealtimeAudioConfig {
+            input: Some(RealtimeAudioInputConfig {
+                format: Some(RealtimeAudioFormat::Pcm(Box::new(RealtimeAudioPcmFormat {
+                    rate: Some(24_000),
+                    ..Default::default()
+                }))),
+                noise_reduction: Some(RealtimeNullable::Value(RealtimeNoiseReduction {
+                    noise_reduction_type: Some(RealtimeNoiseReductionType::NearField),
+                    ..Default::default()
+                })),
+                transcription: Some(RealtimeNullable::Value(RealtimeAudioTranscription {
+                    delay: Some(RealtimeAudioTranscriptionDelay::Low),
+                    language: Some(String::from("en")),
+                    model: Some(String::from("gpt-realtime-whisper")),
+                    prompt: Some(String::from("domain words")),
+                    ..Default::default()
+                })),
+                turn_detection: Some(RealtimeNullable::Value(
+                    RealtimeAudioInputTurnDetection::ServerVad(Box::new(
+                        RealtimeServerVadTurnDetection {
+                            idle_timeout_ms: Some(3_000),
+                            threshold: Some(Number::from_f64(0.42).unwrap()),
+                            ..Default::default()
+                        },
+                    )),
+                )),
+                ..Default::default()
+            }),
+            output: Some(RealtimeAudioOutputConfig {
+                format: Some(RealtimeAudioFormat::pcmu()),
+                speed: Some(Number::from_f64(1.25).unwrap()),
+                voice: Some(RealtimeVoice::Id(Box::new(RealtimeVoiceId {
+                    id: String::from("voice_server"),
+                    ..Default::default()
+                }))),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
     );
     assert_eq!(
         secret.output().session.prompt,
@@ -223,6 +326,14 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 session_type: RealtimeSessionType::Realtime,
                 model: Some(String::from("gpt-realtime-mini")),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
+                audio: Some(RealtimeAudioConfig {
+                    output: Some(RealtimeAudioOutputConfig {
+                        format: Some(RealtimeAudioFormat::pcma()),
+                        voice: Some(RealtimeVoice::from("cedar")),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 parallel_tool_calls: Some(true),
                 prompt: Some(ResponsePrompt {
@@ -278,6 +389,31 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
                 include: Some(vec![RealtimeInclude::ItemInputAudioTranscriptionLogprobs]),
                 instructions: Some(String::from("Stay concise.")),
+                audio: Some(RealtimeAudioConfig {
+                    input: Some(RealtimeAudioInputConfig {
+                        turn_detection: Some(RealtimeNullable::Value(
+                            RealtimeAudioInputTurnDetection::ServerVad(Box::new(
+                                RealtimeServerVadTurnDetection {
+                                    create_response: Some(false),
+                                    interrupt_response: Some(true),
+                                    prefix_padding_ms: Some(250),
+                                    silence_duration_ms: Some(600),
+                                    threshold: Some(Number::from_f64(0.55).unwrap()),
+                                    ..Default::default()
+                                },
+                            )),
+                        )),
+                        ..Default::default()
+                    }),
+                    output: Some(RealtimeAudioOutputConfig {
+                        voice: Some(RealtimeVoice::Id(Box::new(RealtimeVoiceId {
+                            id: String::from("voice_accept"),
+                            ..Default::default()
+                        }))),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Tokens(128)),
                 parallel_tool_calls: Some(true),
                 prompt: Some(ResponsePrompt {
@@ -351,6 +487,39 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
         client_secret_body["session"]["include"][0],
         "item.input_audio_transcription.logprobs"
     );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["input"]["format"]["type"],
+        "audio/pcm"
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["input"]["format"]["rate"],
+        24_000
+    );
+    assert!(client_secret_body["session"]["audio"]["input"]["noise_reduction"].is_null());
+    assert_eq!(
+        client_secret_body["session"]["audio"]["input"]["transcription"]["delay"],
+        "minimal"
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["input"]["turn_detection"]["type"],
+        "semantic_vad"
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["input"]["turn_detection"]["eagerness"],
+        "auto"
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["output"]["format"]["type"],
+        "audio/pcmu"
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["output"]["speed"],
+        1.25
+    );
+    assert_eq!(
+        client_secret_body["session"]["audio"]["output"]["voice"],
+        "marin"
+    );
     assert_eq!(client_secret_body["session"]["max_output_tokens"], 256);
     assert_eq!(
         client_secret_body["session"]["prompt"]["id"],
@@ -412,6 +581,11 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     let multipart_session: serde_json::Value =
         serde_json::from_slice(&parsed.parts[1].body).unwrap();
     assert_eq!(multipart_session["type"], "realtime");
+    assert_eq!(
+        multipart_session["audio"]["output"]["format"]["type"],
+        "audio/pcma"
+    );
+    assert_eq!(multipart_session["audio"]["output"]["voice"], "cedar");
     assert_eq!(multipart_session["max_output_tokens"], "inf");
     assert_eq!(multipart_session["parallel_tool_calls"], true);
     assert_eq!(multipart_session["prompt"]["id"], "pmpt_call_create");
@@ -451,6 +625,22 @@ fn client_secret_creation_and_call_helpers_preserve_routes_and_wire_shapes() {
     assert_eq!(
         accept_body["include"][0],
         "item.input_audio_transcription.logprobs"
+    );
+    assert_eq!(
+        accept_body["audio"]["input"]["turn_detection"]["type"],
+        "server_vad"
+    );
+    assert_eq!(
+        accept_body["audio"]["input"]["turn_detection"]["create_response"],
+        false
+    );
+    assert_eq!(
+        accept_body["audio"]["input"]["turn_detection"]["threshold"],
+        0.55
+    );
+    assert_eq!(
+        accept_body["audio"]["output"]["voice"]["id"],
+        "voice_accept"
     );
     assert_eq!(accept_body["max_output_tokens"], 128);
     assert_eq!(accept_body["prompt"]["id"], "pmpt_accept");

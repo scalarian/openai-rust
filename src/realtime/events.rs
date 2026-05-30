@@ -450,6 +450,255 @@ pub struct RealtimeOtherTool {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Configuration for Realtime input and output audio.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<RealtimeAudioInputConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<RealtimeAudioOutputConfig>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime input audio configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioInputConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<RealtimeAudioFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub noise_reduction: Option<RealtimeNullable<RealtimeNoiseReduction>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription: Option<RealtimeNullable<RealtimeAudioTranscription>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_detection: Option<RealtimeNullable<RealtimeAudioInputTurnDetection>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime output audio configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioOutputConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<RealtimeAudioFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed: Option<Number>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<RealtimeVoice>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime response.create audio configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseAudioConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<RealtimeResponseAudioOutputConfig>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime response output audio configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseAudioOutputConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<RealtimeAudioFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<RealtimeVoice>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime audio wire format.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeAudioFormat {
+    Pcm(Box<RealtimeAudioPcmFormat>),
+    Pcmu(Box<RealtimeAudioCompactFormat>),
+    Pcma(Box<RealtimeAudioCompactFormat>),
+    Other(Box<RealtimeOtherAudioFormat>),
+}
+
+impl RealtimeAudioFormat {
+    pub fn pcm() -> Self {
+        Self::Pcm(Box::default())
+    }
+
+    pub fn pcmu() -> Self {
+        Self::Pcmu(Box::default())
+    }
+
+    pub fn pcma() -> Self {
+        Self::Pcma(Box::default())
+    }
+}
+
+/// PCM audio format configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioPcmFormat {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<u32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// G.711 audio format configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioCompactFormat {
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Forward-compatible audio format object.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeOtherAudioFormat {
+    pub format_type: String,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime input noise reduction configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeNoiseReduction {
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub noise_reduction_type: Option<RealtimeNoiseReductionType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime input noise reduction type.
+    pub enum RealtimeNoiseReductionType {
+        NearField => "near_field",
+        FarField => "far_field",
+    }
+}
+
+/// Realtime input audio transcription configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeAudioTranscription {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delay: Option<RealtimeAudioTranscriptionDelay>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime input audio transcription delay.
+    pub enum RealtimeAudioTranscriptionDelay {
+        Minimal => "minimal",
+        Low => "low",
+        Medium => "medium",
+        High => "high",
+        XHigh => "xhigh",
+    }
+}
+
+/// Realtime input audio turn-detection configuration.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeAudioInputTurnDetection {
+    ServerVad(Box<RealtimeServerVadTurnDetection>),
+    SemanticVad(Box<RealtimeSemanticVadTurnDetection>),
+    Other(Box<RealtimeOtherTurnDetection>),
+}
+
+/// Realtime server VAD turn-detection configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeServerVadTurnDetection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create_response: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idle_timeout_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interrupt_response: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix_padding_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub silence_duration_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<Number>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime semantic VAD turn-detection configuration.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeSemanticVadTurnDetection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create_response: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eagerness: Option<RealtimeSemanticVadEagerness>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interrupt_response: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime semantic VAD eagerness.
+    pub enum RealtimeSemanticVadEagerness {
+        Low => "low",
+        Medium => "medium",
+        High => "high",
+        Auto => "auto",
+    }
+}
+
+/// Forward-compatible Realtime turn-detection object.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RealtimeOtherTurnDetection {
+    pub detection_type: String,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Realtime output voice.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeVoice {
+    Name(RealtimeVoiceName),
+    Id(Box<RealtimeVoiceId>),
+    OtherObject(Box<Value>),
+}
+
+impl From<&str> for RealtimeVoice {
+    fn from(value: &str) -> Self {
+        Self::Name(RealtimeVoiceName::from(value))
+    }
+}
+
+impl From<String> for RealtimeVoice {
+    fn from(value: String) -> Self {
+        Self::Name(RealtimeVoiceName::from(value))
+    }
+}
+
+/// Custom Realtime voice reference.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeVoiceId {
+    pub id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Built-in Realtime voice names.
+    pub enum RealtimeVoiceName {
+        Alloy => "alloy",
+        Ash => "ash",
+        Ballad => "ballad",
+        Coral => "coral",
+        Echo => "echo",
+        Sage => "sage",
+        Shimmer => "shimmer",
+        Verse => "verse",
+        Marin => "marin",
+        Cedar => "cedar",
+    }
+}
+
 /// Nullable Realtime config slot, used when `null` disables an active config.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -549,9 +798,9 @@ impl Serialize for RealtimeTool {
     {
         match self {
             Self::Function(function) => {
-                serialize_realtime_tool_object(serializer, "function", function.as_ref())
+                serialize_realtime_object_with_type(serializer, "function", function.as_ref())
             }
-            Self::Mcp(mcp) => serialize_realtime_tool_object(serializer, "mcp", mcp.as_ref()),
+            Self::Mcp(mcp) => serialize_realtime_object_with_type(serializer, "mcp", mcp.as_ref()),
             Self::Other(other) => {
                 let mut object = Map::new();
                 object.insert(String::from("type"), Value::String(other.tool_type.clone()));
@@ -588,22 +837,22 @@ impl<'de> Deserialize<'de> for RealtimeTool {
     }
 }
 
-fn serialize_realtime_tool_object<S, T>(
+fn serialize_realtime_object_with_type<S, T>(
     serializer: S,
-    tool_type: &str,
-    tool: &T,
+    object_type: &str,
+    source: &T,
 ) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
     T: Serialize,
 {
-    let mut value = serde_json::to_value(tool).map_err(serde::ser::Error::custom)?;
+    let mut value = serde_json::to_value(source).map_err(serde::ser::Error::custom)?;
     let Value::Object(ref mut object) = value else {
         return Err(serde::ser::Error::custom(
-            "tool must serialize to an object",
+            "typed value must serialize to an object",
         ));
     };
-    object.insert(String::from("type"), Value::String(tool_type.to_string()));
+    object.insert(String::from("type"), Value::String(object_type.to_string()));
     value.serialize(serializer)
 }
 
@@ -636,6 +885,145 @@ impl<'de> Deserialize<'de> for RealtimeMcpRequireApproval {
             _ => Err(serde::de::Error::custom(
                 "require_approval must be a string or object",
             )),
+        }
+    }
+}
+
+impl Serialize for RealtimeAudioFormat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Pcm(format) => {
+                serialize_realtime_object_with_type(serializer, "audio/pcm", format.as_ref())
+            }
+            Self::Pcmu(format) => {
+                serialize_realtime_object_with_type(serializer, "audio/pcmu", format.as_ref())
+            }
+            Self::Pcma(format) => {
+                serialize_realtime_object_with_type(serializer, "audio/pcma", format.as_ref())
+            }
+            Self::Other(other) => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(other.format_type.clone()),
+                );
+                object.extend(other.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeAudioFormat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Err(serde::de::Error::custom("audio format must be an object"));
+        };
+        let format_type = remove_required_realtime_string(&mut object, "type", "audio format")
+            .map_err(serde::de::Error::custom)?;
+        match format_type.as_str() {
+            "audio/pcm" => serde_json::from_value(Value::Object(object))
+                .map(|format| Self::Pcm(Box::new(format)))
+                .map_err(serde::de::Error::custom),
+            "audio/pcmu" => serde_json::from_value(Value::Object(object))
+                .map(|format| Self::Pcmu(Box::new(format)))
+                .map_err(serde::de::Error::custom),
+            "audio/pcma" => serde_json::from_value(Value::Object(object))
+                .map(|format| Self::Pcma(Box::new(format)))
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Other(Box::new(RealtimeOtherAudioFormat {
+                format_type,
+                extra: object.into_iter().collect(),
+            }))),
+        }
+    }
+}
+
+impl Serialize for RealtimeAudioInputTurnDetection {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ServerVad(detection) => {
+                serialize_realtime_object_with_type(serializer, "server_vad", detection.as_ref())
+            }
+            Self::SemanticVad(detection) => {
+                serialize_realtime_object_with_type(serializer, "semantic_vad", detection.as_ref())
+            }
+            Self::Other(other) => {
+                let mut object = Map::new();
+                object.insert(
+                    String::from("type"),
+                    Value::String(other.detection_type.clone()),
+                );
+                object.extend(other.extra.clone());
+                Value::Object(object).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeAudioInputTurnDetection {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Err(serde::de::Error::custom("turn_detection must be an object"));
+        };
+        let detection_type = remove_required_realtime_string(&mut object, "type", "turn_detection")
+            .map_err(serde::de::Error::custom)?;
+        match detection_type.as_str() {
+            "server_vad" => serde_json::from_value(Value::Object(object))
+                .map(|detection| Self::ServerVad(Box::new(detection)))
+                .map_err(serde::de::Error::custom),
+            "semantic_vad" => serde_json::from_value(Value::Object(object))
+                .map(|detection| Self::SemanticVad(Box::new(detection)))
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Other(Box::new(RealtimeOtherTurnDetection {
+                detection_type,
+                extra: object.into_iter().collect(),
+            }))),
+        }
+    }
+}
+
+impl Serialize for RealtimeVoice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Name(name) => serializer.serialize_str(name.as_str()),
+            Self::Id(voice_id) => voice_id.serialize(serializer),
+            Self::OtherObject(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RealtimeVoice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::String(value) => Ok(Self::Name(RealtimeVoiceName::from(value))),
+            Value::Object(object) if object.get("id").and_then(Value::as_str).is_some() => {
+                serde_json::from_value(Value::Object(object))
+                    .map(|voice_id| Self::Id(Box::new(voice_id)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Value::Object(object) => Ok(Self::OtherObject(Box::new(Value::Object(object)))),
+            _ => Err(serde::de::Error::custom("voice must be a string or object")),
         }
     }
 }
@@ -832,7 +1220,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_modalities: Option<Vec<RealtimeOutputModality>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub audio: Option<Value>,
+    pub audio: Option<RealtimeAudioConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<RealtimeInclude>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -964,7 +1352,7 @@ pub struct RealtimeErrorInfo {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub audio: Option<Value>,
+    pub audio: Option<RealtimeResponseAudioConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

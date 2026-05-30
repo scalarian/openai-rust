@@ -4,12 +4,13 @@ use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
-        RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions, RealtimeConversationItem,
-        RealtimeConversationMessageContentPart, RealtimeFunctionTool, RealtimeMaxOutputTokens,
-        RealtimeMcpAllowedTools, RealtimeMcpRequireApproval, RealtimeMcpTool,
-        RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
+        RealtimeAudioFormat, RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions,
+        RealtimeConversationItem, RealtimeConversationMessageContentPart, RealtimeFunctionTool,
+        RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpRequireApproval,
+        RealtimeMcpTool, RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
+        RealtimeResponseAudioConfig, RealtimeResponseAudioOutputConfig,
         RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
-        RealtimeSessionType, RealtimeTool, RealtimeToolChoice, ResponsePrompt,
+        RealtimeSessionType, RealtimeTool, RealtimeToolChoice, RealtimeVoice, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -525,6 +526,14 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
         .response()
         .create_params(
             RealtimeResponseCreateParams {
+                audio: Some(RealtimeResponseAudioConfig {
+                    output: Some(RealtimeResponseAudioOutputConfig {
+                        format: Some(RealtimeAudioFormat::pcmu()),
+                        voice: Some(RealtimeVoice::from("marin")),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 max_output_tokens: Some(RealtimeMaxOutputTokens::Inf),
                 metadata: Some(json!({"source": "test"})),
                 output_modalities: Some(vec![RealtimeOutputModality::Text]),
@@ -649,6 +658,11 @@ async fn connection_convenience_resources_emit_upstream_client_events() {
     );
     assert_eq!(captured[0]["event_id"], "evt_update");
     assert_eq!(captured[0]["session"]["instructions"], "Be direct.");
+    assert_eq!(
+        captured[1]["response"]["audio"]["output"]["format"]["type"],
+        "audio/pcmu"
+    );
+    assert_eq!(captured[1]["response"]["audio"]["output"]["voice"], "marin");
     assert_eq!(captured[1]["response"]["metadata"]["source"], "test");
     assert_eq!(
         captured[1]["response"]["output_modalities"],
