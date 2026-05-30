@@ -59,17 +59,23 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     assert_eq!(created.output.id, "cntr_created");
     assert_eq!(created.output.name, "code-interpreter");
     assert_eq!(created.output.memory_limit, Some(ContainerMemoryLimit::G4));
-    assert_eq!(created.output.status, Some(ContainerStatus::Running));
+    assert_eq!(created.output.status, Some(ContainerStatus::Active));
     match created.output.network_policy.as_ref().unwrap() {
         ContainerReadNetworkPolicy::Allowlist { allowed_domains } => {
-            assert_eq!(allowed_domains, &vec![String::from("api.buildkite.com")]);
+            assert_eq!(
+                allowed_domains.as_ref().unwrap(),
+                &vec![String::from("api.buildkite.com")]
+            );
         }
         other => panic!("expected allowlist policy, got {other:?}"),
     }
 
     let retrieved = client.containers().retrieve("cntr_created").unwrap();
     assert_eq!(retrieved.output.id, "cntr_created");
-    assert_eq!(retrieved.output.expires_after.as_ref().unwrap().minutes, 20);
+    assert_eq!(
+        retrieved.output.expires_after.as_ref().unwrap().minutes,
+        Some(20)
+    );
 
     let listed = client
         .containers()
@@ -85,7 +91,7 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
     assert!(listed.output.has_next_page());
     assert!(matches!(
         listed.output.data[0].status,
-        Some(ContainerStatus::Running)
+        Some(ContainerStatus::Active)
     ));
 
     let deleted = client.containers().delete("cntr_created").unwrap();
@@ -126,6 +132,42 @@ fn containers_crud_preserves_execution_policy_fields_without_requiring_tool_exec
 
     let blank_id = client.containers().retrieve(" ").unwrap_err();
     assert!(matches!(blank_id.kind, ErrorKind::Validation));
+}
+
+#[test]
+fn container_read_models_accept_nullable_response_policy_fields() {
+    let server = mock_http::MockHttpServer::spawn(json_response(
+        json!({
+            "id": "cntr_nullable",
+            "object": "container",
+            "created_at": 1_717_171_717,
+            "status": "active",
+            "name": "nullable-policy",
+            "expires_after": {
+                "anchor": null,
+                "minutes": null
+            },
+            "network_policy": {
+                "type": "allowlist",
+                "allowed_domains": null
+            }
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    let client = client(&server.url());
+
+    let retrieved = client.containers().retrieve("cntr_nullable").unwrap();
+    assert_eq!(retrieved.output.status, Some(ContainerStatus::Active));
+    let expires_after = retrieved.output.expires_after.as_ref().unwrap();
+    assert_eq!(expires_after.anchor, None);
+    assert_eq!(expires_after.minutes, None);
+    match retrieved.output.network_policy.as_ref().unwrap() {
+        ContainerReadNetworkPolicy::Allowlist { allowed_domains } => {
+            assert!(allowed_domains.is_none());
+        }
+        other => panic!("expected nullable allowlist policy, got {other:?}"),
+    }
 }
 
 #[test]
@@ -267,7 +309,7 @@ fn container_payload(id: &str) -> String {
         "id": id,
         "object": "container",
         "created_at": 1_717_171_717,
-        "status": "running",
+        "status": "active",
         "name": "code-interpreter",
         "expires_after": {
             "anchor": "last_active_at",

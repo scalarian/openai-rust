@@ -286,7 +286,10 @@ pub enum ContainerNetworkPolicy {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContainerReadNetworkPolicy {
-    Allowlist { allowed_domains: Vec<String> },
+    Allowlist {
+        #[serde(default)]
+        allowed_domains: Option<Vec<String>>,
+    },
     Disabled,
 }
 
@@ -398,6 +401,7 @@ impl ContainerOrder {
 /// Lifecycle status for a container.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContainerStatus {
+    Active,
     Running,
     Deleted,
     Failed,
@@ -418,6 +422,7 @@ impl<'de> Deserialize<'de> for ContainerStatus {
     {
         let value = String::deserialize(deserializer)?;
         Ok(match value.as_str() {
+            "active" => Self::Active,
             "running" => Self::Running,
             "deleted" => Self::Deleted,
             "failed" => Self::Failed,
@@ -425,6 +430,17 @@ impl<'de> Deserialize<'de> for ContainerStatus {
             _ => Self::Unknown(value),
         })
     }
+}
+
+/// Container expiration policy returned by container read endpoints.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+pub struct ContainerResponseExpiresAfter {
+    #[serde(default)]
+    pub anchor: Option<String>,
+    #[serde(default)]
+    pub minutes: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Typed container resource.
@@ -440,7 +456,7 @@ pub struct Container {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
-    pub expires_after: Option<ContainerExpiresAfter>,
+    pub expires_after: Option<ContainerResponseExpiresAfter>,
     #[serde(default)]
     pub last_active_at: Option<u64>,
     #[serde(default)]
