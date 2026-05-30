@@ -13,9 +13,9 @@ use openai_rust::{
             ChatCompletionFunctionCall, ChatCompletionFunctionDefinition,
             ChatCompletionFunctionTool, ChatCompletionInputAudioParam, ChatCompletionMessageParam,
             ChatCompletionModality, ChatCompletionPredictionContent, ChatCompletionResponseFormat,
-            ChatCompletionStreamOptions, ChatCompletionTool, ChatCompletionToolChoice,
-            ChatCompletionVoice, ChatStop, ChatWebSearchOptions, ChatWebSearchUserLocation,
-            ChatWebSearchUserLocationApproximate,
+            ChatCompletionResponseFormatJsonSchema, ChatCompletionStreamOptions,
+            ChatCompletionTool, ChatCompletionToolChoice, ChatCompletionVoice, ChatStop,
+            ChatWebSearchOptions, ChatWebSearchUserLocation, ChatWebSearchUserLocationApproximate,
         },
         common::{
             ListOrder, PromptCacheRetention, ReasoningEffort, SearchContextSize, ServiceTier,
@@ -24,11 +24,18 @@ use openai_rust::{
         multimodal::InputAudioFormat,
     },
 };
+use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 #[path = "support/mock_http.rs"]
 mod mock_http;
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+struct Scorecard {
+    winner: String,
+    score: u32,
+}
 
 #[test]
 fn compatibility_surface_supports_create_and_stored_completion_crud() {
@@ -315,6 +322,106 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
 }
 
 #[test]
+fn chat_parse_parses_structured_content_and_strict_tool_arguments() {
+    let server =
+        mock_http::MockHttpServer::spawn_sequence(vec![json_response(parsed_chat_payload())])
+            .unwrap();
+
+    let client = OpenAI::builder()
+        .api_key("test-key")
+        .base_url(server.url())
+        .max_retries(0)
+        .build();
+
+    let parsed = client
+        .chat()
+        .completions()
+        .parse::<Scorecard>(openai_rust::resources::chat::ChatCompletionCreateParams {
+            model: String::from("gpt-4.1-mini"),
+            messages: vec![ChatCompletionMessageParam::user("who won?")],
+            response_format: Some(ChatCompletionResponseFormat::JsonSchema(
+                ChatCompletionResponseFormatJsonSchema {
+                    name: String::from("scorecard"),
+                    schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "winner": {"type": "string"},
+                            "score": {"type": "integer"}
+                        },
+                        "required": ["winner", "score"],
+                        "additionalProperties": false
+                    }),
+                    strict: Some(true),
+                    ..Default::default()
+                },
+            )),
+            tools: Some(vec![ChatCompletionTool::from(
+                ChatCompletionFunctionTool::new(ChatCompletionFunctionDefinition {
+                    name: String::from("lookup_box_score"),
+                    parameters: Some(json!({
+                        "type": "object",
+                        "properties": {"game_id": {"type": "integer"}},
+                        "required": ["game_id"],
+                        "additionalProperties": false
+                    })),
+                    strict: Some(true),
+                    ..Default::default()
+                }),
+            )]),
+            ..Default::default()
+        })
+        .unwrap();
+
+    assert_eq!(
+        parsed.output().first_parsed(),
+        Some(&Scorecard {
+            winner: String::from("Dodgers"),
+            score: 4
+        })
+    );
+    let message = &parsed.output().choices[0].message;
+    assert_eq!(
+        message.parsed(),
+        Some(&Scorecard {
+            winner: String::from("Dodgers"),
+            score: 4
+        })
+    );
+    assert_eq!(
+        message.tool_calls[0]
+            .function
+            .parsed_arguments
+            .as_ref()
+            .unwrap()["game_id"],
+        json!(7)
+    );
+    assert_eq!(
+        message.tool_calls[1]
+            .custom
+            .as_ref()
+            .and_then(|custom| custom.name.as_deref()),
+        Some("grep_logs")
+    );
+    assert_eq!(
+        message.tool_calls[1]
+            .custom
+            .as_ref()
+            .and_then(|custom| custom.input.as_deref()),
+        Some("error")
+    );
+
+    let request = server.captured_request().expect("captured request");
+    assert_eq!(request.method, "POST");
+    assert_eq!(request.path, "/v1/chat/completions");
+    let body: Value = serde_json::from_slice(&request.body).unwrap();
+    assert_eq!(body["stream"], false);
+    assert_eq!(body["response_format"]["type"], "json_schema");
+    assert_eq!(body["response_format"]["json_schema"]["name"], "scorecard");
+    assert_eq!(body["tools"][0]["type"], "function");
+    assert_eq!(body["tools"][0]["function"]["strict"], true);
+}
+
+#[test]
 fn stored_chat_retrieve_accepts_nullable_tool_calls() {
     let body = json!({
         "id": "chatcmpl_store",
@@ -500,6 +607,51 @@ fn chat_completion_payload(id: &str, text: &str) -> String {
                 "audio_tokens": 0,
                 "cached_tokens": 1
             }
+        }
+    })
+    .to_string()
+}
+
+fn parsed_chat_payload() -> String {
+    json!({
+        "id": "chatcmpl_parse",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "gpt-4.1-mini",
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {
+                    "role": "assistant",
+                    "content": r#"{"winner":"Dodgers","score":4}"#,
+                    "tool_calls": [
+                        {
+                            "id": "call_lookup",
+                            "index": 0,
+                            "type": "function",
+                            "function": {
+                                "name": "lookup_box_score",
+                                "arguments": r#"{"game_id":7}"#
+                            }
+                        },
+                        {
+                            "id": "call_custom",
+                            "index": 1,
+                            "type": "custom",
+                            "custom": {
+                                "name": "grep_logs",
+                                "input": "error"
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 3,
+            "completion_tokens": 2,
+            "total_tokens": 5
         }
     })
     .to_string()

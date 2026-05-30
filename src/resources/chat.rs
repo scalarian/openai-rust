@@ -1,11 +1,11 @@
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{Arc, Condvar, Mutex, mpsc},
     thread,
     time::Duration,
 };
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::Value;
 use tokio::runtime::Builder;
 use tokio::sync::watch;
@@ -145,6 +145,25 @@ impl ChatCompletions {
             &body,
             RequestOptions::default(),
         )
+    }
+
+    /// Creates a non-streamed chat completion and parses structured output/tool arguments.
+    pub fn parse<T>(
+        &self,
+        params: ChatCompletionCreateParams,
+    ) -> Result<crate::core::response::ApiResponse<ParsedChatCompletion<T>>, OpenAIError>
+    where
+        T: DeserializeOwned,
+    {
+        let response_format = params.response_format.clone();
+        let tools = params.tools.clone().unwrap_or_default();
+        let response = self.create(params)?;
+        let parsed =
+            parse_chat_completion_output(response.output, response_format.as_ref(), &tools)?;
+        Ok(crate::core::response::ApiResponse {
+            output: parsed,
+            metadata: response.metadata,
+        })
     }
 
     /// Creates a streamed chat completion and accumulates the final message snapshot.
@@ -1934,6 +1953,8 @@ pub struct ChatCompletionMessageToolCall {
     pub tool_type: Option<ChatCompletionToolType>,
     #[serde(default)]
     pub function: ToolCallFunction,
+    #[serde(default)]
+    pub custom: Option<ChatCompletionMessageCustomToolCallCustom>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1947,6 +1968,252 @@ pub struct ToolCallFunction {
     pub arguments: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Custom tool payload inside a tool-call record.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct ChatCompletionMessageCustomToolCallCustom {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub input: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Chat completion returned by `chat.completions.parse`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedChatCompletion<T> {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub model: Option<String>,
+    pub choices: Vec<ParsedChatCompletionChoice<T>>,
+    pub service_tier: Option<ServiceTier>,
+    pub system_fingerprint: Option<String>,
+    pub usage: Option<ChatCompletionUsage>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl<T> ParsedChatCompletion<T> {
+    pub fn first_parsed(&self) -> Option<&T> {
+        self.choices
+            .first()
+            .and_then(|choice| choice.message.parsed.as_ref())
+    }
+}
+
+/// Parsed choice on a chat completion.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedChatCompletionChoice<T> {
+    pub index: usize,
+    pub finish_reason: Option<ChatCompletionFinishReason>,
+    pub message: ParsedChatCompletionMessage<T>,
+    pub logprobs: Option<ChatCompletionChoiceLogprobs>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Parsed assistant message for chat completions.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedChatCompletionMessage<T> {
+    pub role: Option<ChatCompletionRole>,
+    pub content: Option<String>,
+    pub refusal: Option<String>,
+    pub parsed: Option<T>,
+    pub annotations: Vec<ChatCompletionAnnotation>,
+    pub audio: Option<ChatCompletionAudio>,
+    pub function_call: Option<LegacyFunctionCall>,
+    pub tool_calls: Vec<ParsedChatCompletionMessageToolCall>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl<T> ParsedChatCompletionMessage<T> {
+    pub fn parsed(&self) -> Option<&T> {
+        self.parsed.as_ref()
+    }
+}
+
+/// Parsed tool-call record on a compatibility message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedChatCompletionMessageToolCall {
+    pub id: Option<String>,
+    pub index: Option<usize>,
+    pub tool_type: Option<ChatCompletionToolType>,
+    pub function: ParsedToolCallFunction,
+    pub custom: Option<ChatCompletionMessageCustomToolCallCustom>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function payload with parsed strict arguments.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedToolCallFunction {
+    pub name: Option<String>,
+    pub arguments: Option<String>,
+    pub parsed_arguments: Option<Value>,
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn parse_chat_completion_output<T>(
+    completion: ChatCompletion,
+    response_format: Option<&ChatCompletionResponseFormat>,
+    tools: &[ChatCompletionTool],
+) -> Result<ParsedChatCompletion<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
+    let parse_content = matches!(
+        response_format,
+        Some(
+            ChatCompletionResponseFormat::JsonObject | ChatCompletionResponseFormat::JsonSchema(_)
+        )
+    );
+    let strict_tool_names = strict_chat_function_tool_names(tools);
+
+    let choices = completion
+        .choices
+        .into_iter()
+        .map(|choice| parse_chat_completion_choice(choice, parse_content, &strict_tool_names))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ParsedChatCompletion {
+        id: completion.id,
+        object: completion.object,
+        created: completion.created,
+        model: completion.model,
+        choices,
+        service_tier: completion.service_tier,
+        system_fingerprint: completion.system_fingerprint,
+        usage: completion.usage,
+        extra: completion.extra,
+    })
+}
+
+fn parse_chat_completion_choice<T>(
+    choice: ChatCompletionChoice,
+    parse_content: bool,
+    strict_tool_names: &BTreeSet<String>,
+) -> Result<ParsedChatCompletionChoice<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
+    if matches!(
+        choice.finish_reason,
+        Some(ChatCompletionFinishReason::Length)
+    ) {
+        return Err(OpenAIError::new(
+            ErrorKind::Parse,
+            "chat completion ended because it reached the length limit",
+        ));
+    }
+    if matches!(
+        choice.finish_reason,
+        Some(ChatCompletionFinishReason::ContentFilter)
+    ) {
+        return Err(OpenAIError::new(
+            ErrorKind::Parse,
+            "chat completion ended because content was filtered",
+        ));
+    }
+
+    let message = parse_chat_completion_message(choice.message, parse_content, strict_tool_names)?;
+    Ok(ParsedChatCompletionChoice {
+        index: choice.index,
+        finish_reason: choice.finish_reason,
+        message,
+        logprobs: choice.logprobs,
+        extra: choice.extra,
+    })
+}
+
+fn parse_chat_completion_message<T>(
+    message: ChatCompletionMessage,
+    parse_content: bool,
+    strict_tool_names: &BTreeSet<String>,
+) -> Result<ParsedChatCompletionMessage<T>, OpenAIError>
+where
+    T: DeserializeOwned,
+{
+    let parsed = if parse_content && message.refusal.is_none() {
+        match message.content.as_deref() {
+            Some(content) if !content.trim().is_empty() => {
+                Some(serde_json::from_str(content).map_err(|error| {
+                    OpenAIError::new(
+                        ErrorKind::Parse,
+                        format!("failed to parse chat completion structured output: {error}"),
+                    )
+                    .with_source(error)
+                })?)
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    let tool_calls = message
+        .tool_calls
+        .into_iter()
+        .map(|tool_call| parse_chat_tool_call(tool_call, strict_tool_names))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ParsedChatCompletionMessage {
+        role: message.role,
+        content: message.content,
+        refusal: message.refusal,
+        parsed,
+        annotations: message.annotations,
+        audio: message.audio,
+        function_call: message.function_call,
+        tool_calls,
+        extra: message.extra,
+    })
+}
+
+fn parse_chat_tool_call(
+    tool_call: ChatCompletionMessageToolCall,
+    strict_tool_names: &BTreeSet<String>,
+) -> Result<ParsedChatCompletionMessageToolCall, OpenAIError> {
+    let parsed_arguments = match (
+        tool_call.function.name.as_deref(),
+        tool_call.function.arguments.as_deref(),
+    ) {
+        (Some(name), Some(arguments)) if strict_tool_names.contains(name) => {
+            Some(serde_json::from_str(arguments).map_err(|error| {
+                OpenAIError::new(
+                    ErrorKind::Parse,
+                    format!("failed to parse strict chat tool arguments for `{name}`: {error}"),
+                )
+                .with_source(error)
+            })?)
+        }
+        _ => None,
+    };
+
+    Ok(ParsedChatCompletionMessageToolCall {
+        id: tool_call.id,
+        index: tool_call.index,
+        tool_type: tool_call.tool_type,
+        function: ParsedToolCallFunction {
+            name: tool_call.function.name,
+            arguments: tool_call.function.arguments,
+            parsed_arguments,
+            extra: tool_call.function.extra,
+        },
+        custom: tool_call.custom,
+        extra: tool_call.extra,
+    })
+}
+
+fn strict_chat_function_tool_names(tools: &[ChatCompletionTool]) -> BTreeSet<String> {
+    tools
+        .iter()
+        .filter_map(|tool| match tool {
+            ChatCompletionTool::Function(tool) if tool.function.strict == Some(true) => {
+                Some(tool.function.name.clone())
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Usage statistics for chat completions and chat streaming usage chunks.
