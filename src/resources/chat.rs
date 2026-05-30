@@ -186,7 +186,7 @@ pub struct ChatCompletionCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,7 +268,7 @@ impl ChatCompletionCreateParams {
 /// Metadata-only stored chat-completion update body.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct StoredChatCompletionUpdateParams {
-    pub metadata: Value,
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

@@ -43,7 +43,10 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
             max_completion_tokens: Some(128),
             max_tokens: Some(256),
             store: Some(true),
-            metadata: Some(json!({"tenant": "acme"})),
+            metadata: Some(BTreeMap::from([(
+                String::from("tenant"),
+                String::from("acme"),
+            )])),
             modalities: Some(vec![String::from("text"), String::from("audio")]),
             n: Some(1),
             parallel_tool_calls: Some(true),
@@ -136,7 +139,10 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
         .update(
             "chatcmpl_store",
             openai_rust::resources::chat::StoredChatCompletionUpdateParams {
-                metadata: json!({"tenant": "acme", "phase": "updated"}),
+                metadata: Some(BTreeMap::from([
+                    (String::from("tenant"), String::from("acme")),
+                    (String::from("phase"), String::from("updated")),
+                ])),
                 ..Default::default()
             },
         )
@@ -247,7 +253,7 @@ fn compatibility_surface_supports_create_and_stored_completion_crud() {
         .update(
             "",
             openai_rust::resources::chat::StoredChatCompletionUpdateParams {
-                metadata: json!({}),
+                metadata: Some(BTreeMap::new()),
                 ..Default::default()
             },
         )
