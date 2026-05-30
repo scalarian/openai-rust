@@ -356,6 +356,35 @@ fn usage_page_json(result_object: &str) -> Value {
     })
 }
 
+fn audit_log_json(id: &str) -> Value {
+    json!({
+        "id": id,
+        "effective_at": 1_717_172_600u64,
+        "type": "project.created",
+        "actor": {
+            "type": "session",
+            "session": {
+                "ip_address": "203.0.113.10",
+                "user": {
+                    "id": "user_admin",
+                    "email": "ops@example.com"
+                }
+            }
+        },
+        "project": {
+            "id": "proj_research",
+            "name": "Research"
+        },
+        "project.created": {
+            "id": "proj_research",
+            "data": {
+                "name": "research",
+                "title": "Research"
+            }
+        }
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -910,6 +939,14 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     let mut responses = (0..24)
         .map(|index| json_response(json!({"id": format!("typed_admin_{index}")}).to_string()))
         .collect::<Vec<_>>();
+    responses[0] = json_response(
+        json!({
+            "data": [audit_log_json("audit_1")],
+            "has_more": true,
+            "last_id": "audit_1"
+        })
+        .to_string(),
+    );
     responses[1] = json_response(organization_invite_json("invite_new").to_string());
     responses[2] = json_response(
         json!({
@@ -1026,7 +1063,8 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
     let client = client(&server.url());
     let org = client.admin().organization();
 
-    org.audit_logs()
+    let audit_logs = org
+        .audit_logs()
         .list(AdminAuditLogListParams {
             actor_emails: Some(vec![
                 String::from("ops@example.com"),
@@ -1046,6 +1084,27 @@ fn admin_organization_typed_params_preserve_queries_and_bodies() {
             resource_ids: Some(vec![String::from("res_1")]),
         })
         .unwrap();
+    assert_eq!(audit_logs.output.data[0].id, "audit_1");
+    assert_eq!(
+        audit_logs.output.data[0].event_type,
+        AdminAuditLogEventType::ProjectCreated
+    );
+    assert_eq!(
+        audit_logs.output.data[0]
+            .actor
+            .as_ref()
+            .and_then(|actor| actor.kind.as_ref()),
+        Some(&AdminAuditLogActorType::Session)
+    );
+    assert_eq!(
+        audit_logs.output.data[0]
+            .project_created
+            .as_ref()
+            .and_then(|event| event.get("id"))
+            .and_then(Value::as_str),
+        Some("proj_research")
+    );
+    assert_eq!(audit_logs.output.next_after(), Some("audit_1"));
 
     let invite = org
         .invites()

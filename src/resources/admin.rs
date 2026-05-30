@@ -546,6 +546,22 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Audit-log actor type.
+    pub enum AdminAuditLogActorType {
+        Session => "session",
+        ApiKey => "api_key",
+    }
+}
+
+admin_string_literal_enum! {
+    /// Audit-log API-key actor type.
+    pub enum AdminAuditLogActorApiKeyType {
+        User => "user",
+        ServiceAccount => "service_account",
+    }
+}
+
+admin_string_literal_enum! {
     /// Bucket width accepted by most organization usage endpoints.
     pub enum AdminUsageBucketWidth {
         OneMinute => "1m",
@@ -870,6 +886,201 @@ pub type AdminUsageImagesResponse = AdminUsagePage;
 pub type AdminUsageModerationsResponse = AdminUsagePage;
 pub type AdminUsageVectorStoresResponse = AdminUsagePage;
 pub type AdminUsageWebSearchCallsResponse = AdminUsagePage;
+
+/// Event-specific audit-log details preserved under the upstream event alias.
+pub type AdminAuditLogEventDetails = BTreeMap<String, Value>;
+
+/// Service account that performed an audit logged action through an API key.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActorApiKeyServiceAccount {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// User that performed an audit logged action through an API key.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActorApiKeyUser {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// API key actor for an audit log entry.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActorApiKey {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub service_account: Option<AdminAuditLogActorApiKeyServiceAccount>,
+    #[serde(default, rename = "type")]
+    pub kind: Option<AdminAuditLogActorApiKeyType>,
+    #[serde(default)]
+    pub user: Option<AdminAuditLogActorApiKeyUser>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// User in the session that performed an audit logged action.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActorSessionUser {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Session actor for an audit log entry.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActorSession {
+    #[serde(default)]
+    pub ip_address: Option<String>,
+    #[serde(default)]
+    pub user: Option<AdminAuditLogActorSessionUser>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Actor that performed an audit logged action.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogActor {
+    #[serde(default)]
+    pub api_key: Option<AdminAuditLogActorApiKey>,
+    #[serde(default)]
+    pub session: Option<AdminAuditLogActorSession>,
+    #[serde(default, rename = "type")]
+    pub kind: Option<AdminAuditLogActorType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Project scope for an audit log entry.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLogProject {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// A log of a user action or configuration change within this organization.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminAuditLog {
+    pub id: String,
+    pub effective_at: u64,
+    #[serde(rename = "type")]
+    pub event_type: AdminAuditLogEventType,
+    #[serde(default)]
+    pub actor: Option<AdminAuditLogActor>,
+    #[serde(default, rename = "api_key.created")]
+    pub api_key_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "api_key.deleted")]
+    pub api_key_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "api_key.updated")]
+    pub api_key_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "certificate.created")]
+    pub certificate_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "certificate.deleted")]
+    pub certificate_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "certificate.updated")]
+    pub certificate_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "certificates.activated")]
+    pub certificates_activated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "certificates.deactivated")]
+    pub certificates_deactivated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "checkpoint.permission.created")]
+    pub checkpoint_permission_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "checkpoint.permission.deleted")]
+    pub checkpoint_permission_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "external_key.registered")]
+    pub external_key_registered: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "external_key.removed")]
+    pub external_key_removed: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "group.created")]
+    pub group_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "group.deleted")]
+    pub group_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "group.updated")]
+    pub group_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "invite.accepted")]
+    pub invite_accepted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "invite.deleted")]
+    pub invite_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "invite.sent")]
+    pub invite_sent: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "ip_allowlist.config.activated")]
+    pub ip_allowlist_config_activated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "ip_allowlist.config.deactivated")]
+    pub ip_allowlist_config_deactivated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "ip_allowlist.created")]
+    pub ip_allowlist_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "ip_allowlist.deleted")]
+    pub ip_allowlist_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "ip_allowlist.updated")]
+    pub ip_allowlist_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "login.failed")]
+    pub login_failed: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "login.succeeded")]
+    pub login_succeeded: Option<Value>,
+    #[serde(default, rename = "logout.failed")]
+    pub logout_failed: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "logout.succeeded")]
+    pub logout_succeeded: Option<Value>,
+    #[serde(default, rename = "organization.updated")]
+    pub organization_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default)]
+    pub project: Option<AdminAuditLogProject>,
+    #[serde(default, rename = "project.archived")]
+    pub project_archived: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "project.created")]
+    pub project_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "project.deleted")]
+    pub project_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "project.updated")]
+    pub project_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "rate_limit.deleted")]
+    pub rate_limit_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "rate_limit.updated")]
+    pub rate_limit_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "role.assignment.created")]
+    pub role_assignment_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "role.assignment.deleted")]
+    pub role_assignment_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "role.created")]
+    pub role_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "role.deleted")]
+    pub role_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "role.updated")]
+    pub role_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "scim.disabled")]
+    pub scim_disabled: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "scim.enabled")]
+    pub scim_enabled: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "service_account.created")]
+    pub service_account_created: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "service_account.deleted")]
+    pub service_account_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "service_account.updated")]
+    pub service_account_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "user.added")]
+    pub user_added: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "user.deleted")]
+    pub user_deleted: Option<AdminAuditLogEventDetails>,
+    #[serde(default, rename = "user.updated")]
+    pub user_updated: Option<AdminAuditLogEventDetails>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminAuditLogListResponse = AdminConversationCursorPage<AdminAuditLog>;
 
 /// Organization audit-log effective-time filter.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -2875,7 +3086,7 @@ impl AuditLogs {
     pub fn list(
         &self,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminAuditLogListResponse>, OpenAIError> {
         get_query(&self.runtime, "/organization/audit_logs", params)
     }
 }
