@@ -358,9 +358,10 @@ fn newer_response_stream_events_are_typed_and_update_snapshots() {
     let snapshot = stream
         .current_response()
         .expect("snapshot after new events");
+    assert_eq!(snapshot.output[0].summary[0].summary_type, "summary_text");
     assert_eq!(
-        snapshot.output[0].summary,
-        vec![json!({"type": "summary_text", "text": "Plan done"})]
+        snapshot.output[0].summary[0].text.as_deref(),
+        Some("Plan done")
     );
     assert!(matches!(
         snapshot.output[1].content[0].annotations.as_slice(),

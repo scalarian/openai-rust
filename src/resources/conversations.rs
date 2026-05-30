@@ -10,7 +10,7 @@ use crate::{
     resources::responses::{
         ResponseCodeInterpreterOutput, ResponseComputerAction, ResponseFileSearchResult,
         ResponseInputAudioData, ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-        ResponseTextAnnotation, ResponseTextLogprob,
+        ResponseReasoningSummaryPart, ResponseTextAnnotation, ResponseTextLogprob,
     },
 };
 
@@ -338,7 +338,7 @@ pub struct ConversationItem {
     pub reason: Option<String>,
     pub error: Option<String>,
     pub tools: Vec<ConversationMcpListTool>,
-    pub summary: Vec<Value>,
+    pub summary: Vec<ResponseReasoningSummaryPart>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
     pub outputs: Option<Vec<ResponseCodeInterpreterOutput>>,
@@ -466,7 +466,10 @@ impl From<WireConversationItem> for ConversationItem {
         let arguments = value.arguments.as_ref().map(argument_value_to_string);
         let mut extra = value.extra;
         let summary = match value.summary {
-            Some(Value::Array(summary)) => summary,
+            Some(Value::Array(summary)) => summary
+                .into_iter()
+                .map(crate::resources::responses::response_reasoning_summary_part_from_value)
+                .collect(),
             Some(summary) => {
                 extra.insert(String::from("summary"), summary);
                 Vec::new()

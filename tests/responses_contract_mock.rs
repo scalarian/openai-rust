@@ -473,9 +473,10 @@ fn tool_and_refusal_fields_round_trip() {
             .iter()
             .find(|item| item.item_type == "reasoning")
             .expect("reasoning item");
+        assert_eq!(reasoning.summary[0].summary_type, "summary_text");
         assert_eq!(
-            reasoning.summary,
-            vec![json!({"type": "summary_text", "text": "Checked weather"})]
+            reasoning.summary[0].text.as_deref(),
+            Some("Checked weather")
         );
         assert_eq!(
             reasoning.encrypted_content.as_deref(),

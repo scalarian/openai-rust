@@ -1142,7 +1142,7 @@ pub struct ResponseOutputItem {
     pub reason: Option<String>,
     pub error: Option<String>,
     pub tools: Vec<ResponseMcpListTool>,
-    pub summary: Vec<Value>,
+    pub summary: Vec<ResponseReasoningSummaryPart>,
     pub encrypted_content: Option<String>,
     pub container_id: Option<String>,
     pub outputs: Option<Vec<ResponseCodeInterpreterOutput>>,
@@ -1266,6 +1266,31 @@ pub struct ResponseComputerSafetyCheck {
     pub message: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+/// Reasoning summary content emitted by reasoning output items.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseReasoningSummaryPart {
+    #[serde(rename = "type", default = "unknown_reasoning_summary_type")]
+    pub summary_type: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn unknown_reasoning_summary_type() -> String {
+    String::from("unknown")
+}
+
+pub(crate) fn response_reasoning_summary_part_from_value(
+    value: Value,
+) -> ResponseReasoningSummaryPart {
+    serde_json::from_value(value.clone()).unwrap_or_else(|_| ResponseReasoningSummaryPart {
+        summary_type: String::from("unknown"),
+        text: None,
+        extra: BTreeMap::from([(String::from("value"), value)]),
+    })
 }
 
 /// Action payload used by output items with a generic `action` field.
@@ -1812,7 +1837,10 @@ impl From<WireResponseOutputItem> for ResponseOutputItem {
         let arguments = value.arguments.as_ref().map(argument_value_to_string);
         let mut extra = value.extra;
         let summary = match value.summary {
-            Some(Value::Array(summary)) => summary,
+            Some(Value::Array(summary)) => summary
+                .into_iter()
+                .map(response_reasoning_summary_part_from_value)
+                .collect(),
             Some(summary) => {
                 extra.insert(String::from("summary"), summary);
                 Vec::new()
@@ -4631,7 +4659,10 @@ impl StreamAccumulator {
                 format!("stream referenced missing summary_index {summary_index}"),
             ));
         }
-        summary.insert(summary_index, part);
+        summary.insert(
+            summary_index,
+            response_reasoning_summary_part_from_value(part),
+        );
         Ok(())
     }
 
@@ -4648,7 +4679,7 @@ impl StreamAccumulator {
                 format!("stream referenced missing summary_index {summary_index}"),
             )
         })?;
-        *slot = part;
+        *slot = response_reasoning_summary_part_from_value(part);
         Ok(())
     }
 
@@ -4659,25 +4690,14 @@ impl StreamAccumulator {
         delta: &str,
     ) -> Result<(), OpenAIError> {
         let part = self.reasoning_summary_part_mut(output_index, summary_index)?;
-        let part = part.as_object_mut().ok_or_else(|| {
-            OpenAIError::new(
+        if part.summary_type != "summary_text" {
+            return Err(OpenAIError::new(
                 ErrorKind::Validation,
-                "stream addressed non-object reasoning summary part",
-            )
-        })?;
-        let text = part
-            .entry(String::from("text"))
-            .or_insert_with(|| Value::String(String::new()));
-        let updated = {
-            let current = text.as_str().ok_or_else(|| {
-                OpenAIError::new(
-                    ErrorKind::Validation,
-                    "stream addressed non-string reasoning summary text",
-                )
-            })?;
-            format!("{current}{delta}")
-        };
-        *text = Value::String(updated);
+                "stream addressed non-summary_text reasoning summary part",
+            ));
+        }
+        let text = part.text.get_or_insert_with(String::new);
+        text.push_str(delta);
         Ok(())
     }
 
@@ -4688,13 +4708,13 @@ impl StreamAccumulator {
         text: &str,
     ) -> Result<(), OpenAIError> {
         let part = self.reasoning_summary_part_mut(output_index, summary_index)?;
-        let part = part.as_object_mut().ok_or_else(|| {
-            OpenAIError::new(
+        if part.summary_type != "summary_text" {
+            return Err(OpenAIError::new(
                 ErrorKind::Validation,
-                "stream addressed non-object reasoning summary part",
-            )
-        })?;
-        part.insert(String::from("text"), Value::String(text.to_string()));
+                "stream addressed non-summary_text reasoning summary part",
+            ));
+        }
+        part.text = Some(text.to_string());
         Ok(())
     }
 
@@ -4702,7 +4722,7 @@ impl StreamAccumulator {
         &mut self,
         output_index: usize,
         summary_index: usize,
-    ) -> Result<&mut Value, OpenAIError> {
+    ) -> Result<&mut ResponseReasoningSummaryPart, OpenAIError> {
         let summary = self.reasoning_summary_mut(output_index)?;
         summary.get_mut(summary_index).ok_or_else(|| {
             OpenAIError::new(
@@ -4715,7 +4735,7 @@ impl StreamAccumulator {
     fn reasoning_summary_mut(
         &mut self,
         output_index: usize,
-    ) -> Result<&mut Vec<Value>, OpenAIError> {
+    ) -> Result<&mut Vec<ResponseReasoningSummaryPart>, OpenAIError> {
         let output = self.get_output_mut(output_index, &["reasoning"])?;
         Ok(&mut output.summary)
     }
