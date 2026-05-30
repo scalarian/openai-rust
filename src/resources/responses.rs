@@ -1052,6 +1052,20 @@ pub enum ResponseStreamEvent {
     Created {
         response: Response,
     },
+    Queued {
+        response: Response,
+    },
+    InProgress {
+        response: Response,
+    },
+    AudioDelta {
+        delta: String,
+    },
+    AudioDone,
+    AudioTranscriptDelta {
+        delta: String,
+    },
+    AudioTranscriptDone,
     OutputTextDelta {
         output_index: usize,
         content_index: usize,
@@ -1080,6 +1094,55 @@ pub enum ResponseStreamEvent {
     RefusalDone {
         output_index: usize,
         content_index: usize,
+        text: String,
+    },
+    ImageGenerationCallInProgress {
+        item_id: Option<String>,
+        output_index: usize,
+    },
+    ImageGenerationCallGenerating {
+        item_id: Option<String>,
+        output_index: usize,
+    },
+    ImageGenerationCallPartialImage {
+        item_id: Option<String>,
+        output_index: usize,
+        partial_image_b64: String,
+        partial_image_index: usize,
+    },
+    ImageGenerationCallCompleted {
+        item_id: Option<String>,
+        output_index: usize,
+    },
+    OutputTextAnnotationAdded {
+        item_id: Option<String>,
+        output_index: usize,
+        content_index: usize,
+        annotation_index: usize,
+        annotation: Value,
+    },
+    ReasoningSummaryPartAdded {
+        item_id: Option<String>,
+        output_index: usize,
+        summary_index: usize,
+        part: Value,
+    },
+    ReasoningSummaryPartDone {
+        item_id: Option<String>,
+        output_index: usize,
+        summary_index: usize,
+        part: Value,
+    },
+    ReasoningSummaryTextDelta {
+        item_id: Option<String>,
+        output_index: usize,
+        summary_index: usize,
+        delta: String,
+    },
+    ReasoningSummaryTextDone {
+        item_id: Option<String>,
+        output_index: usize,
+        summary_index: usize,
         text: String,
     },
     Completed {
@@ -1711,6 +1774,11 @@ struct StreamTextDeltaPayload {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct StreamAudioDeltaPayload {
+    delta: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct StreamTextDonePayload {
     output_index: usize,
     content_index: usize,
@@ -1759,6 +1827,54 @@ struct StreamToolTextDonePayload {
 #[derive(Clone, Debug, Deserialize)]
 struct StreamToolStatusPayload {
     output_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamImageGenerationPartialImagePayload {
+    output_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+    partial_image_b64: String,
+    partial_image_index: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamOutputTextAnnotationAddedPayload {
+    output_index: usize,
+    content_index: usize,
+    annotation_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+    annotation: Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamReasoningSummaryPartPayload {
+    output_index: usize,
+    summary_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+    part: Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamReasoningSummaryTextDeltaPayload {
+    output_index: usize,
+    summary_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+    delta: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StreamReasoningSummaryTextDonePayload {
+    output_index: usize,
+    summary_index: usize,
+    #[serde(default)]
+    item_id: Option<String>,
+    text: String,
 }
 
 #[derive(Clone, Debug)]
@@ -1843,6 +1959,20 @@ impl StreamAccumulator {
                 self.snapshot = Some(response.clone());
                 Ok(Some(ResponseStreamEvent::Created { response }))
             }
+            "response.queued" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                Ok(Some(ResponseStreamEvent::Queued { response }))
+            }
+            "response.in_progress" => {
+                let response: Response = serde_json::from_str::<WireResponse>(data)
+                    .map(Response::from)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.snapshot = Some(response.clone());
+                Ok(Some(ResponseStreamEvent::InProgress { response }))
+            }
             "response.output_item.added" => {
                 let payload: StreamOutputItemPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
@@ -1921,6 +2051,22 @@ impl StreamAccumulator {
                     text: payload.text,
                 }))
             }
+            "response.audio.delta" => {
+                let payload: StreamAudioDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                Ok(Some(ResponseStreamEvent::AudioDelta {
+                    delta: payload.delta,
+                }))
+            }
+            "response.audio.done" => Ok(Some(ResponseStreamEvent::AudioDone)),
+            "response.audio.transcript.delta" => {
+                let payload: StreamAudioDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                Ok(Some(ResponseStreamEvent::AudioTranscriptDelta {
+                    delta: payload.delta,
+                }))
+            }
+            "response.audio.transcript.done" => Ok(Some(ResponseStreamEvent::AudioTranscriptDone)),
             "response.function_call_arguments.delta" => {
                 let payload: StreamToolTextDeltaPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
@@ -2061,6 +2207,23 @@ impl StreamAccumulator {
                         .unwrap_or_else(|_| Value::String(data.to_string())),
                 }))
             }
+            "response.output_text.annotation.added" => {
+                let payload: StreamOutputTextAnnotationAddedPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.insert_output_text_annotation(
+                    payload.output_index,
+                    payload.content_index,
+                    payload.annotation_index,
+                    payload.annotation.clone(),
+                )?;
+                Ok(Some(ResponseStreamEvent::OutputTextAnnotationAdded {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    content_index: payload.content_index,
+                    annotation_index: payload.annotation_index,
+                    annotation: payload.annotation,
+                }))
+            }
             "response.reasoning_text.delta" => {
                 let payload: StreamTextDeltaPayload = serde_json::from_str(data)
                     .map_err(|error| stream_parse_error(event_name, error))?;
@@ -2088,6 +2251,66 @@ impl StreamAccumulator {
                 Ok(Some(ResponseStreamEvent::ReasoningTextDone {
                     output_index: payload.output_index,
                     content_index: payload.content_index,
+                    text: payload.text,
+                }))
+            }
+            "response.reasoning_summary_part.added" => {
+                let payload: StreamReasoningSummaryPartPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.insert_reasoning_summary_part(
+                    payload.output_index,
+                    payload.summary_index,
+                    payload.part.clone(),
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningSummaryPartAdded {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    summary_index: payload.summary_index,
+                    part: payload.part,
+                }))
+            }
+            "response.reasoning_summary_part.done" => {
+                let payload: StreamReasoningSummaryPartPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_reasoning_summary_part(
+                    payload.output_index,
+                    payload.summary_index,
+                    payload.part.clone(),
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningSummaryPartDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    summary_index: payload.summary_index,
+                    part: payload.part,
+                }))
+            }
+            "response.reasoning_summary_text.delta" => {
+                let payload: StreamReasoningSummaryTextDeltaPayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.append_reasoning_summary_text(
+                    payload.output_index,
+                    payload.summary_index,
+                    &payload.delta,
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningSummaryTextDelta {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    summary_index: payload.summary_index,
+                    delta: payload.delta,
+                }))
+            }
+            "response.reasoning_summary_text.done" => {
+                let payload: StreamReasoningSummaryTextDonePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                self.replace_reasoning_summary_text(
+                    payload.output_index,
+                    payload.summary_index,
+                    &payload.text,
+                )?;
+                Ok(Some(ResponseStreamEvent::ReasoningSummaryTextDone {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    summary_index: payload.summary_index,
                     text: payload.text,
                 }))
             }
@@ -2155,6 +2378,9 @@ impl StreamAccumulator {
             | "response.code_interpreter_call.interpreting"
             | "response.code_interpreter_call.completed"
             | "response.code_interpreter_call.failed"
+            | "response.image_generation_call.in_progress"
+            | "response.image_generation_call.generating"
+            | "response.image_generation_call.completed"
             | "response.mcp_call.in_progress"
             | "response.mcp_call.completed"
             | "response.mcp_call.failed"
@@ -2165,10 +2391,40 @@ impl StreamAccumulator {
                     .map_err(|error| stream_parse_error(event_name, error))?;
                 let status = event_name.rsplit('.').next().unwrap_or_default();
                 self.set_output_status(payload.output_index, status)?;
-                Ok(Some(ResponseStreamEvent::Unknown {
-                    event: event_name.to_string(),
-                    data: serde_json::from_str(data)
-                        .unwrap_or_else(|_| Value::String(data.to_string())),
+                match event_name {
+                    "response.image_generation_call.in_progress" => {
+                        Ok(Some(ResponseStreamEvent::ImageGenerationCallInProgress {
+                            item_id: payload.item_id,
+                            output_index: payload.output_index,
+                        }))
+                    }
+                    "response.image_generation_call.generating" => {
+                        Ok(Some(ResponseStreamEvent::ImageGenerationCallGenerating {
+                            item_id: payload.item_id,
+                            output_index: payload.output_index,
+                        }))
+                    }
+                    "response.image_generation_call.completed" => {
+                        Ok(Some(ResponseStreamEvent::ImageGenerationCallCompleted {
+                            item_id: payload.item_id,
+                            output_index: payload.output_index,
+                        }))
+                    }
+                    _ => Ok(Some(ResponseStreamEvent::Unknown {
+                        event: event_name.to_string(),
+                        data: serde_json::from_str(data)
+                            .unwrap_or_else(|_| Value::String(data.to_string())),
+                    })),
+                }
+            }
+            "response.image_generation_call.partial_image" => {
+                let payload: StreamImageGenerationPartialImagePayload = serde_json::from_str(data)
+                    .map_err(|error| stream_parse_error(event_name, error))?;
+                Ok(Some(ResponseStreamEvent::ImageGenerationCallPartialImage {
+                    item_id: payload.item_id,
+                    output_index: payload.output_index,
+                    partial_image_b64: payload.partial_image_b64,
+                    partial_image_index: payload.partial_image_index,
                 }))
             }
             other => {
@@ -2384,6 +2640,151 @@ impl StreamAccumulator {
         let output = self.get_output_mut(output_index, &[])?;
         output.status = Some(status.to_string());
         Ok(())
+    }
+
+    fn insert_output_text_annotation(
+        &mut self,
+        output_index: usize,
+        content_index: usize,
+        annotation_index: usize,
+        annotation: Value,
+    ) -> Result<(), OpenAIError> {
+        let snapshot = self.snapshot.as_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "received output text annotation before response.created",
+            )
+        })?;
+        let content = get_content_mut(snapshot, output_index, content_index, "output_text")?;
+        let annotations = content
+            .extra
+            .entry(String::from("annotations"))
+            .or_insert_with(|| Value::Array(Vec::new()));
+        let annotations = annotations.as_array_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "stream addressed non-array output text annotations",
+            )
+        })?;
+        if annotation_index > annotations.len() {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing annotation_index {annotation_index}"),
+            ));
+        }
+        annotations.insert(annotation_index, annotation);
+        Ok(())
+    }
+
+    fn insert_reasoning_summary_part(
+        &mut self,
+        output_index: usize,
+        summary_index: usize,
+        part: Value,
+    ) -> Result<(), OpenAIError> {
+        let summary = self.reasoning_summary_mut(output_index)?;
+        if summary_index > summary.len() {
+            return Err(OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing summary_index {summary_index}"),
+            ));
+        }
+        summary.insert(summary_index, part);
+        Ok(())
+    }
+
+    fn replace_reasoning_summary_part(
+        &mut self,
+        output_index: usize,
+        summary_index: usize,
+        part: Value,
+    ) -> Result<(), OpenAIError> {
+        let summary = self.reasoning_summary_mut(output_index)?;
+        let slot = summary.get_mut(summary_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing summary_index {summary_index}"),
+            )
+        })?;
+        *slot = part;
+        Ok(())
+    }
+
+    fn append_reasoning_summary_text(
+        &mut self,
+        output_index: usize,
+        summary_index: usize,
+        delta: &str,
+    ) -> Result<(), OpenAIError> {
+        let part = self.reasoning_summary_part_mut(output_index, summary_index)?;
+        let part = part.as_object_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "stream addressed non-object reasoning summary part",
+            )
+        })?;
+        let text = part
+            .entry(String::from("text"))
+            .or_insert_with(|| Value::String(String::new()));
+        let updated = {
+            let current = text.as_str().ok_or_else(|| {
+                OpenAIError::new(
+                    ErrorKind::Validation,
+                    "stream addressed non-string reasoning summary text",
+                )
+            })?;
+            format!("{current}{delta}")
+        };
+        *text = Value::String(updated);
+        Ok(())
+    }
+
+    fn replace_reasoning_summary_text(
+        &mut self,
+        output_index: usize,
+        summary_index: usize,
+        text: &str,
+    ) -> Result<(), OpenAIError> {
+        let part = self.reasoning_summary_part_mut(output_index, summary_index)?;
+        let part = part.as_object_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "stream addressed non-object reasoning summary part",
+            )
+        })?;
+        part.insert(String::from("text"), Value::String(text.to_string()));
+        Ok(())
+    }
+
+    fn reasoning_summary_part_mut(
+        &mut self,
+        output_index: usize,
+        summary_index: usize,
+    ) -> Result<&mut Value, OpenAIError> {
+        let summary = self.reasoning_summary_mut(output_index)?;
+        summary.get_mut(summary_index).ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                format!("stream referenced missing summary_index {summary_index}"),
+            )
+        })
+    }
+
+    fn reasoning_summary_mut(
+        &mut self,
+        output_index: usize,
+    ) -> Result<&mut Vec<Value>, OpenAIError> {
+        let output = self.get_output_mut(output_index, &["reasoning"])?;
+        let summary = output
+            .extra
+            .entry(String::from("summary"))
+            .or_insert_with(|| Value::Array(Vec::new()));
+        summary.as_array_mut().ok_or_else(|| {
+            OpenAIError::new(
+                ErrorKind::Validation,
+                "stream addressed non-array reasoning summary",
+            )
+        })
     }
 
     fn get_output_mut<'a>(

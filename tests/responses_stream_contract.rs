@@ -222,6 +222,163 @@ fn unknown_events_and_invalid_ordering_are_deterministic() {
 }
 
 #[test]
+fn newer_response_stream_events_are_typed_and_update_snapshots() {
+    let metadata = ResponseMetadata {
+        status_code: 200,
+        ..Default::default()
+    };
+    let transcript = concat!(
+        "event: response.queued\n",
+        "data: {\"id\":\"resp_new_events\",\"object\":\"response\",\"created_at\":1,\"status\":\"queued\",\"output\":[],\"usage\":{},\"sequence_number\":1}\n\n",
+        "event: response.in_progress\n",
+        "data: {\"id\":\"resp_new_events\",\"object\":\"response\",\"created_at\":1,\"status\":\"in_progress\",\"output\":[{\"id\":\"rs_1\",\"type\":\"reasoning\",\"summary\":[]},{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]}]},{\"id\":\"img_1\",\"type\":\"image_generation_call\",\"status\":\"in_progress\"}],\"usage\":{},\"sequence_number\":2}\n\n",
+        "event: response.reasoning_summary_part.added\n",
+        "data: {\"item_id\":\"rs_1\",\"output_index\":0,\"summary_index\":0,\"part\":{\"type\":\"summary_text\",\"text\":\"\"},\"sequence_number\":3}\n\n",
+        "event: response.reasoning_summary_text.delta\n",
+        "data: {\"item_id\":\"rs_1\",\"output_index\":0,\"summary_index\":0,\"delta\":\"Plan\",\"sequence_number\":4}\n\n",
+        "event: response.reasoning_summary_text.done\n",
+        "data: {\"item_id\":\"rs_1\",\"output_index\":0,\"summary_index\":0,\"text\":\"Plan done\",\"sequence_number\":5}\n\n",
+        "event: response.reasoning_summary_part.done\n",
+        "data: {\"item_id\":\"rs_1\",\"output_index\":0,\"summary_index\":0,\"part\":{\"type\":\"summary_text\",\"text\":\"Plan done\"},\"sequence_number\":6}\n\n",
+        "event: response.output_text.annotation.added\n",
+        "data: {\"item_id\":\"msg_1\",\"output_index\":1,\"content_index\":0,\"annotation_index\":0,\"annotation\":{\"type\":\"url_citation\",\"url\":\"https://example.com\"},\"sequence_number\":7}\n\n",
+        "event: response.audio.delta\n",
+        "data: {\"delta\":\"QUJD\",\"sequence_number\":8}\n\n",
+        "event: response.audio.done\n",
+        "data: {\"sequence_number\":9}\n\n",
+        "event: response.audio.transcript.delta\n",
+        "data: {\"delta\":\"hello\",\"sequence_number\":10}\n\n",
+        "event: response.audio.transcript.done\n",
+        "data: {\"sequence_number\":11}\n\n",
+        "event: response.image_generation_call.in_progress\n",
+        "data: {\"item_id\":\"img_1\",\"output_index\":2,\"sequence_number\":12}\n\n",
+        "event: response.image_generation_call.generating\n",
+        "data: {\"item_id\":\"img_1\",\"output_index\":2,\"sequence_number\":13}\n\n",
+        "event: response.image_generation_call.partial_image\n",
+        "data: {\"item_id\":\"img_1\",\"output_index\":2,\"partial_image_b64\":\"aW1n\",\"partial_image_index\":0,\"sequence_number\":14}\n\n",
+        "event: response.image_generation_call.completed\n",
+        "data: {\"item_id\":\"img_1\",\"output_index\":2,\"sequence_number\":15}\n\n",
+        "event: response.completed\n",
+        "data: {\"id\":\"resp_new_events\",\"object\":\"response\",\"created_at\":1,\"status\":\"completed\",\"output\":[{\"id\":\"rs_1\",\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Plan done\"}]},{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[{\"type\":\"url_citation\",\"url\":\"https://example.com\"}]}]},{\"id\":\"img_1\",\"type\":\"image_generation_call\",\"status\":\"completed\"}],\"usage\":{},\"sequence_number\":16}\n\n",
+        "data: [DONE]\n\n"
+    );
+
+    let mut stream = ResponseStream::from_sse_chunks(metadata, vec![transcript]).expect("stream");
+
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::Queued { ref response })
+            if response.status.as_deref() == Some("queued")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::InProgress { ref response })
+            if response.status.as_deref() == Some("in_progress")
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ReasoningSummaryPartAdded {
+            output_index: 0,
+            summary_index: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ReasoningSummaryTextDelta { ref delta, .. })
+            if delta == "Plan"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ReasoningSummaryTextDone { ref text, .. })
+            if text == "Plan done"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ReasoningSummaryPartDone {
+            output_index: 0,
+            summary_index: 0,
+            ..
+        })
+    ));
+    match stream.next_event() {
+        Some(ResponseStreamEvent::OutputTextAnnotationAdded {
+            annotation,
+            annotation_index: 0,
+            ..
+        }) => assert_eq!(annotation["url"], "https://example.com"),
+        other => panic!("unexpected annotation event: {other:?}"),
+    }
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::AudioDelta { ref delta }) if delta == "QUJD"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::AudioDone)
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::AudioTranscriptDelta { ref delta }) if delta == "hello"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::AudioTranscriptDone)
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ImageGenerationCallInProgress {
+            output_index: 2,
+            ..
+        })
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ImageGenerationCallGenerating {
+            output_index: 2,
+            ..
+        })
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ImageGenerationCallPartialImage {
+            ref partial_image_b64,
+            partial_image_index: 0,
+            ..
+        }) if partial_image_b64 == "aW1n"
+    ));
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::ImageGenerationCallCompleted {
+            output_index: 2,
+            ..
+        })
+    ));
+
+    let snapshot = stream
+        .current_response()
+        .expect("snapshot after new events");
+    assert_eq!(
+        snapshot.output[0].extra.get("summary"),
+        Some(&json!([{"type": "summary_text", "text": "Plan done"}]))
+    );
+    assert_eq!(
+        snapshot.output[1].content[0].extra.get("annotations"),
+        Some(&json!([{"type": "url_citation", "url": "https://example.com"}]))
+    );
+    assert_eq!(snapshot.output[2].status.as_deref(), Some("completed"));
+
+    assert!(matches!(
+        stream.next_event(),
+        Some(ResponseStreamEvent::Completed { .. })
+    ));
+    assert_eq!(
+        stream.final_response().unwrap().status.as_deref(),
+        Some("completed")
+    );
+}
+
+#[test]
 fn terminal_failure_and_refusal_states_remain_explicit() {
     let metadata = ResponseMetadata {
         status_code: 200,
