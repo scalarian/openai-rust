@@ -727,7 +727,7 @@ impl BetaThreadRunSteps {
         thread_id: &str,
         run_id: &str,
         step_id: &str,
-        query: BetaQueryParams,
+        query: impl Into<BetaQueryParams>,
     ) -> Result<ApiResponse<Value>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
@@ -735,7 +735,7 @@ impl BetaThreadRunSteps {
         assistants_beta_get_query(
             &self.runtime,
             format!("/threads/{thread_id}/runs/{run_id}/steps/{step_id}"),
-            query.into_pairs(),
+            query.into().into_pairs(),
         )
     }
 
@@ -744,16 +744,32 @@ impl BetaThreadRunSteps {
         &self,
         thread_id: &str,
         run_id: &str,
-        params: BetaQueryParams,
+        params: impl Into<BetaQueryParams>,
     ) -> Result<ApiResponse<Value>, OpenAIError> {
         let thread_id = path_id("thread_id", thread_id)?;
         let run_id = path_id("run_id", run_id)?;
         assistants_beta_get_query(
             &self.runtime,
             format!("/threads/{thread_id}/runs/{run_id}/steps"),
-            params.into_pairs(),
+            params.into().into_pairs(),
         )
     }
+}
+
+/// Deprecated beta run-step retrieve query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaThreadRunStepRetrieveParams {
+    pub include: Option<Vec<String>>,
+}
+
+/// Deprecated beta run-step list query parameters.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaThreadRunStepListParams {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub include: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub order: Option<String>,
 }
 
 /// Flexible query parameters for deprecated beta endpoints.
@@ -850,6 +866,30 @@ impl From<BetaThreadRunListParams> for BetaQueryParams {
             .push_opt("before", value.before)
             .push_opt("limit", value.limit)
             .push_opt("order", value.order)
+    }
+}
+
+impl From<BetaThreadRunStepRetrieveParams> for BetaQueryParams {
+    fn from(value: BetaThreadRunStepRetrieveParams) -> Self {
+        let mut params = Self::new();
+        if let Some(include) = value.include {
+            params = params.push_array("include", include);
+        }
+        params
+    }
+}
+
+impl From<BetaThreadRunStepListParams> for BetaQueryParams {
+    fn from(value: BetaThreadRunStepListParams) -> Self {
+        let mut params = Self::new()
+            .push_opt("after", value.after)
+            .push_opt("before", value.before)
+            .push_opt("limit", value.limit)
+            .push_opt("order", value.order);
+        if let Some(include) = value.include {
+            params = params.push_array("include", include);
+        }
+        params
     }
 }
 

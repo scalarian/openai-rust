@@ -10,7 +10,8 @@ use openai_rust::{
         BetaAssistantCreateParams, BetaAssistantListParams, BetaAssistantStream,
         BetaAssistantUpdateParams, BetaQueryParams, BetaRunPollOptions, BetaThreadCreateParams,
         BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageUpdateParams,
-        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunSubmitToolOutputsParams,
+        BetaThreadRunCreateParams, BetaThreadRunListParams, BetaThreadRunStepListParams,
+        BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
         BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
     },
 };
@@ -295,7 +296,9 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 "thread_123",
                 "run_123",
                 "step_123",
-                BetaQueryParams::new().push_array("include", ["step_details"])
+                BetaThreadRunStepRetrieveParams {
+                    include: Some(vec![String::from("step_details")]),
+                },
             )
             .unwrap()
             .output["id"],
@@ -306,11 +309,13 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .list(
                 "thread_123",
                 "run_123",
-                BetaQueryParams::new()
-                    .push("after", "step_after")
-                    .push("limit", 1)
-                    .push("order", "asc")
-                    .push_array("include", ["step_details"])
+                BetaThreadRunStepListParams {
+                    after: Some(String::from("step_after")),
+                    before: Some(String::from("step_before")),
+                    include: Some(vec![String::from("step_details")]),
+                    limit: Some(1),
+                    order: Some(String::from("asc")),
+                },
             )
             .unwrap()
             .output["data"][0]["id"],
@@ -372,7 +377,7 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
     assert_eq!(
         requests[23].path,
-        "/v1/threads/thread_123/runs/run_123/steps?after=step_after&limit=1&order=asc&include%5B%5D=step_details"
+        "/v1/threads/thread_123/runs/run_123/steps?after=step_after&before=step_before&limit=1&order=asc&include%5B%5D=step_details"
     );
     for request in &requests {
         assert_eq!(
