@@ -45,7 +45,7 @@ If you want a zero-cost configuration check before making a live request, use `c
 ## Capability Overview
 
 - Responses-first request and streaming flows, including structured outputs and tool schemas.
-- Coverage for chat completions, legacy completions, embeddings, files, uploads, vector stores, images, audio, evals, fine-tuning, moderations, webhooks, admin organization operations, beta ChatKit, and beta realtime session issuance.
+- Coverage for chat completions, legacy completions, embeddings, files, uploads, vector stores, images, audio, evals, fine-tuning, moderations, webhooks, admin organization operations, beta ChatKit, deprecated beta Assistants/Threads/Runs compatibility, and beta realtime session issuance.
 - Realtime session models plus an opt-in blocking facade for synchronous integrations.
 - Example-driven docs and contract tests that keep the published API aligned with the repository.
 

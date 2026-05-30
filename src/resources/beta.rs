@@ -13,7 +13,7 @@ use crate::{
 };
 
 const CHATKIT_BETA_HEADER: &str = "chatkit_beta=v1";
-const REALTIME_BETA_HEADER: &str = "assistants=v2";
+const ASSISTANTS_BETA_HEADER: &str = "assistants=v2";
 
 /// Beta API family.
 #[derive(Clone, Debug)]
@@ -36,9 +36,444 @@ impl Beta {
         BetaRealtime::new(self.runtime.clone())
     }
 
+    /// Returns deprecated beta Assistants endpoints.
+    pub fn assistants(&self) -> BetaAssistants {
+        BetaAssistants::new(self.runtime.clone())
+    }
+
+    /// Returns deprecated beta Threads endpoints.
+    pub fn threads(&self) -> BetaThreads {
+        BetaThreads::new(self.runtime.clone())
+    }
+
     /// Returns ChatKit beta endpoints.
     pub fn chatkit(&self) -> ChatKit {
         ChatKit::new(self.runtime.clone())
+    }
+}
+
+/// Deprecated beta Assistants API family.
+#[derive(Clone, Debug)]
+pub struct BetaAssistants {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaAssistants {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Creates an assistant.
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+        assistants_beta_post_body(&self.runtime, "/assistants", &params)
+    }
+
+    /// Retrieves one assistant by id.
+    pub fn retrieve(&self, assistant_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+        let assistant_id = path_id("assistant_id", assistant_id)?;
+        assistants_beta_get(&self.runtime, format!("/assistants/{assistant_id}"))
+    }
+
+    /// Updates one assistant by id.
+    pub fn update<B: Serialize>(
+        &self,
+        assistant_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let assistant_id = path_id("assistant_id", assistant_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            format!("/assistants/{assistant_id}"),
+            &params,
+        )
+    }
+
+    /// Lists assistants.
+    pub fn list(&self, params: BetaQueryParams) -> Result<ApiResponse<Value>, OpenAIError> {
+        assistants_beta_get_query(&self.runtime, "/assistants", params.into_pairs())
+    }
+
+    /// Deletes one assistant by id.
+    pub fn delete(&self, assistant_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+        let assistant_id = path_id("assistant_id", assistant_id)?;
+        assistants_beta_delete(&self.runtime, format!("/assistants/{assistant_id}"))
+    }
+}
+
+/// Deprecated beta Threads API family.
+#[derive(Clone, Debug)]
+pub struct BetaThreads {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaThreads {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Returns thread message endpoints.
+    pub fn messages(&self) -> BetaThreadMessages {
+        BetaThreadMessages::new(self.runtime.clone())
+    }
+
+    /// Returns thread run endpoints.
+    pub fn runs(&self) -> BetaThreadRuns {
+        BetaThreadRuns::new(self.runtime.clone())
+    }
+
+    /// Creates an empty thread.
+    pub fn create_empty(&self) -> Result<ApiResponse<Value>, OpenAIError> {
+        let params = Value::Object(serde_json::Map::new());
+        assistants_beta_post_body(&self.runtime, "/threads", &params)
+    }
+
+    /// Creates a thread.
+    pub fn create<B: Serialize>(&self, params: B) -> Result<ApiResponse<Value>, OpenAIError> {
+        assistants_beta_post_body(&self.runtime, "/threads", &params)
+    }
+
+    /// Retrieves one thread by id.
+    pub fn retrieve(&self, thread_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_get(&self.runtime, format!("/threads/{thread_id}"))
+    }
+
+    /// Updates one thread by id.
+    pub fn update<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_post_body(&self.runtime, format!("/threads/{thread_id}"), &params)
+    }
+
+    /// Deletes one thread by id.
+    pub fn delete(&self, thread_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_delete(&self.runtime, format!("/threads/{thread_id}"))
+    }
+
+    /// Creates a thread and starts a run.
+    pub fn create_and_run<B: Serialize>(
+        &self,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        assistants_beta_post_body(&self.runtime, "/threads/runs", &params)
+    }
+}
+
+/// Deprecated beta thread message endpoints.
+#[derive(Clone, Debug)]
+pub struct BetaThreadMessages {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaThreadMessages {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Creates a message within a thread.
+    pub fn create<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            format!("/threads/{thread_id}/messages"),
+            &params,
+        )
+    }
+
+    /// Retrieves one message within a thread.
+    pub fn retrieve(
+        &self,
+        thread_id: &str,
+        message_id: &str,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let message_id = path_id("message_id", message_id)?;
+        assistants_beta_get(
+            &self.runtime,
+            format!("/threads/{thread_id}/messages/{message_id}"),
+        )
+    }
+
+    /// Updates one message within a thread.
+    pub fn update<B: Serialize>(
+        &self,
+        thread_id: &str,
+        message_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let message_id = path_id("message_id", message_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            format!("/threads/{thread_id}/messages/{message_id}"),
+            &params,
+        )
+    }
+
+    /// Lists messages within a thread.
+    pub fn list(
+        &self,
+        thread_id: &str,
+        params: BetaQueryParams,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_get_query(
+            &self.runtime,
+            format!("/threads/{thread_id}/messages"),
+            params.into_pairs(),
+        )
+    }
+
+    /// Deletes one message within a thread.
+    pub fn delete(
+        &self,
+        thread_id: &str,
+        message_id: &str,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let message_id = path_id("message_id", message_id)?;
+        assistants_beta_delete(
+            &self.runtime,
+            format!("/threads/{thread_id}/messages/{message_id}"),
+        )
+    }
+}
+
+/// Deprecated beta thread run endpoints.
+#[derive(Clone, Debug)]
+pub struct BetaThreadRuns {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaThreadRuns {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Returns run step endpoints.
+    pub fn steps(&self) -> BetaThreadRunSteps {
+        BetaThreadRunSteps::new(self.runtime.clone())
+    }
+
+    /// Creates a run within a thread.
+    pub fn create<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        self.create_with_query(thread_id, params, BetaQueryParams::default())
+    }
+
+    /// Creates a run within a thread with additional query parameters.
+    pub fn create_with_query<B: Serialize>(
+        &self,
+        thread_id: &str,
+        params: B,
+        query: BetaQueryParams,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            path_with_query(format!("/threads/{thread_id}/runs"), query.into_pairs()),
+            &params,
+        )
+    }
+
+    /// Retrieves one run within a thread.
+    pub fn retrieve(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        assistants_beta_get(&self.runtime, format!("/threads/{thread_id}/runs/{run_id}"))
+    }
+
+    /// Updates one run within a thread.
+    pub fn update<B: Serialize>(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}"),
+            &params,
+        )
+    }
+
+    /// Lists runs within a thread.
+    pub fn list(
+        &self,
+        thread_id: &str,
+        params: BetaQueryParams,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        assistants_beta_get_query(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs"),
+            params.into_pairs(),
+        )
+    }
+
+    /// Cancels one run within a thread.
+    pub fn cancel(&self, thread_id: &str, run_id: &str) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        assistants_beta_post(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}/cancel"),
+        )
+    }
+
+    /// Submits tool outputs for a run.
+    pub fn submit_tool_outputs<B: Serialize>(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        params: B,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        assistants_beta_post_body(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}/submit_tool_outputs"),
+            &params,
+        )
+    }
+}
+
+/// Deprecated beta run step endpoints.
+#[derive(Clone, Debug)]
+pub struct BetaThreadRunSteps {
+    runtime: Arc<ClientRuntime>,
+}
+
+impl BetaThreadRunSteps {
+    fn new(runtime: Arc<ClientRuntime>) -> Self {
+        Self { runtime }
+    }
+
+    /// Retrieves one run step.
+    pub fn retrieve(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        step_id: &str,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        self.retrieve_with_query(thread_id, run_id, step_id, BetaQueryParams::default())
+    }
+
+    /// Retrieves one run step with additional query parameters.
+    pub fn retrieve_with_query(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        step_id: &str,
+        query: BetaQueryParams,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        let step_id = path_id("step_id", step_id)?;
+        assistants_beta_get_query(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}/steps/{step_id}"),
+            query.into_pairs(),
+        )
+    }
+
+    /// Lists run steps.
+    pub fn list(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        params: BetaQueryParams,
+    ) -> Result<ApiResponse<Value>, OpenAIError> {
+        let thread_id = path_id("thread_id", thread_id)?;
+        let run_id = path_id("run_id", run_id)?;
+        assistants_beta_get_query(
+            &self.runtime,
+            format!("/threads/{thread_id}/runs/{run_id}/steps"),
+            params.into_pairs(),
+        )
+    }
+}
+
+/// Flexible query parameters for deprecated beta endpoints.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BetaQueryParams {
+    pairs: Vec<(String, String)>,
+}
+
+impl BetaQueryParams {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(mut self, key: impl Into<String>, value: impl ToString) -> Self {
+        self.pairs.push((key.into(), value.to_string()));
+        self
+    }
+
+    pub fn push_opt<T: ToString>(mut self, key: impl Into<String>, value: Option<T>) -> Self {
+        if let Some(value) = value {
+            self.pairs.push((key.into(), value.to_string()));
+        }
+        self
+    }
+
+    pub fn push_repeated<T, I>(mut self, key: impl Into<String>, values: I) -> Self
+    where
+        T: ToString,
+        I: IntoIterator<Item = T>,
+    {
+        let key = key.into();
+        for value in values {
+            self.pairs.push((key.clone(), value.to_string()));
+        }
+        self
+    }
+
+    pub fn push_array<T, I>(mut self, key: impl Into<String>, values: I) -> Self
+    where
+        T: ToString,
+        I: IntoIterator<Item = T>,
+    {
+        let key = format!("{}[]", key.into());
+        for value in values {
+            self.pairs.push((key.clone(), value.to_string()));
+        }
+        self
+    }
+
+    fn into_pairs(self) -> Vec<(String, String)> {
+        self.pairs
+    }
+}
+
+impl<K, V, const N: usize> From<[(K, V); N]> for BetaQueryParams
+where
+    K: Into<String>,
+    V: ToString,
+{
+    fn from(value: [(K, V); N]) -> Self {
+        let mut params = Self::new();
+        for (key, value) in value {
+            params = params.push(key, value);
+        }
+        params
     }
 }
 
@@ -551,6 +986,70 @@ where
     execute_json(&request, &options)
 }
 
+fn assistants_beta_get(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+) -> Result<ApiResponse<Value>, OpenAIError> {
+    assistants_beta_execute(runtime, "GET", path, None)
+}
+
+fn assistants_beta_get_query(
+    runtime: &ClientRuntime,
+    base: impl Into<String>,
+    query: Vec<(String, String)>,
+) -> Result<ApiResponse<Value>, OpenAIError> {
+    assistants_beta_get(runtime, path_with_query(base, query))
+}
+
+fn assistants_beta_post(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+) -> Result<ApiResponse<Value>, OpenAIError> {
+    assistants_beta_execute(runtime, "POST", path, None)
+}
+
+fn assistants_beta_post_body<B>(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+    body: &B,
+) -> Result<ApiResponse<Value>, OpenAIError>
+where
+    B: Serialize,
+{
+    let mut request = runtime.prepare_json_request("POST", path, body)?;
+    request.headers.insert(
+        String::from("openai-beta"),
+        String::from(ASSISTANTS_BETA_HEADER),
+    );
+    let options = runtime.resolve_request_options(&RequestOptions::default())?;
+    execute_json(&request, &options)
+}
+
+fn assistants_beta_delete(
+    runtime: &ClientRuntime,
+    path: impl AsRef<str>,
+) -> Result<ApiResponse<Value>, OpenAIError> {
+    assistants_beta_execute(runtime, "DELETE", path, None)
+}
+
+fn assistants_beta_execute(
+    runtime: &ClientRuntime,
+    method: impl AsRef<str>,
+    path: impl AsRef<str>,
+    body: Option<Vec<u8>>,
+) -> Result<ApiResponse<Value>, OpenAIError> {
+    let mut request = runtime.prepare_request_with_body(method, path, body)?;
+    request
+        .headers
+        .insert(String::from("accept"), String::from("application/json"));
+    request.headers.insert(
+        String::from("openai-beta"),
+        String::from(ASSISTANTS_BETA_HEADER),
+    );
+    let options = runtime.resolve_request_options(&RequestOptions::default())?;
+    execute_json(&request, &options)
+}
+
 fn realtime_beta_post_body<B>(
     runtime: &ClientRuntime,
     path: impl AsRef<str>,
@@ -562,7 +1061,7 @@ where
     let mut request = runtime.prepare_json_request("POST", path, body)?;
     request.headers.insert(
         String::from("openai-beta"),
-        String::from(REALTIME_BETA_HEADER),
+        String::from(ASSISTANTS_BETA_HEADER),
     );
     let options = runtime.resolve_request_options(&RequestOptions::default())?;
     execute_json(&request, &options)

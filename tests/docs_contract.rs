@@ -100,8 +100,8 @@ fn docs_reference_current_commands_and_examples_from_the_published_markdown() {
 
     for gap in [
         "Azure compatibility",
-        "Deprecated Assistants / Threads / Runs",
-        "Realtime beta as the primary contract",
+        "Python-style streaming and polling helper managers for the deprecated Assistants API",
+        "Realtime beta as the primary realtime client contract",
     ] {
         assert!(gaps.contains(gap), "gap note should mention `{gap}`");
     }
