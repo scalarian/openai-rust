@@ -7,13 +7,15 @@ use openai_rust::{
         responses::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
             ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
-            ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
-            ResponseFileSearchFilter, ResponseFileSearchFilterValue, ResponseFormatTextConfig,
-            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
-            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
-            ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
-            ResponseShellEnvironment, ResponseShellOutputOutcome, ResponseShellTool,
-            ResponseTextAnnotation, ResponseTool, ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseConversation, ResponseConversationObject, ResponseCustomTool,
+            ResponseCustomToolGrammar, ResponseCustomToolInputFormat,
+            ResponseFileSearchAttributeValue, ResponseFileSearchFilter,
+            ResponseFileSearchFilterValue, ResponseFormatTextConfig, ResponseItemAction,
+            ResponseItemEnvironment, ResponseItemOutput, ResponseMcpAllowedTools,
+            ResponseMcpApprovalFilter, ResponseMcpRequireApproval, ResponseMcpTool,
+            ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning, ResponseShellEnvironment,
+            ResponseShellOutputOutcome, ResponseShellTool, ResponseTextAnnotation, ResponseTool,
+            ResponseToolChoice, ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -138,6 +140,19 @@ fn create_populates_output_text_helper() {
                         extra: BTreeMap::new(),
                     }),
                 }),
+                ResponseTool::Custom(ResponseCustomTool {
+                    name: String::from("query_parser"),
+                    defer_loading: Some(true),
+                    description: Some(String::from("Parse search query")),
+                    format: Some(ResponseCustomToolInputFormat::Grammar(
+                        ResponseCustomToolGrammar {
+                            definition: String::from("start: WORD+"),
+                            syntax: String::from("lark"),
+                            extra: BTreeMap::new(),
+                        },
+                    )),
+                    extra: BTreeMap::new(),
+                }),
             ],
             ..Default::default()
         })
@@ -223,6 +238,12 @@ fn create_populates_output_text_helper() {
         body["tools"][3]["environment"]["network_policy"]["allowed_domains"],
         json!(["api.example.com"])
     );
+    assert_eq!(body["tools"][4]["type"], "custom");
+    assert_eq!(body["tools"][4]["name"], "query_parser");
+    assert_eq!(body["tools"][4]["defer_loading"], true);
+    assert_eq!(body["tools"][4]["format"]["type"], "grammar");
+    assert_eq!(body["tools"][4]["format"]["syntax"], "lark");
+    assert_eq!(body["tools"][4]["format"]["definition"], "start: WORD+");
     assert_eq!(response.output().id, "resp_create");
     assert_eq!(response.output().object, "response");
     assert_eq!(response.output().created_at, 1.25);
@@ -283,7 +304,7 @@ fn create_populates_output_text_helper() {
         response.output().tool_choice,
         Some(ResponseToolChoice::Auto)
     );
-    assert_eq!(response.output().tools.len(), 5);
+    assert_eq!(response.output().tools.len(), 6);
     assert_eq!(
         response.output().tools[0],
         ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
@@ -330,7 +351,15 @@ fn create_populates_output_text_helper() {
         Some(ResponseShellEnvironment::ContainerReference(environment))
             if environment.container_id == "cntr_shell"
     ));
-    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[4] else {
+    let ResponseTool::Custom(response_custom_tool) = &response.output().tools[4] else {
+        panic!("expected response custom tool");
+    };
+    assert_eq!(response_custom_tool.name, "freeform");
+    assert!(matches!(
+        response_custom_tool.format.as_ref(),
+        Some(ResponseCustomToolInputFormat::Text)
+    ));
+    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[5] else {
         panic!("expected response mcp tool");
     };
     assert_eq!(response_mcp_tool.server_label, "deepwiki");
@@ -1191,6 +1220,11 @@ fn response_payload_tools() -> Value {
                 "type": "container_reference",
                 "container_id": "cntr_shell"
             }
+        },
+        {
+            "type": "custom",
+            "name": "freeform",
+            "format": {"type": "text"}
         },
         {
             "type": "mcp",

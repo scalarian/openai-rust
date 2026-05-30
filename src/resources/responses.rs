@@ -4045,7 +4045,96 @@ pub struct ResponseCustomTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<Value>,
+    pub format: Option<ResponseCustomToolInputFormat>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseCustomToolInputFormat {
+    Text,
+    Grammar(ResponseCustomToolGrammar),
+    Other {
+        format_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Json(Value),
+}
+
+impl Serialize for ResponseCustomToolInputFormat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Text => {
+                let mut object = serde_json::Map::new();
+                object.insert(String::from("type"), Value::String(String::from("text")));
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Grammar(grammar) => {
+                let mut value = serde_json::to_value(grammar).map_err(serde::ser::Error::custom)?;
+                let object = value.as_object_mut().ok_or_else(|| {
+                    serde::ser::Error::custom("custom tool grammar must serialize to an object")
+                })?;
+                object.insert(String::from("type"), Value::String(String::from("grammar")));
+                value.serialize(serializer)
+            }
+            Self::Other { format_type, extra } => {
+                let mut object = serde_json::Map::new();
+                for (key, value) in extra {
+                    object.insert(key.clone(), value.clone());
+                }
+                object.insert(String::from("type"), Value::String(format_type.clone()));
+                Value::Object(object).serialize(serializer)
+            }
+            Self::Json(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponseCustomToolInputFormat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(object) = value else {
+            return Ok(Self::Json(value));
+        };
+        let Some(format_type) = object
+            .get("type")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            return Ok(Self::Json(Value::Object(object)));
+        };
+
+        match format_type.as_str() {
+            "text" => Ok(Self::Text),
+            "grammar" => {
+                let mut object = object;
+                object.remove("type");
+                serde_json::from_value(Value::Object(object))
+                    .map(Self::Grammar)
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => {
+                let mut extra = object;
+                extra.remove("type");
+                Ok(Self::Other {
+                    format_type,
+                    extra: extra.into_iter().collect(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ResponseCustomToolGrammar {
+    pub definition: String,
+    pub syntax: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
