@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use openai_rust::{
     OpenAI,
     resources::responses::{
-        FunctionTool, ResponseFileSearchTool, ResponseFormatTextConfig,
+        FunctionTool, ResponseFileSearchFilter, ResponseFileSearchFilterArrayValue,
+        ResponseFileSearchFilterValue, ResponseFileSearchTool, ResponseFormatTextConfig,
         ResponseInputTokensCountParams, ResponseTextConfig, ResponseTool,
     },
 };
@@ -67,7 +68,21 @@ fn input_tokens_count_forwards_modalities_and_tools() {
                 }),
                 ResponseTool::FileSearch(ResponseFileSearchTool {
                     vector_store_ids: vec![String::from("vs_123")],
-                    filters: None,
+                    filters: Some(ResponseFileSearchFilter::And {
+                        filters: vec![
+                            ResponseFileSearchFilter::Eq {
+                                key: String::from("section"),
+                                value: ResponseFileSearchFilterValue::String(String::from("intro")),
+                            },
+                            ResponseFileSearchFilter::In {
+                                key: String::from("chapter"),
+                                value: ResponseFileSearchFilterValue::Array(vec![
+                                    ResponseFileSearchFilterArrayValue::String(String::from("one")),
+                                    ResponseFileSearchFilterArrayValue::Number(2.0),
+                                ]),
+                            },
+                        ],
+                    }),
                     max_num_results: None,
                     ranking_options: None,
                     extra: BTreeMap::new(),
@@ -90,6 +105,15 @@ fn input_tokens_count_forwards_modalities_and_tools() {
     assert_eq!(body["tools"][0]["strict"], true);
     assert_eq!(body["tools"][1]["type"], "file_search");
     assert_eq!(body["tools"][1]["vector_store_ids"], json!(["vs_123"]));
+    assert_eq!(body["tools"][1]["filters"]["type"], "and");
+    assert_eq!(body["tools"][1]["filters"]["filters"][0]["type"], "eq");
+    assert_eq!(body["tools"][1]["filters"]["filters"][0]["key"], "section");
+    assert_eq!(body["tools"][1]["filters"]["filters"][0]["value"], "intro");
+    assert_eq!(body["tools"][1]["filters"]["filters"][1]["type"], "in");
+    assert_eq!(
+        body["tools"][1]["filters"]["filters"][1]["value"],
+        json!(["one", 2.0])
+    );
     assert_eq!(body["text"]["verbosity"], "low");
     assert_eq!(body["truncation"], "auto");
 

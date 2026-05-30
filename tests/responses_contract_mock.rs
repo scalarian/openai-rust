@@ -8,11 +8,12 @@ use openai_rust::{
             ResponseApplyPatchOperation, ResponseCodeInterpreterContainer,
             ResponseCodeInterpreterOutput, ResponseCodeInterpreterTool, ResponseComputerAction,
             ResponseConversation, ResponseConversationObject, ResponseFileSearchAttributeValue,
-            ResponseFormatTextConfig, ResponseItemAction, ResponseItemEnvironment,
-            ResponseItemOutput, ResponseMcpAllowedTools, ResponseMcpApprovalFilter,
-            ResponseMcpRequireApproval, ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt,
-            ResponseReasoning, ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool,
-            ResponseToolChoice, ResponseWebSearchPreviewTool,
+            ResponseFileSearchFilter, ResponseFileSearchFilterValue, ResponseFormatTextConfig,
+            ResponseItemAction, ResponseItemEnvironment, ResponseItemOutput,
+            ResponseMcpAllowedTools, ResponseMcpApprovalFilter, ResponseMcpRequireApproval,
+            ResponseMcpTool, ResponseMcpToolFilter, ResponsePrompt, ResponseReasoning,
+            ResponseShellOutputOutcome, ResponseTextAnnotation, ResponseTool, ResponseToolChoice,
+            ResponseWebSearchPreviewTool,
         },
     },
 };
@@ -255,7 +256,7 @@ fn create_populates_output_text_helper() {
         response.output().tool_choice,
         Some(ResponseToolChoice::Auto)
     );
-    assert_eq!(response.output().tools.len(), 3);
+    assert_eq!(response.output().tools.len(), 4);
     assert_eq!(
         response.output().tools[0],
         ResponseTool::WebSearchPreview(ResponseWebSearchPreviewTool {
@@ -265,14 +266,36 @@ fn create_populates_output_text_helper() {
             extra: BTreeMap::new(),
         })
     );
-    let ResponseTool::CodeInterpreter(response_code_tool) = &response.output().tools[1] else {
+    let ResponseTool::FileSearch(response_file_search_tool) = &response.output().tools[1] else {
+        panic!("expected response file search tool");
+    };
+    assert_eq!(
+        response_file_search_tool.vector_store_ids,
+        vec![String::from("vs_123")]
+    );
+    let Some(ResponseFileSearchFilter::And { filters }) =
+        response_file_search_tool.filters.as_ref()
+    else {
+        panic!("expected compound file search filter");
+    };
+    assert!(matches!(
+        &filters[0],
+        ResponseFileSearchFilter::Eq { key, value: ResponseFileSearchFilterValue::String(value) }
+            if key == "section" && value == "intro"
+    ));
+    assert!(matches!(
+        &filters[1],
+        ResponseFileSearchFilter::Gte { key, value: ResponseFileSearchFilterValue::Number(value) }
+            if key == "score" && (*value - 0.7).abs() < f64::EPSILON
+    ));
+    let ResponseTool::CodeInterpreter(response_code_tool) = &response.output().tools[2] else {
         panic!("expected response code interpreter tool");
     };
     assert!(matches!(
         &response_code_tool.container,
         ResponseCodeInterpreterContainer::Id(id) if id == "cntr_response"
     ));
-    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[2] else {
+    let ResponseTool::Mcp(response_mcp_tool) = &response.output().tools[3] else {
         panic!("expected response mcp tool");
     };
     assert_eq!(response_mcp_tool.server_label, "deepwiki");
@@ -976,6 +999,7 @@ fn response_payload(
     previous_response_id: Option<&str>,
     conversation: Option<Value>,
 ) -> String {
+    let tools = response_payload_tools();
     json!({
         "id": id,
         "object": "response",
@@ -1087,20 +1111,7 @@ fn response_payload(
         "temperature": 0.2,
         "text": {"format": {"type": "text"}},
         "tool_choice": "auto",
-        "tools": [
-            {"type": "web_search_preview"},
-            {
-                "type": "code_interpreter",
-                "container": "cntr_response"
-            },
-            {
-                "type": "mcp",
-                "server_label": "deepwiki",
-                "allowed_tools": ["search_docs"],
-                "require_approval": "never",
-                "server_url": "https://mcp.example.test"
-            }
-        ],
+        "tools": tools,
         "top_logprobs": 2,
         "top_p": 0.8,
         "truncation": "auto",
@@ -1114,6 +1125,39 @@ fn response_payload(
         }
     })
     .to_string()
+}
+
+fn response_payload_tools() -> Value {
+    json!([
+        {"type": "web_search_preview"},
+        {
+            "type": "file_search",
+            "vector_store_ids": ["vs_123"],
+            "filters": {
+                "type": "and",
+                "filters": [
+                    {"type": "eq", "key": "section", "value": "intro"},
+                    {"type": "gte", "key": "score", "value": 0.7}
+                ]
+            },
+            "ranking_options": {
+                "ranker": "auto",
+                "score_threshold": 0.4,
+                "hybrid_search": {"embedding_weight": 0.75, "text_weight": 0.25}
+            }
+        },
+        {
+            "type": "code_interpreter",
+            "container": "cntr_response"
+        },
+        {
+            "type": "mcp",
+            "server_label": "deepwiki",
+            "allowed_tools": ["search_docs"],
+            "require_approval": "never",
+            "server_url": "https://mcp.example.test"
+        }
+    ])
 }
 
 fn response_payload_with_tool_and_refusal(id: &str) -> String {

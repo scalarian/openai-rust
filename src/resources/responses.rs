@@ -3390,13 +3390,73 @@ pub struct ResponseFileSearchTool {
     #[serde(default)]
     pub vector_store_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Value>,
+    pub filters: Option<ResponseFileSearchFilter>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_num_results: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_options: Option<ResponseFileSearchRankingOptions>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ResponseFileSearchFilter {
+    Eq {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Ne {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Gt {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Gte {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Lt {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Lte {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    In {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    Nin {
+        key: String,
+        value: ResponseFileSearchFilterValue,
+    },
+    And {
+        filters: Vec<ResponseFileSearchFilter>,
+    },
+    Or {
+        filters: Vec<ResponseFileSearchFilter>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseFileSearchFilterValue {
+    String(String),
+    Bool(bool),
+    Number(f64),
+    Array(Vec<ResponseFileSearchFilterArrayValue>),
+    Json(Value),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResponseFileSearchFilterArrayValue {
+    String(String),
+    Number(f64),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
