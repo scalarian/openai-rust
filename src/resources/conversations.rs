@@ -7,6 +7,7 @@ use crate::{
     OpenAIError,
     core::{request::RequestOptions, response::ApiResponse, runtime::ClientRuntime},
     error::ErrorKind,
+    resources::responses::ResponseComputerAction,
 };
 
 /// Conversations API family.
@@ -318,8 +319,8 @@ pub struct ConversationItem {
     pub phase: Option<String>,
     pub namespace: Option<String>,
     pub created_by: Option<String>,
-    pub action: Option<Value>,
-    pub actions: Option<Value>,
+    pub action: Option<ResponseComputerAction>,
+    pub actions: Option<Vec<ResponseComputerAction>>,
     pub operation: Option<Value>,
     pub environment: Option<Value>,
     pub execution: Option<String>,
@@ -407,9 +408,9 @@ struct WireConversationItem {
     #[serde(default)]
     created_by: Option<String>,
     #[serde(default)]
-    action: Option<Value>,
+    action: Option<ResponseComputerAction>,
     #[serde(default)]
-    actions: Option<Value>,
+    actions: Option<Vec<ResponseComputerAction>>,
     #[serde(default)]
     operation: Option<Value>,
     #[serde(default)]

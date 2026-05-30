@@ -1,4 +1,4 @@
-use openai_rust::{ErrorKind, OpenAI};
+use openai_rust::{ErrorKind, OpenAI, resources::responses::ResponseComputerAction};
 use serde_json::{Value, json};
 
 #[path = "support/mock_http.rs"]
@@ -308,6 +308,19 @@ fn typed_known_fields_are_not_lost() {
         computer_call.pending_safety_checks[0].message.as_deref(),
         Some("Browser confirmation required")
     );
+    assert!(matches!(
+        computer_call.action.as_ref(),
+        Some(ResponseComputerAction::Click(action))
+            if action.button == "left" && action.x == 10 && action.y == 20
+    ));
+    assert!(matches!(
+        computer_call.actions.as_ref().unwrap().as_slice(),
+        [
+            ResponseComputerAction::Keypress(_),
+            ResponseComputerAction::Type(_),
+            ResponseComputerAction::Wait
+        ]
+    ));
 
     let computer_output = &listed.output().data[4];
     assert_eq!(computer_output.item_type, "computer_call_output");
@@ -446,6 +459,12 @@ fn computer_call_item(id: &str) -> Value {
         "type": "computer_call",
         "call_id": "call_computer",
         "status": "completed",
+        "action": {"type": "click", "button": "left", "x": 10, "y": 20},
+        "actions": [
+            {"type": "keypress", "keys": ["CTRL", "L"]},
+            {"type": "type", "text": "openai.com"},
+            {"type": "wait"}
+        ],
         "pending_safety_checks": [{
             "id": "safety_pending_1",
             "code": "unsafe_browser",

@@ -1127,8 +1127,8 @@ pub struct ResponseOutputItem {
     pub phase: Option<String>,
     pub namespace: Option<String>,
     pub created_by: Option<String>,
-    pub action: Option<Value>,
-    pub actions: Option<Value>,
+    pub action: Option<ResponseComputerAction>,
+    pub actions: Option<Vec<ResponseComputerAction>>,
     pub operation: Option<Value>,
     pub environment: Option<Value>,
     pub execution: Option<String>,
@@ -1180,6 +1180,151 @@ pub struct ResponseComputerSafetyCheck {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Computer action requested by a computer-call output item.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ResponseComputerAction {
+    Click(ResponseComputerClickAction),
+    DoubleClick(ResponseComputerPointAction),
+    Drag(ResponseComputerDragAction),
+    Keypress(ResponseComputerKeypressAction),
+    Move(ResponseComputerPointAction),
+    Screenshot,
+    Scroll(ResponseComputerScrollAction),
+    Type(ResponseComputerTypeAction),
+    Wait,
+    Other {
+        action_type: String,
+        extra: BTreeMap<String, Value>,
+    },
+    Raw(Value),
+}
+
+impl<'de> Deserialize<'de> for ResponseComputerAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let Value::Object(mut object) = value else {
+            return Ok(Self::Raw(value));
+        };
+        let Some(action_type) = object.remove("type").and_then(|value| match value {
+            Value::String(value) => Some(value),
+            _ => None,
+        }) else {
+            return Ok(Self::Other {
+                action_type: String::from("unknown"),
+                extra: object.into_iter().collect(),
+            });
+        };
+        deserialize_response_computer_action_object(action_type, object)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerClickAction {
+    pub button: String,
+    pub x: i64,
+    pub y: i64,
+    #[serde(default)]
+    pub keys: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerPointAction {
+    pub x: i64,
+    pub y: i64,
+    #[serde(default)]
+    pub keys: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerDragAction {
+    #[serde(default)]
+    pub path: Vec<ResponseComputerDragPath>,
+    #[serde(default)]
+    pub keys: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerDragPath {
+    pub x: i64,
+    pub y: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerKeypressAction {
+    #[serde(default)]
+    pub keys: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerScrollAction {
+    pub scroll_x: i64,
+    pub scroll_y: i64,
+    pub x: i64,
+    pub y: i64,
+    #[serde(default)]
+    pub keys: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ResponseComputerTypeAction {
+    pub text: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_response_computer_action_object(
+    action_type: String,
+    object: serde_json::Map<String, Value>,
+) -> Result<ResponseComputerAction, String> {
+    let value = Value::Object(object);
+    match action_type.as_str() {
+        "click" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Click)
+            .map_err(|error| format!("invalid click computer action: {error}")),
+        "double_click" => serde_json::from_value(value)
+            .map(ResponseComputerAction::DoubleClick)
+            .map_err(|error| format!("invalid double_click computer action: {error}")),
+        "drag" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Drag)
+            .map_err(|error| format!("invalid drag computer action: {error}")),
+        "keypress" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Keypress)
+            .map_err(|error| format!("invalid keypress computer action: {error}")),
+        "move" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Move)
+            .map_err(|error| format!("invalid move computer action: {error}")),
+        "screenshot" => Ok(ResponseComputerAction::Screenshot),
+        "scroll" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Scroll)
+            .map_err(|error| format!("invalid scroll computer action: {error}")),
+        "type" => serde_json::from_value(value)
+            .map(ResponseComputerAction::Type)
+            .map_err(|error| format!("invalid type computer action: {error}")),
+        "wait" => Ok(ResponseComputerAction::Wait),
+        _ => match value {
+            Value::Object(object) => Ok(ResponseComputerAction::Other {
+                action_type,
+                extra: object.into_iter().collect(),
+            }),
+            _ => unreachable!("computer action helper always receives an object"),
+        },
+    }
+}
+
 impl<'de> Deserialize<'de> for ResponseOutputItem {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1217,9 +1362,9 @@ struct WireResponseOutputItem {
     #[serde(default)]
     created_by: Option<String>,
     #[serde(default)]
-    action: Option<Value>,
+    action: Option<ResponseComputerAction>,
     #[serde(default)]
-    actions: Option<Value>,
+    actions: Option<Vec<ResponseComputerAction>>,
     #[serde(default)]
     operation: Option<Value>,
     #[serde(default)]
