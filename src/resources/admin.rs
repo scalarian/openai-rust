@@ -365,6 +365,13 @@ admin_string_literal_enum! {
 }
 
 admin_string_literal_enum! {
+    /// Project rate-limit object type.
+    pub enum AdminProjectRateLimitObject {
+        ProjectRateLimit => "project.rate_limit",
+    }
+}
+
+admin_string_literal_enum! {
     /// Project model-permission mode.
     pub enum AdminProjectModelPermissionMode {
         AllowList => "allow_list",
@@ -1983,6 +1990,28 @@ pub struct ProjectApiKeyDeleteResponse {
 
 pub type ProjectApiKeyListResponse = AdminConversationCursorPage<ProjectApiKey>;
 
+/// Represents a project rate-limit config.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct AdminProjectRateLimit {
+    pub id: String,
+    pub max_requests_per_1_minute: u64,
+    pub max_tokens_per_1_minute: u64,
+    pub model: String,
+    pub object: AdminProjectRateLimitObject,
+    #[serde(default)]
+    pub batch_1_day_max_input_tokens: Option<u64>,
+    #[serde(default)]
+    pub max_audio_megabytes_per_1_minute: Option<u64>,
+    #[serde(default)]
+    pub max_images_per_1_minute: Option<u64>,
+    #[serde(default)]
+    pub max_requests_per_1_day: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+pub type AdminProjectRateLimitListResponse = AdminConversationCursorPage<AdminProjectRateLimit>;
+
 /// Project rate-limit list query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AdminProjectRateLimitListParams {
@@ -2149,6 +2178,10 @@ pub type AdminProjectGroupRoleCreateResponse = AdminGroupRoleCreateResponse;
 pub type AdminProjectGroupRoleRetrieveResponse = AdminRoleAssignment;
 pub type AdminProjectGroupRoleListResponse = AdminNextCursorPage<AdminRoleAssignment>;
 pub type AdminProjectGroupRoleDeleteResponse = AdminRoleAssignmentDeleteResponse;
+
+pub type AdminProjectRole = AdminRole;
+pub type AdminProjectRoleListResponse = AdminNextCursorPage<AdminProjectRole>;
+pub type AdminProjectRoleDeleteResponse = AdminRoleDeleteResponse;
 
 /// Project role creation body.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -3966,12 +3999,15 @@ impl ProjectRateLimits {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRateLimitListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/organization/projects/{project_id}/rate_limits"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(
+                format!("/organization/projects/{project_id}/rate_limits"),
+                params,
+            ),
+            RequestOptions::default(),
         )
     }
 
@@ -3980,13 +4016,14 @@ impl ProjectRateLimits {
         project_id: &str,
         rate_limit_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRateLimit>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let rate_limit_id = path_id("rate_limit_id", rate_limit_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/organization/projects/{project_id}/rate_limits/{rate_limit_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 }
@@ -4250,12 +4287,13 @@ impl ProjectRoles {
         &self,
         project_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRole>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/projects/{project_id}/roles"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4263,12 +4301,13 @@ impl ProjectRoles {
         &self,
         project_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRole>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let role_id = path_id("role_id", role_id)?;
-        get(
-            &self.runtime,
+        self.runtime.execute_json(
+            "GET",
             format!("/projects/{project_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 
@@ -4277,13 +4316,14 @@ impl ProjectRoles {
         project_id: &str,
         role_id: &str,
         params: B,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRole>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let role_id = path_id("role_id", role_id)?;
-        post_body(
-            &self.runtime,
+        self.runtime.execute_json_with_body(
+            "POST",
             format!("/projects/{project_id}/roles/{role_id}"),
-            params,
+            &params,
+            RequestOptions::default(),
         )
     }
 
@@ -4291,12 +4331,12 @@ impl ProjectRoles {
         &self,
         project_id: &str,
         params: impl Into<AdminQueryParams>,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRoleListResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
-        get_query(
-            &self.runtime,
-            format!("/projects/{project_id}/roles"),
-            params,
+        self.runtime.execute_json(
+            "GET",
+            path_with_query(format!("/projects/{project_id}/roles"), params),
+            RequestOptions::default(),
         )
     }
 
@@ -4304,12 +4344,13 @@ impl ProjectRoles {
         &self,
         project_id: &str,
         role_id: &str,
-    ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
+    ) -> Result<ApiResponse<AdminProjectRoleDeleteResponse>, OpenAIError> {
         let project_id = path_id("project_id", project_id)?;
         let role_id = path_id("role_id", role_id)?;
-        delete(
-            &self.runtime,
+        self.runtime.execute_json(
+            "DELETE",
             format!("/projects/{project_id}/roles/{role_id}"),
+            RequestOptions::default(),
         )
     }
 }
@@ -4511,19 +4552,4 @@ fn get_query(
     params: impl Into<AdminQueryParams>,
 ) -> Result<ApiResponse<AdminValue>, OpenAIError> {
     get(runtime, path_with_query(base, params))
-}
-
-fn post_body<B: Serialize>(
-    runtime: &ClientRuntime,
-    path: impl AsRef<str>,
-    body: B,
-) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-    runtime.execute_json_with_body("POST", path, &body, RequestOptions::default())
-}
-
-fn delete(
-    runtime: &ClientRuntime,
-    path: impl AsRef<str>,
-) -> Result<ApiResponse<AdminValue>, OpenAIError> {
-    runtime.execute_json("DELETE", path, RequestOptions::default())
 }

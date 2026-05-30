@@ -297,6 +297,20 @@ fn project_group_json(group_id: &str, group_name: &str, group_type: &str) -> Val
     })
 }
 
+fn project_rate_limit_json(id: &str, max_requests_per_1_minute: u64) -> Value {
+    json!({
+        "id": id,
+        "batch_1_day_max_input_tokens": 1_000_000u64,
+        "max_audio_megabytes_per_1_minute": null,
+        "max_images_per_1_minute": null,
+        "max_requests_per_1_day": 10_000u64,
+        "max_requests_per_1_minute": max_requests_per_1_minute,
+        "max_tokens_per_1_minute": 200_000u64,
+        "model": "gpt-5",
+        "object": "project.rate_limit"
+    })
+}
+
 fn certificate_json(
     id: &str,
     object: &str,
@@ -457,6 +471,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         })
         .to_string(),
     );
+    responses[15] = json_response(organization_role_json("role_audit").to_string());
     responses[16] = json_response(
         json!({
             "data": [organization_role_assignment_json("role_group_viewer")],
@@ -465,6 +480,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         })
         .to_string(),
     );
+    responses[18] = json_response(project_rate_limit_json("rl_gpt_5", 120).to_string());
     responses[21] =
         json_response(project_group_json("grp_eng", "Engineering", "group").to_string());
     let server = mock_http::MockHttpServer::spawn_sequence(responses).unwrap();
@@ -616,7 +632,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         .unwrap();
     assert!(deleted_project_user_role.output.deleted);
     assert_eq!(deleted_project_user_role.output.object, "user.role.deleted");
-    projects
+    let created_project_role = projects
         .roles()
         .create(
             "proj_research",
@@ -627,6 +643,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert_eq!(created_project_role.output.object, AdminRoleObject::Role);
+    assert_eq!(
+        created_project_role.output.permissions,
+        vec![String::from("logs.read")]
+    );
     let project_group_roles = projects
         .groups()
         .roles()
@@ -656,7 +677,7 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
         project_key.output.owner.owner_type,
         Some(ProjectApiKeyOwnerType::User)
     );
-    projects
+    let updated_rate_limit = projects
         .rate_limits()
         .update_rate_limit(
             "proj_research",
@@ -667,6 +688,11 @@ fn admin_organization_surface_matches_upstream_paths_and_payload_shapes() {
             },
         )
         .unwrap();
+    assert_eq!(
+        updated_rate_limit.output.object,
+        AdminProjectRateLimitObject::ProjectRateLimit
+    );
+    assert_eq!(updated_rate_limit.output.max_requests_per_1_minute, 120);
     let deleted_model_permissions = projects
         .model_permissions()
         .delete("proj_research")
@@ -1343,6 +1369,14 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         })
         .to_string(),
     );
+    responses[8] = json_response(
+        json!({
+            "data": [project_rate_limit_json("rl_gpt_5", 100)],
+            "has_more": true,
+            "last_id": "rl_gpt_5"
+        })
+        .to_string(),
+    );
     responses[9] = json_response(project_model_permissions_json().to_string());
     responses[10] =
         json_response(project_group_json("grp_eng", "Engineering", "group").to_string());
@@ -1356,6 +1390,15 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
     );
     responses[12] = json_response(
         organization_group_role_create_json("grp_eng", "role_group_viewer").to_string(),
+    );
+    responses[13] = json_response(organization_role_json("role_audit").to_string());
+    responses[14] = json_response(
+        json!({
+            "data": [organization_role_json("role_audit")],
+            "has_more": true,
+            "next": "role_audit"
+        })
+        .to_string(),
     );
     responses[15] = json_response(project_data_retention_json("organization_default").to_string());
     responses[16] = json_response(project_spend_alert_json("alert_project", 30_000).to_string());
@@ -1519,7 +1562,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         .unwrap();
     assert_eq!(project_keys.output.data[0].id, "key_project");
     assert_eq!(project_keys.output.next_after(), Some("key_project"));
-    projects
+    let rate_limits = projects
         .rate_limits()
         .list_rate_limits(
             "proj_research",
@@ -1530,6 +1573,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(rate_limits.output.data[0].id, "rl_gpt_5");
+    assert_eq!(rate_limits.output.next_after(), Some("rl_gpt_5"));
     let model_permissions = projects
         .model_permissions()
         .update(
@@ -1596,7 +1641,7 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
         AdminGroupRoleObject::GroupRole
     );
 
-    projects
+    let updated_project_role = projects
         .roles()
         .update(
             "proj_research",
@@ -1608,7 +1653,9 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
-    projects
+    assert_eq!(updated_project_role.output.id, "role_audit");
+    assert_eq!(updated_project_role.output.object, AdminRoleObject::Role);
+    let project_roles = projects
         .roles()
         .list(
             "proj_research",
@@ -1619,6 +1666,8 @@ fn admin_project_typed_params_preserve_queries_and_bodies() {
             },
         )
         .unwrap();
+    assert_eq!(project_roles.output.data[0].id, "role_audit");
+    assert_eq!(project_roles.output.next_after(), Some("role_audit"));
 
     let project_retention = projects
         .data_retention()
@@ -2474,6 +2523,43 @@ fn admin_project_group_role_retrieve_and_delete_return_typed_responses() {
     assert_eq!(
         requests[1].path,
         "/v1/projects/proj_research/groups/grp_eng/roles/role_group_viewer"
+    );
+}
+
+#[test]
+fn admin_project_role_retrieve_and_delete_return_typed_responses() {
+    let server = mock_http::MockHttpServer::spawn_sequence(vec![
+        json_response(organization_role_json("role_audit").to_string()),
+        json_response(
+            json!({
+                "id": "role_audit",
+                "deleted": true,
+                "object": "role.deleted"
+            })
+            .to_string(),
+        ),
+    ])
+    .unwrap();
+    let client = client(&server.url());
+    let roles = client.admin().organization().projects().roles();
+
+    let role = roles.retrieve("proj_research", "role_audit").unwrap();
+    assert_eq!(role.output.id, "role_audit");
+    assert_eq!(role.output.object, AdminRoleObject::Role);
+
+    let deleted = roles.delete("proj_research", "role_audit").unwrap();
+    assert!(deleted.output.deleted);
+    assert_eq!(deleted.output.object, AdminRoleDeletedObject::RoleDeleted);
+
+    let requests = server.captured_requests(2).unwrap();
+    assert_eq!(
+        requests[0].path,
+        "/v1/projects/proj_research/roles/role_audit"
+    );
+    assert_eq!(requests[1].method, "DELETE");
+    assert_eq!(
+        requests[1].path,
+        "/v1/projects/proj_research/roles/role_audit"
     );
 }
 
