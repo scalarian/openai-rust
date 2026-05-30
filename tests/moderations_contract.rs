@@ -31,19 +31,32 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
     assert_eq!(text_response.output().results.len(), 2);
     assert!(!text_response.output().results[0].flagged);
     assert!(text_response.output().results[1].flagged);
+    assert!(text_response.output().results[1].categories.violence);
+    assert!(!text_response.output().results[0].categories.self_harm);
+    assert!(
+        !text_response.output().results[1]
+            .categories
+            .harassment_threatening
+    );
     assert_eq!(
-        text_response.output().results[0].category_applied_input_types["violence"],
+        text_response.output().results[1].category_scores.violence,
+        0.91
+    );
+    assert_eq!(
+        text_response.output().results[0]
+            .category_applied_input_types
+            .violence,
         vec![String::from("text")]
     );
 
     let multimodal_input = json!([
         {
-            "type": "input_text",
+            "type": "text",
             "text": "describe this image"
         },
         {
-            "type": "input_image",
-            "image_url": "https://example.com/cat.png"
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/cat.png"}
         }
     ]);
     let multimodal_response = client
@@ -58,11 +71,15 @@ fn moderations_preserve_text_and_multimodal_input_correspondence() {
         .unwrap();
     assert_eq!(multimodal_response.output().results.len(), 2);
     assert_eq!(
-        multimodal_response.output().results[0].category_applied_input_types["self-harm"],
+        multimodal_response.output().results[0]
+            .category_applied_input_types
+            .self_harm,
         vec![String::from("text")]
     );
     assert_eq!(
-        multimodal_response.output().results[1].category_applied_input_types["violence"],
+        multimodal_response.output().results[1]
+            .category_applied_input_types
+            .violence,
         vec![String::from("image")]
     );
 
@@ -98,7 +115,11 @@ fn text_results_payload() -> String {
         "results": [
             {
                 "flagged": false,
-                "categories": {"violence": false, "self-harm": false},
+                "categories": {
+                    "harassment/threatening": false,
+                    "violence": false,
+                    "self-harm": false
+                },
                 "category_scores": {"violence": 0.01, "self-harm": 0.0},
                 "category_applied_input_types": {
                     "violence": ["text"],
@@ -107,7 +128,11 @@ fn text_results_payload() -> String {
             },
             {
                 "flagged": true,
-                "categories": {"violence": true, "self-harm": false},
+                "categories": {
+                    "harassment/threatening": false,
+                    "violence": true,
+                    "self-harm": false
+                },
                 "category_scores": {"violence": 0.91, "self-harm": 0.0},
                 "category_applied_input_types": {
                     "violence": ["text"],
