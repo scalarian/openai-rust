@@ -344,6 +344,48 @@ pub struct ResponsesConnectionEvent {
     pub payload: Value,
 }
 
+/// Typed client event sent to the persistent Responses websocket.
+#[derive(Clone, Debug, Default)]
+pub struct ResponsesClientEvent {
+    pub params: ResponseCreateParams,
+}
+
+impl ResponsesClientEvent {
+    pub fn response_create(params: ResponseCreateParams) -> Self {
+        Self { params }
+    }
+
+    pub const fn event_type(&self) -> &'static str {
+        "response.create"
+    }
+}
+
+impl From<ResponseCreateParams> for ResponsesClientEvent {
+    fn from(params: ResponseCreateParams) -> Self {
+        Self::response_create(params)
+    }
+}
+
+impl Serialize for ResponsesClientEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut params = self.params.clone();
+        let raw_tools = std::mem::take(&mut params.raw_tools);
+        let mut value = serde_json::to_value(params).map_err(serde::ser::Error::custom)?;
+        merge_raw_tools(&mut value, raw_tools);
+        let object = value.as_object_mut().ok_or_else(|| {
+            serde::ser::Error::custom("Responses client event must serialize to an object")
+        })?;
+        object.insert(
+            String::from("type"),
+            Value::String(String::from("response.create")),
+        );
+        value.serialize(serializer)
+    }
+}
+
 /// Registered Responses websocket event handler identifier.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ResponsesEventHandlerId(u64);

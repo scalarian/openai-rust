@@ -8,7 +8,10 @@ use std::{
 use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
     OpenAI,
-    resources::responses::{ResponsesConnectOptions, ResponsesConnectionEvent},
+    resources::responses::{
+        ResponseCreateParams, ResponseInput, ResponsesClientEvent, ResponsesConnectOptions,
+        ResponsesConnectionEvent,
+    },
 };
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -152,13 +155,13 @@ async fn responses_websocket_can_exchange_flexible_json_events() {
     );
 
     connection
-        .send(json!({
-            "type": "response.create",
-            "response": {
-                "model": "gpt-5.5",
-                "input": "Say hello"
-            }
-        }))
+        .send(ResponsesClientEvent::response_create(
+            ResponseCreateParams {
+                model: String::from("gpt-5.5"),
+                input: Some(ResponseInput::text("Say hello")),
+                ..Default::default()
+            },
+        ))
         .await
         .expect("send response.create event");
     assert!(connection.recv().await.is_none());
@@ -174,10 +177,8 @@ async fn responses_websocket_can_exchange_flexible_json_events() {
         message_rx.recv().unwrap(),
         json!({
             "type": "response.create",
-            "response": {
-                "model": "gpt-5.5",
-                "input": "Say hello"
-            }
+            "model": "gpt-5.5",
+            "input": "Say hello"
         })
         .to_string()
     );
