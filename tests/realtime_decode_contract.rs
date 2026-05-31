@@ -1,4 +1,7 @@
-use openai_rust::realtime::{RealtimeConversationItem, RealtimeServerEvent, decode_server_event};
+use openai_rust::realtime::{
+    RealtimeAudioFormat, RealtimeConversationItem, RealtimeMaxOutputTokens, RealtimeOutputModality,
+    RealtimeServerEvent, RealtimeVoice, decode_server_event,
+};
 use serde_json::json;
 
 #[test]
@@ -139,6 +142,154 @@ fn output_item_events_derive_item_id_from_the_nested_item_payload() {
             ..
         } if item_id == "msg_123" && nested_id == "msg_123"
     ));
+}
+
+#[test]
+fn response_lifecycle_events_decode_typed_response_resources() {
+    let done = decode_server_event(&json!({
+        "type": "response.done",
+        "event_id": "evt_done",
+        "response": {
+            "id": "resp_123",
+            "object": "realtime.response",
+            "audio": {
+                "output": {
+                    "format": {"type": "audio/pcm", "rate": 24000},
+                    "voice": "marin"
+                }
+            },
+            "conversation_id": "conv_123",
+            "max_output_tokens": "inf",
+            "metadata": {"trace": "typed"},
+            "output": [
+                {
+                    "id": "msg_123",
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "text", "text": "Hello"}]
+                }
+            ],
+            "output_modalities": ["audio", "text"],
+            "status": "incomplete",
+            "status_details": {
+                "type": "incomplete",
+                "reason": "max_output_tokens",
+                "error": {"type": "server_error", "code": "rate_limit"}
+            },
+            "usage": {
+                "input_tokens": 10,
+                "input_token_details": {
+                    "audio_tokens": 2,
+                    "cached_tokens": 4,
+                    "cached_tokens_details": {
+                        "audio_tokens": 1,
+                        "image_tokens": 2,
+                        "text_tokens": 1
+                    },
+                    "image_tokens": 3,
+                    "text_tokens": 5
+                },
+                "output_tokens": 6,
+                "output_token_details": {"audio_tokens": 4, "text_tokens": 2},
+                "total_tokens": 16
+            }
+        }
+    }))
+    .expect("response.done should decode typed response");
+
+    let RealtimeServerEvent::ResponseDone { response, .. } = done else {
+        panic!("expected response.done");
+    };
+    assert_eq!(response.id.as_deref(), Some("resp_123"));
+    assert_eq!(
+        response.object.as_ref().map(|object| object.as_str()),
+        Some("realtime.response")
+    );
+    assert!(matches!(
+        response.max_output_tokens,
+        Some(RealtimeMaxOutputTokens::Inf)
+    ));
+    assert_eq!(
+        response
+            .metadata
+            .as_ref()
+            .unwrap()
+            .get("trace")
+            .map(String::as_str),
+        Some("typed")
+    );
+    assert_eq!(
+        response.output.as_ref().unwrap()[0].id.as_deref(),
+        Some("msg_123")
+    );
+    assert_eq!(
+        response.output_modalities.as_ref().unwrap()[0],
+        RealtimeOutputModality::Audio
+    );
+    assert_eq!(
+        response.status.as_ref().map(|status| status.as_str()),
+        Some("incomplete")
+    );
+
+    let output = response
+        .audio
+        .as_ref()
+        .and_then(|audio| audio.output.as_ref())
+        .expect("audio output");
+    assert!(matches!(
+        output.format.as_ref(),
+        Some(RealtimeAudioFormat::Pcm(format)) if format.rate == Some(24000)
+    ));
+    assert!(matches!(
+        output.voice.as_ref(),
+        Some(RealtimeVoice::Name(name)) if name.as_str() == "marin"
+    ));
+
+    let status = response.status_details.as_ref().expect("status details");
+    assert_eq!(
+        status
+            .status_type
+            .as_ref()
+            .map(|status_type| status_type.as_str()),
+        Some("incomplete")
+    );
+    assert_eq!(
+        status.reason.as_ref().map(|reason| reason.as_str()),
+        Some("max_output_tokens")
+    );
+    assert_eq!(
+        status
+            .error
+            .as_ref()
+            .and_then(|error| error.code.as_deref()),
+        Some("rate_limit")
+    );
+
+    let usage = response.usage.as_ref().expect("usage");
+    assert_eq!(usage.input_tokens, Some(10));
+    assert_eq!(usage.output_tokens, Some(6));
+    assert_eq!(usage.total_tokens, Some(16));
+    let input_details = usage
+        .input_token_details
+        .as_ref()
+        .expect("input token details");
+    assert_eq!(input_details.audio_tokens, Some(2));
+    assert_eq!(input_details.cached_tokens, Some(4));
+    assert_eq!(
+        input_details
+            .cached_tokens_details
+            .as_ref()
+            .and_then(|details| details.image_tokens),
+        Some(2)
+    );
+    assert_eq!(
+        usage
+            .output_token_details
+            .as_ref()
+            .and_then(|details| details.audio_tokens),
+        Some(4)
+    );
 }
 
 #[test]

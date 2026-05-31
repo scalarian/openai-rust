@@ -509,6 +509,155 @@ pub struct RealtimeResponseAudioOutputConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Typed Realtime response resource.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<RealtimeResponseAudioConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<RealtimeMaxOutputTokens>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BTreeMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object: Option<RealtimeResponseObject>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<Vec<RealtimeConversationItem>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_modalities: Option<Vec<RealtimeOutputModality>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<RealtimeResponseStatusValue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_details: Option<RealtimeResponseStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<RealtimeResponseUsage>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Realtime response object marker.
+    pub enum RealtimeResponseObject {
+        RealtimeResponse => "realtime.response",
+    }
+}
+
+realtime_string_literal_enum! {
+    /// Realtime response lifecycle status.
+    pub enum RealtimeResponseStatusValue {
+        Completed => "completed",
+        Cancelled => "cancelled",
+        Failed => "failed",
+        Incomplete => "incomplete",
+        InProgress => "in_progress",
+    }
+}
+
+/// Additional details about a Realtime response status.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseStatus {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<RealtimeResponseStatusError>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<RealtimeResponseStatusReason>,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub status_type: Option<RealtimeResponseStatusType>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Error details for a failed Realtime response.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseStatusError {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub error_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+realtime_string_literal_enum! {
+    /// Reason a Realtime response did not complete normally.
+    pub enum RealtimeResponseStatusReason {
+        TurnDetected => "turn_detected",
+        ClientCancelled => "client_cancelled",
+        MaxOutputTokens => "max_output_tokens",
+        ContentFilter => "content_filter",
+    }
+}
+
+realtime_string_literal_enum! {
+    /// Detail type for a Realtime response status.
+    pub enum RealtimeResponseStatusType {
+        Completed => "completed",
+        Cancelled => "cancelled",
+        Incomplete => "incomplete",
+        Failed => "failed",
+    }
+}
+
+/// Usage statistics for a Realtime response.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseUsage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_token_details: Option<RealtimeResponseUsageInputTokenDetails>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_token_details: Option<RealtimeResponseUsageOutputTokenDetails>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Details about input tokens used by a Realtime response.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseUsageInputTokenDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_tokens_details: Option<RealtimeResponseUsageCachedTokensDetails>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Details about cached input tokens used by a Realtime response.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseUsageCachedTokensDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Details about output tokens used by a Realtime response.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeResponseUsageOutputTokenDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_tokens: Option<u64>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Controls which conversation a Realtime response writes to.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RealtimeResponseConversation {
@@ -2008,11 +2157,11 @@ pub enum RealtimeServerEvent {
     },
     ResponseCreated {
         event_id: String,
-        response: Value,
+        response: RealtimeResponse,
     },
     ResponseDone {
         event_id: String,
-        response: Value,
+        response: RealtimeResponse,
     },
     Error {
         event_id: String,
@@ -2371,11 +2520,11 @@ pub fn decode_server_event(value: &Value) -> Result<RealtimeServerEvent, OpenAIE
         }),
         "response.created" => Ok(RealtimeServerEvent::ResponseCreated {
             event_id: required_string(object, "event_id")?,
-            response: object.get("response").cloned().unwrap_or(Value::Null),
+            response: required_json(object, "response")?,
         }),
         "response.done" => Ok(RealtimeServerEvent::ResponseDone {
             event_id: required_string(object, "event_id")?,
-            response: object.get("response").cloned().unwrap_or(Value::Null),
+            response: required_json(object, "response")?,
         }),
         "error" => Ok(RealtimeServerEvent::Error {
             event_id: required_string(object, "event_id")?,

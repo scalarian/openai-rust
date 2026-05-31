@@ -4,7 +4,8 @@ use crate::{OpenAIError, error::ErrorKind};
 
 use super::events::{
     RealtimeConversationItem, RealtimeConversationItemStatus,
-    RealtimeConversationMessageContentPart, RealtimeServerEvent, RealtimeSessionConfig,
+    RealtimeConversationMessageContentPart, RealtimeResponse, RealtimeServerEvent,
+    RealtimeSessionConfig,
 };
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -18,7 +19,7 @@ pub struct RealtimeAudioBufferState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RealtimeResponseState {
-    pub response: Value,
+    pub response: RealtimeResponse,
     pub output: Vec<RealtimeConversationItem>,
     output_text: String,
 }
@@ -28,36 +29,18 @@ impl RealtimeResponseState {
         &self.output_text
     }
 
-    fn from_value(response: Value) -> Result<Self, OpenAIError> {
-        let output = response
-            .get("output")
-            .cloned()
-            .unwrap_or_else(|| Value::Array(vec![]));
-        let output: Vec<RealtimeConversationItem> =
-            serde_json::from_value(output).map_err(|error| {
-                OpenAIError::new(
-                    ErrorKind::Parse,
-                    format!("failed to parse Realtime response output: {error}"),
-                )
-                .with_source(error)
-            })?;
+    fn from_response(response: RealtimeResponse) -> Self {
+        let output = response.output.clone().unwrap_or_default();
         let output_text = aggregate_output_text(&output);
-        Ok(Self {
+        Self {
             response,
             output,
             output_text,
-        })
+        }
     }
 
     fn sync_response(&mut self) {
-        let object = self
-            .response
-            .as_object_mut()
-            .expect("realtime response snapshots must be JSON objects");
-        object.insert(
-            String::from("output"),
-            serde_json::to_value(&self.output).expect("realtime output should serialize"),
-        );
+        self.response.output = Some(self.output.clone());
         self.output_text = aggregate_output_text(&self.output);
     }
 }
@@ -273,10 +256,11 @@ impl RealtimeEventState {
                 }
             }
             RealtimeServerEvent::ResponseCreated { response, .. } => {
-                self.current_response = Some(RealtimeResponseState::from_value(response.clone())?);
+                self.current_response =
+                    Some(RealtimeResponseState::from_response(response.clone()));
             }
             RealtimeServerEvent::ResponseDone { response, .. } => {
-                let snapshot = RealtimeResponseState::from_value(response.clone())?;
+                let snapshot = RealtimeResponseState::from_response(response.clone());
                 self.current_response = Some(snapshot.clone());
                 self.terminal_response = Some(snapshot);
             }

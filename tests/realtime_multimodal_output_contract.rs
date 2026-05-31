@@ -160,6 +160,9 @@ fn output_items_reconcile_at_response_done() {
     assert_eq!(current.output[0].content[1].text.as_deref(), Some("Hi"));
 
     let terminal = state.terminal_response().expect("terminal response");
-    assert_eq!(terminal.response["status"], json!("completed"));
+    assert!(matches!(
+        terminal.response.status.as_ref(),
+        Some(status) if status.as_str() == "completed"
+    ));
     assert_eq!(terminal.output_text(), "Hi");
 }

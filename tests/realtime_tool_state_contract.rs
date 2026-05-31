@@ -120,7 +120,10 @@ fn tool_and_mcp_events_finalize_against_terminal_response() {
     assert_eq!(current.output[1].status.as_deref(), Some("completed"));
 
     let terminal = state.terminal_response().expect("terminal response");
-    assert_eq!(terminal.response["status"], json!("completed"));
+    assert!(matches!(
+        terminal.response.status.as_ref(),
+        Some(status) if status.as_str() == "completed"
+    ));
     assert_eq!(
         terminal.output[0].arguments.as_deref(),
         Some("{\"city\":\"Paris\"}")
