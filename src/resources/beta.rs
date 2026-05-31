@@ -2300,7 +2300,137 @@ pub struct BetaThreadMessageDeltaEvent {
     #[serde(default)]
     pub object: String,
     #[serde(default)]
-    pub delta: Value,
+    pub delta: BetaThreadMessageDelta,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Delta fields emitted for a deprecated beta thread message.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageDelta {
+    #[serde(default)]
+    pub content: Option<Vec<BetaThreadMessageContentDelta>>,
+    #[serde(default)]
+    pub role: Option<BetaThreadMessageRole>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Content delta block emitted for a deprecated beta thread message.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageContentDelta {
+    Text {
+        index: u64,
+        #[serde(default)]
+        text: Option<BetaThreadMessageTextDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    ImageFile {
+        index: u64,
+        #[serde(default)]
+        image_file: Option<BetaThreadMessageImageFileDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    ImageUrl {
+        index: u64,
+        #[serde(default)]
+        image_url: Option<BetaThreadMessageImageUrlDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    Refusal {
+        index: u64,
+        #[serde(default)]
+        refusal: Option<String>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Text delta emitted for a deprecated beta thread message.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageTextDelta {
+    #[serde(default)]
+    pub annotations: Option<Vec<BetaThreadMessageAnnotationDelta>>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Annotation delta emitted for deprecated beta thread message text.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadMessageAnnotationDelta {
+    FileCitation {
+        index: u64,
+        #[serde(default)]
+        end_index: Option<u64>,
+        #[serde(default)]
+        file_citation: Option<BetaThreadMessageFileCitationDelta>,
+        #[serde(default)]
+        start_index: Option<u64>,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    FilePath {
+        index: u64,
+        #[serde(default)]
+        end_index: Option<u64>,
+        #[serde(default)]
+        file_path: Option<BetaThreadMessageFilePathDelta>,
+        #[serde(default)]
+        start_index: Option<u64>,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// File-citation annotation delta payload.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageFileCitationDelta {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(default)]
+    pub quote: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-path annotation delta payload.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageFilePathDelta {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Image-file delta emitted for a deprecated beta thread message.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageImageFileDelta {
+    #[serde(default)]
+    pub detail: Option<BetaThreadMessageImageDetail>,
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Image-url delta emitted for a deprecated beta thread message.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadMessageImageUrlDelta {
+    #[serde(default)]
+    pub detail: Option<BetaThreadMessageImageDetail>,
+    #[serde(default)]
+    pub url: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -2312,7 +2442,129 @@ pub struct BetaThreadRunStepDeltaEvent {
     #[serde(default)]
     pub object: String,
     #[serde(default)]
-    pub delta: Value,
+    pub delta: BetaThreadRunStepDelta,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Delta fields emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepDelta {
+    #[serde(default)]
+    pub step_details: Option<BetaThreadRunStepDeltaDetails>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Step-details delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepDeltaDetails {
+    MessageCreation {
+        #[serde(default)]
+        message_creation: Option<BetaThreadRunStepDeltaMessageCreation>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    ToolCalls {
+        #[serde(default)]
+        tool_calls: Option<Vec<BetaThreadRunStepToolCallDelta>>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Message-creation delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepDeltaMessageCreation {
+    #[serde(default)]
+    pub message_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool-call delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepToolCallDelta {
+    CodeInterpreter {
+        index: u64,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default)]
+        code_interpreter: Option<BetaThreadRunStepCodeInterpreterDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    FileSearch {
+        index: u64,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default)]
+        file_search: BTreeMap<String, Value>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    Function {
+        index: u64,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default)]
+        function: Option<BetaThreadRunStepFunctionDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Code-interpreter delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepCodeInterpreterDelta {
+    #[serde(default)]
+    pub input: Option<String>,
+    #[serde(default)]
+    pub outputs: Option<Vec<BetaThreadRunStepCodeInterpreterOutputDelta>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Code-interpreter output delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepCodeInterpreterOutputDelta {
+    Logs {
+        index: u64,
+        #[serde(default)]
+        logs: Option<String>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    Image {
+        index: u64,
+        #[serde(default)]
+        image: Option<BetaThreadRunStepCodeInterpreterOutputImageDelta>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Code-interpreter image output delta payload.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepCodeInterpreterOutputImageDelta {
+    #[serde(default)]
+    pub file_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function delta emitted for a deprecated beta thread run step.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepFunctionDelta {
+    #[serde(default)]
+    pub arguments: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub output: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

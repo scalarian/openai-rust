@@ -16,16 +16,19 @@ use openai_rust::{
             BetaAssistantToolChoice, BetaAssistantToolChoiceFunction, BetaAssistantUpdateParams,
             BetaQueryParams, BetaRunPollOptions, BetaThreadCreateAndRunParams,
             BetaThreadCreateParams, BetaThreadMessageAttachment, BetaThreadMessageAttachmentTool,
-            BetaThreadMessageContent, BetaThreadMessageContentBlock, BetaThreadMessageCreateParams,
-            BetaThreadMessageListParams, BetaThreadMessageRole, BetaThreadMessageUpdateParams,
-            BetaThreadRunAdditionalMessage, BetaThreadRunCreateParams, BetaThreadRunListParams,
+            BetaThreadMessageContent, BetaThreadMessageContentBlock, BetaThreadMessageContentDelta,
+            BetaThreadMessageCreateParams, BetaThreadMessageListParams, BetaThreadMessageRole,
+            BetaThreadMessageUpdateParams, BetaThreadRunAdditionalMessage,
+            BetaThreadRunCreateParams, BetaThreadRunListParams,
             BetaThreadRunRequiredActionToolCallType, BetaThreadRunRequiredActionType,
-            BetaThreadRunStatus, BetaThreadRunStepCodeInterpreterOutput, BetaThreadRunStepDetails,
-            BetaThreadRunStepInclude, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
-            BetaThreadRunStepToolCall, BetaThreadRunSubmitToolOutputsParams,
-            BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
-            BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
-            BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
+            BetaThreadRunStatus, BetaThreadRunStepCodeInterpreterOutput,
+            BetaThreadRunStepDeltaDetails, BetaThreadRunStepDetails, BetaThreadRunStepInclude,
+            BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+            BetaThreadRunStepToolCall, BetaThreadRunStepToolCallDelta,
+            BetaThreadRunSubmitToolOutputsParams, BetaThreadRunToolOutput,
+            BetaThreadRunUpdateParams, BetaThreadUpdateParams, BetaToolResourceFileSearchOverrides,
+            BetaToolResourceOverrides, BetaToolResources, BetaToolResourcesCodeInterpreter,
+            BetaTruncationStrategy,
         },
         common::{ListOrder, ReasoningEffort},
     },
@@ -718,11 +721,56 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
     };
     let run_event = serde_json::from_str::<serde_json::Value>(&run_payload("run_stream", "queued"))
         .expect("run event payload");
+    let message_delta_event = json!({
+        "id": "msg_stream",
+        "object": "thread.message.delta",
+        "delta": {
+            "role": "assistant",
+            "content": [{
+                "index": 0,
+                "type": "text",
+                "text": {
+                    "value": "hel",
+                    "annotations": [{
+                        "index": 0,
+                        "type": "file_citation",
+                        "text": "hel",
+                        "file_citation": {
+                            "file_id": "file_123",
+                            "quote": "hello"
+                        }
+                    }]
+                }
+            }]
+        }
+    });
+    let run_step_delta_event = json!({
+        "id": "step_stream",
+        "object": "thread.run.step.delta",
+        "delta": {
+            "step_details": {
+                "type": "tool_calls",
+                "tool_calls": [{
+                    "index": 0,
+                    "id": "call_123",
+                    "type": "function",
+                    "function": {
+                        "name": "lookup_order",
+                        "arguments": "{\"order_id\""
+                    }
+                }]
+            }
+        }
+    });
     let mut stream = BetaAssistantStream::from_sse_chunks(
         metadata.clone(),
         [format!(
             "event: thread.run.created\n\
              data: {run_event}\n\n\
+             event: thread.message.delta\n\
+             data: {message_delta_event}\n\n\
+             event: thread.run.step.delta\n\
+             data: {run_step_delta_event}\n\n\
              event: thread.future\n\
              data: {{\"id\":\"run_stream\",\"status\":\"future\"}}\n\n\
              data: [DONE]\n\n"
@@ -746,6 +794,50 @@ fn beta_assistants_stream_parser_preserves_raw_sse_events() {
             if run.id == "run_stream" && run.status == Some(BetaThreadRunStatus::Queued)
     ));
     assert_eq!(event.raw_data, run_event.to_string());
+    let message_delta = stream
+        .next_event()
+        .expect("message delta read")
+        .expect("message delta event");
+    assert_eq!(
+        message_delta.event,
+        Some(BetaAssistantStreamEventType::ThreadMessageDelta)
+    );
+    assert!(matches!(
+        &message_delta.parsed_data,
+        BetaAssistantStreamEventData::MessageDelta(delta)
+            if matches!(
+                delta.delta.content.as_ref().and_then(|content| content.first()),
+                Some(BetaThreadMessageContentDelta::Text {
+                    text: Some(text),
+                    ..
+                }) if text.value.as_deref() == Some("hel")
+            )
+    ));
+    let run_step_delta = stream
+        .next_event()
+        .expect("run step delta read")
+        .expect("run step delta event");
+    assert_eq!(
+        run_step_delta.event,
+        Some(BetaAssistantStreamEventType::ThreadRunStepDelta)
+    );
+    assert!(matches!(
+        &run_step_delta.parsed_data,
+        BetaAssistantStreamEventData::RunStepDelta(delta)
+            if matches!(
+                delta.delta.step_details.as_ref(),
+                Some(BetaThreadRunStepDeltaDetails::ToolCalls {
+                    tool_calls: Some(tool_calls),
+                    ..
+                }) if matches!(
+                    tool_calls.first(),
+                    Some(BetaThreadRunStepToolCallDelta::Function {
+                        function: Some(function),
+                        ..
+                    }) if function.name.as_deref() == Some("lookup_order")
+                )
+            )
+    ));
     let unknown = stream
         .next_event()
         .expect("unknown event read")
