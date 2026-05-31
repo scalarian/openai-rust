@@ -1297,7 +1297,7 @@ pub struct RealtimeSessionConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncation: Option<RealtimeTruncation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub turn_detection: Option<Value>,
+    pub turn_detection: Option<RealtimeNullable<RealtimeAudioInputTurnDetection>>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

@@ -7,14 +7,14 @@ use futures_util::{SinkExt, StreamExt};
 use openai_rust::{
     ErrorKind, OpenAI,
     realtime::{
-        RealtimeAudioFormat, RealtimeAuth, RealtimeClientEvent, RealtimeConnectOptions,
-        RealtimeConversationItem, RealtimeConversationMessageContentPart, RealtimeFunctionTool,
-        RealtimeMaxOutputTokens, RealtimeMcpAllowedTools, RealtimeMcpRequireApproval,
-        RealtimeMcpTool, RealtimeOutputModality, RealtimeReasoning, RealtimeReasoningEffort,
-        RealtimeResponseAudioConfig, RealtimeResponseAudioOutputConfig,
-        RealtimeResponseConversation, RealtimeResponseCreateParams, RealtimeServerEvent,
-        RealtimeSessionConfig, RealtimeSessionType, RealtimeTool, RealtimeToolChoice,
-        RealtimeVoice, ResponsePrompt,
+        RealtimeAudioFormat, RealtimeAudioInputTurnDetection, RealtimeAuth, RealtimeClientEvent,
+        RealtimeConnectOptions, RealtimeConversationItem, RealtimeConversationMessageContentPart,
+        RealtimeFunctionTool, RealtimeMaxOutputTokens, RealtimeMcpAllowedTools,
+        RealtimeMcpRequireApproval, RealtimeMcpTool, RealtimeNullable, RealtimeOutputModality,
+        RealtimeReasoning, RealtimeReasoningEffort, RealtimeResponseAudioConfig,
+        RealtimeResponseAudioOutputConfig, RealtimeResponseConversation,
+        RealtimeResponseCreateParams, RealtimeServerEvent, RealtimeSessionConfig,
+        RealtimeSessionType, RealtimeTool, RealtimeToolChoice, RealtimeVoice, ResponsePrompt,
     },
 };
 use serde_json::json;
@@ -211,7 +211,11 @@ async fn bootstrap_and_clean_close() {
                         "id": "sess_123",
                         "type": "realtime",
                         "model": "gpt-realtime-mini",
-                        "output_modalities": ["text"]
+                        "output_modalities": ["text"],
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "threshold": 0.5
+                        }
                     }
                 })
                 .to_string()
@@ -306,6 +310,11 @@ async fn bootstrap_and_clean_close() {
         created,
         RealtimeServerEvent::SessionCreated { ref session, .. }
             if session.id.as_deref() == Some("sess_123")
+                && matches!(
+                    session.turn_detection.as_ref(),
+                    Some(RealtimeNullable::Value(RealtimeAudioInputTurnDetection::ServerVad(detection)))
+                        if detection.threshold.as_ref().and_then(serde_json::Number::as_f64) == Some(0.5)
+                )
     ));
 
     connection
