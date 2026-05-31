@@ -2868,27 +2868,27 @@ impl BetaRealtimeTranscriptionSessions {
 pub struct BetaRealtimeSession {
     pub client_secret: BetaRealtimeClientSecretResponse,
     #[serde(default)]
-    pub input_audio_format: Option<String>,
+    pub input_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(default)]
     pub input_audio_transcription: Option<BetaRealtimeInputAudioTranscriptionResponse>,
     #[serde(default)]
     pub instructions: Option<String>,
     #[serde(default)]
-    pub max_response_output_tokens: Option<Value>,
+    pub max_response_output_tokens: Option<BetaRealtimeMaxResponseOutputTokens>,
     #[serde(default)]
-    pub modalities: Option<Vec<String>>,
+    pub modalities: Option<Vec<BetaRealtimeModality>>,
     #[serde(default)]
-    pub output_audio_format: Option<String>,
+    pub output_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(default)]
     pub speed: Option<f64>,
     #[serde(default)]
     pub temperature: Option<f64>,
     #[serde(default)]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<String>,
     #[serde(default)]
     pub tools: Option<Vec<BetaRealtimeToolResponse>>,
     #[serde(default)]
-    pub tracing: Option<Value>,
+    pub tracing: Option<BetaRealtimeTracing>,
     #[serde(default)]
     pub turn_detection: Option<BetaRealtimeTurnDetectionResponse>,
     #[serde(default)]
@@ -2902,11 +2902,11 @@ pub struct BetaRealtimeSession {
 pub struct BetaRealtimeTranscriptionSession {
     pub client_secret: BetaRealtimeClientSecretResponse,
     #[serde(default)]
-    pub input_audio_format: Option<String>,
+    pub input_audio_format: Option<BetaRealtimeAudioFormat>,
     #[serde(default)]
     pub input_audio_transcription: Option<BetaRealtimeInputAudioTranscriptionResponse>,
     #[serde(default)]
-    pub modalities: Option<Vec<String>>,
+    pub modalities: Option<Vec<BetaRealtimeModality>>,
     #[serde(default)]
     pub turn_detection: Option<BetaRealtimeTurnDetectionResponse>,
     #[serde(flatten)]
@@ -2928,7 +2928,7 @@ pub struct BetaRealtimeInputAudioTranscriptionResponse {
     #[serde(default)]
     pub language: Option<String>,
     #[serde(default)]
-    pub model: Option<String>,
+    pub model: Option<BetaRealtimeInputAudioTranscriptionModel>,
     #[serde(default)]
     pub prompt: Option<String>,
     #[serde(flatten)]
@@ -2945,7 +2945,7 @@ pub struct BetaRealtimeToolResponse {
     #[serde(default)]
     pub parameters: Option<Value>,
     #[serde(rename = "type", default)]
-    pub tool_type: Option<String>,
+    pub tool_type: Option<BetaRealtimeToolType>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -2954,13 +2954,19 @@ pub struct BetaRealtimeToolResponse {
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct BetaRealtimeTurnDetectionResponse {
     #[serde(default)]
+    pub create_response: Option<bool>,
+    #[serde(default)]
+    pub eagerness: Option<BetaRealtimeTurnDetectionEagerness>,
+    #[serde(default)]
+    pub interrupt_response: Option<bool>,
+    #[serde(default)]
     pub prefix_padding_ms: Option<u32>,
     #[serde(default)]
     pub silence_duration_ms: Option<u32>,
     #[serde(default)]
     pub threshold: Option<f64>,
     #[serde(rename = "type", default)]
-    pub turn_detection_type: Option<String>,
+    pub turn_detection_type: Option<BetaRealtimeTurnDetectionType>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -3040,7 +3046,7 @@ impl<T> From<T> for BetaRealtimeNullable<T> {
 }
 
 /// Realtime audio wire formats.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaRealtimeAudioFormat {
     Pcm16,
@@ -3049,7 +3055,7 @@ pub enum BetaRealtimeAudioFormat {
 }
 
 /// Realtime response modalities.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaRealtimeModality {
     Text,
@@ -3175,6 +3181,28 @@ impl Serialize for BetaRealtimeMaxResponseOutputTokens {
     }
 }
 
+impl<'de> Deserialize<'de> for BetaRealtimeMaxResponseOutputTokens {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::Number(number) => number
+                .as_u64()
+                .map(Self::Tokens)
+                .ok_or_else(|| serde::de::Error::custom("realtime token limit must be u64")),
+            Value::String(value) if value == "inf" => Ok(Self::Inf),
+            Value::String(value) => Err(serde::de::Error::custom(format!(
+                "unsupported realtime token limit string: {value}"
+            ))),
+            _ => Err(serde::de::Error::custom(
+                "realtime token limit must be an integer or inf",
+            )),
+        }
+    }
+}
+
 /// Realtime function tool definition.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct BetaRealtimeTool {
@@ -3191,7 +3219,7 @@ pub struct BetaRealtimeTool {
 }
 
 /// Realtime tool kind.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaRealtimeToolType {
     Function,
@@ -3216,8 +3244,29 @@ impl Serialize for BetaRealtimeTracing {
     }
 }
 
+impl<'de> Deserialize<'de> for BetaRealtimeTracing {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(value) if value == "auto" => Ok(Self::Auto),
+            Value::String(value) => Err(serde::de::Error::custom(format!(
+                "unsupported realtime tracing string: {value}"
+            ))),
+            Value::Object(_) => serde_json::from_value(value)
+                .map(Self::Configuration)
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom(
+                "realtime tracing must be auto or a configuration object",
+            )),
+        }
+    }
+}
+
 /// Realtime tracing configuration object.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaRealtimeTracingConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_id: Option<String>,
@@ -3251,7 +3300,7 @@ pub struct BetaRealtimeTurnDetection {
 }
 
 /// Realtime turn-detection mode.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaRealtimeTurnDetectionType {
     ServerVad,
@@ -3259,7 +3308,7 @@ pub enum BetaRealtimeTurnDetectionType {
 }
 
 /// Realtime semantic VAD eagerness.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BetaRealtimeTurnDetectionEagerness {
     Low,

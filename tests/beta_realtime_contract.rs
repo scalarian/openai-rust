@@ -68,6 +68,41 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
         })
         .unwrap();
     assert_eq!(session.output.client_secret.value, "ek_realtime");
+    assert_eq!(
+        session.output.input_audio_format,
+        Some(BetaRealtimeAudioFormat::Pcm16)
+    );
+    assert_eq!(
+        session.output.max_response_output_tokens,
+        Some(BetaRealtimeMaxResponseOutputTokens::Inf)
+    );
+    assert_eq!(
+        session.output.modalities,
+        Some(vec![BetaRealtimeModality::Text])
+    );
+    assert_eq!(session.output.tool_choice.as_deref(), Some("auto"));
+    assert!(matches!(
+        session.output.tracing.as_ref(),
+        Some(BetaRealtimeTracing::Configuration(config))
+            if config.workflow_name.as_deref() == Some("support-flow")
+    ));
+    assert_eq!(
+        session
+            .output
+            .tools
+            .as_ref()
+            .and_then(|tools| tools.first())
+            .and_then(|tool| tool.tool_type),
+        Some(BetaRealtimeToolType::Function)
+    );
+    assert_eq!(
+        session
+            .output
+            .turn_detection
+            .as_ref()
+            .and_then(|turn_detection| turn_detection.turn_detection_type),
+        Some(BetaRealtimeTurnDetectionType::ServerVad)
+    );
 
     let transcription = realtime
         .transcription_sessions()
@@ -97,6 +132,18 @@ fn beta_realtime_sessions_preserve_upstream_routes_headers_and_flexible_bodies()
         })
         .unwrap();
     assert_eq!(transcription.output.client_secret.value, "ek_transcription");
+    assert_eq!(
+        transcription.output.input_audio_format,
+        Some(BetaRealtimeAudioFormat::Pcm16)
+    );
+    assert_eq!(
+        transcription
+            .output
+            .input_audio_transcription
+            .as_ref()
+            .and_then(|transcription| transcription.model.clone()),
+        Some(BetaRealtimeInputAudioTranscriptionModel::Gpt4oTranscribe)
+    );
 
     let requests = server.captured_requests(2).unwrap();
     assert_eq!(requests[0].method, "POST");
@@ -151,8 +198,26 @@ fn realtime_session_payload(secret: &str) -> String {
         },
         "modalities": ["text"],
         "input_audio_format": "pcm16",
+        "input_audio_transcription": {
+            "model": "gpt-4o-transcribe",
+            "language": "en"
+        },
+        "max_response_output_tokens": "inf",
+        "tool_choice": "auto",
+        "tools": [{
+            "type": "function",
+            "name": "lookup_case",
+            "parameters": {"type": "object"}
+        }],
+        "tracing": {
+            "workflow_name": "support-flow",
+            "group_id": "case_123",
+            "metadata": {"tenant": "acme"}
+        },
         "turn_detection": {
             "type": "server_vad",
+            "create_response": true,
+            "interrupt_response": true,
             "threshold": 0.5
         }
     })
