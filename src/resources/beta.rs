@@ -394,11 +394,11 @@ pub struct BetaAssistant {
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(default)]
     pub temperature: Option<f64>,
     #[serde(default)]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResources>,
     #[serde(default)]
     pub tools: Vec<BetaAssistantTool>,
     #[serde(default)]
@@ -533,8 +533,50 @@ impl Serialize for BetaAssistantResponseFormat {
     }
 }
 
+impl<'de> Deserialize<'de> for BetaAssistantResponseFormat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(format) if format == "auto" => Ok(Self::Auto),
+            Value::String(format) => Err(serde::de::Error::custom(format!(
+                "unsupported beta assistant response format string: {format}"
+            ))),
+            Value::Object(mut object) => {
+                let Some(Value::String(format_type)) = object.remove("type") else {
+                    return Err(serde::de::Error::custom(
+                        "beta assistant response format object missing string type",
+                    ));
+                };
+                match format_type.as_str() {
+                    "text" => Ok(Self::Text),
+                    "json_object" => Ok(Self::JsonObject),
+                    "json_schema" => {
+                        let schema = object.remove("json_schema").ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "beta assistant json_schema response format missing json_schema",
+                            )
+                        })?;
+                        serde_json::from_value(schema)
+                            .map(Self::JsonSchema)
+                            .map_err(serde::de::Error::custom)
+                    }
+                    _ => Err(serde::de::Error::custom(format!(
+                        "unsupported beta assistant response format type: {format_type}"
+                    ))),
+                }
+            }
+            _ => Err(serde::de::Error::custom(
+                "beta assistant response format must be auto or an object",
+            )),
+        }
+    }
+}
+
 /// JSON-schema response format payload for deprecated beta assistants.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaAssistantResponseFormatJsonSchema {
     pub name: String,
     pub schema: Value,
@@ -608,8 +650,54 @@ impl Serialize for BetaAssistantToolChoice {
     }
 }
 
+impl<'de> Deserialize<'de> for BetaAssistantToolChoice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match value {
+            Value::String(choice) => match choice.as_str() {
+                "none" => Ok(Self::None),
+                "auto" => Ok(Self::Auto),
+                "required" => Ok(Self::Required),
+                _ => Err(serde::de::Error::custom(format!(
+                    "unsupported beta assistant tool choice string: {choice}"
+                ))),
+            },
+            Value::Object(mut object) => {
+                let Some(Value::String(choice_type)) = object.remove("type") else {
+                    return Err(serde::de::Error::custom(
+                        "beta assistant tool choice object missing string type",
+                    ));
+                };
+                match choice_type.as_str() {
+                    "function" => {
+                        let function = object.remove("function").ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "beta assistant function tool choice missing function",
+                            )
+                        })?;
+                        serde_json::from_value(function)
+                            .map(Self::Function)
+                            .map_err(serde::de::Error::custom)
+                    }
+                    "code_interpreter" => Ok(Self::CodeInterpreter),
+                    "file_search" => Ok(Self::FileSearch),
+                    _ => Err(serde::de::Error::custom(format!(
+                        "unsupported beta assistant tool choice type: {choice_type}"
+                    ))),
+                }
+            }
+            _ => Err(serde::de::Error::custom(
+                "beta assistant tool choice must be a string or object",
+            )),
+        }
+    }
+}
+
 /// Function name for a deprecated beta assistant named tool choice.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaAssistantToolChoiceFunction {
     pub name: String,
     #[serde(flatten)]
@@ -709,7 +797,7 @@ pub struct BetaAssistantFunctionDefinition {
 }
 
 /// Tool resources accepted when creating beta assistants or threads.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaToolResources {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code_interpreter: Option<BetaToolResourcesCodeInterpreter>,
@@ -720,7 +808,7 @@ pub struct BetaToolResources {
 }
 
 /// Code-interpreter file resources.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaToolResourcesCodeInterpreter {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub file_ids: Vec<String>,
@@ -729,7 +817,7 @@ pub struct BetaToolResourcesCodeInterpreter {
 }
 
 /// File-search resources accepted by create calls.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaToolResourcesFileSearch {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub vector_store_ids: Vec<String>,
@@ -740,7 +828,7 @@ pub struct BetaToolResourcesFileSearch {
 }
 
 /// Inline vector-store creation helper for beta tool resources.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BetaToolResourcesVectorStore {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunking_strategy: Option<BetaVectorStoreChunkingStrategy>,
@@ -753,7 +841,7 @@ pub struct BetaToolResourcesVectorStore {
 }
 
 /// Vector-store chunking strategy for beta tool-resource helpers.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BetaVectorStoreChunkingStrategy {
     Auto,
@@ -764,7 +852,7 @@ pub enum BetaVectorStoreChunkingStrategy {
 }
 
 /// Static vector-store chunking configuration.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BetaVectorStoreStaticChunkingStrategy {
     pub chunk_overlap_tokens: u32,
     pub max_chunk_size_tokens: u32,
@@ -898,7 +986,7 @@ pub struct BetaThread {
     #[serde(default)]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
-    pub tool_resources: Option<Value>,
+    pub tool_resources: Option<BetaToolResources>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1066,7 +1154,7 @@ pub struct BetaThreadMessage {
     #[serde(default)]
     pub assistant_id: Option<String>,
     #[serde(default)]
-    pub attachments: Option<Vec<Value>>,
+    pub attachments: Option<Vec<BetaThreadMessageAttachment>>,
     #[serde(default)]
     pub completed_at: Option<u64>,
     #[serde(default)]
@@ -1273,7 +1361,7 @@ pub struct BetaThreadMessageImageUrl {
 }
 
 /// Deprecated beta thread message file attachment.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BetaThreadMessageAttachment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_id: Option<String>,
@@ -1282,7 +1370,7 @@ pub struct BetaThreadMessageAttachment {
 }
 
 /// Deprecated beta thread message attachment tool target.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BetaThreadMessageAttachmentTool {
     CodeInterpreter,
@@ -1582,7 +1670,7 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub required_action: Option<BetaThreadRunRequiredAction>,
     #[serde(default)]
-    pub response_format: Option<Value>,
+    pub response_format: Option<BetaAssistantResponseFormat>,
     #[serde(default)]
     pub started_at: Option<u64>,
     #[serde(default)]
@@ -1590,7 +1678,7 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub thread_id: Option<String>,
     #[serde(default)]
-    pub tool_choice: Option<Value>,
+    pub tool_choice: Option<BetaAssistantToolChoice>,
     #[serde(default)]
     pub tools: Vec<BetaAssistantTool>,
     #[serde(default)]

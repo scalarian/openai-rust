@@ -93,6 +93,23 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
         assistant.output.tools.first(),
         Some(BetaAssistantTool::CodeInterpreter)
     ));
+    assert!(matches!(
+        assistant.output.response_format.as_ref(),
+        Some(BetaAssistantResponseFormat::Text)
+    ));
+    let assistant_resources = assistant
+        .output
+        .tool_resources
+        .as_ref()
+        .expect("assistant tool resources");
+    assert_eq!(
+        assistant_resources
+            .code_interpreter
+            .as_ref()
+            .expect("assistant code interpreter resources")
+            .file_ids,
+        vec![String::from("file_123")]
+    );
 
     assert_eq!(
         assistants.retrieve("asst_123").unwrap().output.object,
@@ -163,9 +180,20 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .id,
         "thread_123"
     );
+    let retrieved_thread = threads.retrieve("thread_123").unwrap();
+    assert_eq!(retrieved_thread.output.id, "thread_123");
+    let thread_resources = retrieved_thread
+        .output
+        .tool_resources
+        .as_ref()
+        .expect("thread tool resources");
     assert_eq!(
-        threads.retrieve("thread_123").unwrap().output.id,
-        "thread_123"
+        thread_resources
+            .file_search
+            .as_ref()
+            .expect("thread file search resources")
+            .vector_store_ids,
+        vec![String::from("vs_123")]
     );
     assert_eq!(
         threads
@@ -248,6 +276,22 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
                 if text.value == "hello" && text.annotations.is_empty()
         ),
         "expected typed text message content block"
+    );
+    assert!(
+        matches!(
+            created_message
+                .output
+                .attachments
+                .as_ref()
+                .and_then(|attachments| attachments.first()),
+            Some(attachment)
+                if attachment.file_id.as_deref() == Some("file_123")
+                    && matches!(
+                        attachment.tools.first(),
+                        Some(BetaThreadMessageAttachmentTool::CodeInterpreter)
+                    )
+        ),
+        "expected typed message attachment"
     );
     assert_eq!(
         messages
@@ -362,6 +406,14 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
             .map(|strategy| strategy.strategy_type.as_str()),
         Some("auto")
     );
+    assert!(matches!(
+        retrieved_run.output.response_format.as_ref(),
+        Some(BetaAssistantResponseFormat::Text)
+    ));
+    assert!(matches!(
+        retrieved_run.output.tool_choice.as_ref(),
+        Some(BetaAssistantToolChoice::Auto)
+    ));
     assert_eq!(
         runs.update(
             "thread_123",
@@ -1005,6 +1057,10 @@ fn assistant_payload(id: &str) -> String {
         "created_at": 1_800_000_000u64,
         "model": "gpt-4.1",
         "name": "Support analyst",
+        "response_format": {"type": "text"},
+        "tool_resources": {
+            "code_interpreter": {"file_ids": ["file_123"]}
+        },
         "tools": [{"type": "code_interpreter"}]
     })
     .to_string()
@@ -1015,7 +1071,10 @@ fn thread_payload(id: &str) -> String {
         "id": id,
         "object": "thread",
         "created_at": 1_800_000_001u64,
-        "metadata": {"case_id": "case_123"}
+        "metadata": {"case_id": "case_123"},
+        "tool_resources": {
+            "file_search": {"vector_store_ids": ["vs_123"]}
+        }
     })
     .to_string()
 }
@@ -1027,6 +1086,10 @@ fn message_payload(id: &str) -> String {
         "created_at": 1_800_000_002u64,
         "thread_id": "thread_123",
         "role": "user",
+        "attachments": [{
+            "file_id": "file_123",
+            "tools": [{"type": "code_interpreter"}]
+        }],
         "content": [{"type": "text", "text": {"value": "hello"}}]
     })
     .to_string()
@@ -1040,6 +1103,8 @@ fn run_payload(id: &str, status: &str) -> String {
         "thread_id": "thread_123",
         "assistant_id": "asst_123",
         "status": status,
+        "response_format": {"type": "text"},
+        "tool_choice": "auto",
         "tools": [{"type": "code_interpreter"}],
         "truncation_strategy": {"type": "auto"}
     });
