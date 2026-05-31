@@ -19,8 +19,10 @@ use openai_rust::{
             BetaThreadMessageContent, BetaThreadMessageContentBlock, BetaThreadMessageCreateParams,
             BetaThreadMessageListParams, BetaThreadMessageRole, BetaThreadMessageUpdateParams,
             BetaThreadRunAdditionalMessage, BetaThreadRunCreateParams, BetaThreadRunListParams,
-            BetaThreadRunStatus, BetaThreadRunStepInclude, BetaThreadRunStepListParams,
-            BetaThreadRunStepRetrieveParams, BetaThreadRunSubmitToolOutputsParams,
+            BetaThreadRunRequiredActionToolCallType, BetaThreadRunRequiredActionType,
+            BetaThreadRunStatus, BetaThreadRunStepCodeInterpreterOutput, BetaThreadRunStepDetails,
+            BetaThreadRunStepInclude, BetaThreadRunStepListParams, BetaThreadRunStepRetrieveParams,
+            BetaThreadRunStepToolCall, BetaThreadRunSubmitToolOutputsParams,
             BetaThreadRunToolOutput, BetaThreadRunUpdateParams, BetaThreadUpdateParams,
             BetaToolResourceFileSearchOverrides, BetaToolResourceOverrides, BetaToolResources,
             BetaToolResourcesCodeInterpreter, BetaTruncationStrategy,
@@ -415,22 +417,55 @@ fn beta_assistants_threads_runs_and_steps_preserve_routes_headers_and_bodies() {
     );
 
     let steps = runs.steps();
-    assert_eq!(
-        steps
-            .retrieve_with_query(
-                "thread_123",
-                "run_123",
-                "step_123",
-                BetaThreadRunStepRetrieveParams {
-                    include: Some(vec![
-                        BetaThreadRunStepInclude::StepDetailsToolCallsFileSearchResultsContent,
-                    ]),
-                },
+    let retrieved_step = steps
+        .retrieve_with_query(
+            "thread_123",
+            "run_123",
+            "step_123",
+            BetaThreadRunStepRetrieveParams {
+                include: Some(vec![
+                    BetaThreadRunStepInclude::StepDetailsToolCallsFileSearchResultsContent,
+                ]),
+            },
+        )
+        .unwrap();
+    assert_eq!(retrieved_step.output.id, "step_123");
+    let Some(BetaThreadRunStepDetails::ToolCalls { tool_calls, .. }) =
+        retrieved_step.output.step_details.as_ref()
+    else {
+        panic!("expected typed tool-calls run step details");
+    };
+    assert_eq!(tool_calls.len(), 3);
+    assert!(matches!(
+        &tool_calls[0],
+        BetaThreadRunStepToolCall::Function { function, .. }
+            if function.name == "lookup_order" && function.output.as_deref() == Some("done")
+    ));
+    assert!(matches!(
+        &tool_calls[1],
+        BetaThreadRunStepToolCall::CodeInterpreter {
+            code_interpreter,
+            ..
+        } if matches!(
+            code_interpreter.outputs.first(),
+            Some(BetaThreadRunStepCodeInterpreterOutput::Logs { logs, .. }) if logs == "ok"
+        )
+    ));
+    assert!(matches!(
+        &tool_calls[2],
+        BetaThreadRunStepToolCall::FileSearch { file_search, .. }
+            if matches!(
+                file_search.results.as_ref().and_then(|results| results.first()),
+                Some(result) if result.file_id == "file_123"
             )
-            .unwrap()
+    ));
+    assert_eq!(
+        retrieved_step
             .output
-            .id,
-        "step_123"
+            .usage
+            .as_ref()
+            .map(|usage| usage.total_tokens),
+        Some(3)
     );
     assert_eq!(
         steps
@@ -826,6 +861,10 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
         )
         .expect("direct poll");
     assert_eq!(direct.output.status, Some(BetaThreadRunStatus::Completed));
+    assert_eq!(
+        direct.output.usage.as_ref().map(|usage| usage.total_tokens),
+        Some(30)
+    );
 
     let created = runs
         .create_and_poll(
@@ -866,6 +905,25 @@ fn beta_assistants_poll_helpers_preserve_routes_and_terminal_statuses() {
         thread_created.output.status,
         Some(BetaThreadRunStatus::RequiresAction)
     );
+    let required_action = thread_created
+        .output
+        .required_action
+        .as_ref()
+        .expect("required action");
+    assert_eq!(
+        required_action.action_type,
+        BetaThreadRunRequiredActionType::SubmitToolOutputs
+    );
+    let tool_call = required_action
+        .submit_tool_outputs
+        .tool_calls
+        .first()
+        .expect("required function tool call");
+    assert_eq!(
+        tool_call.tool_call_type,
+        BetaThreadRunRequiredActionToolCallType::Function
+    );
+    assert_eq!(tool_call.function.name, "lookup_order");
 
     let requests = server.captured_requests(8).unwrap();
     assert_methods(
@@ -975,7 +1033,7 @@ fn message_payload(id: &str) -> String {
 }
 
 fn run_payload(id: &str, status: &str) -> String {
-    json!({
+    let mut payload = json!({
         "id": id,
         "object": "thread.run",
         "created_at": 1_800_000_003u64,
@@ -984,8 +1042,33 @@ fn run_payload(id: &str, status: &str) -> String {
         "status": status,
         "tools": [{"type": "code_interpreter"}],
         "truncation_strategy": {"type": "auto"}
-    })
-    .to_string()
+    });
+    if status == "completed" {
+        payload["usage"] = json!({
+            "completion_tokens": 10,
+            "prompt_tokens": 20,
+            "total_tokens": 30
+        });
+    }
+    if status == "incomplete" {
+        payload["incomplete_details"] = json!({"reason": "max_prompt_tokens"});
+    }
+    if status == "requires_action" {
+        payload["required_action"] = json!({
+            "type": "submit_tool_outputs",
+            "submit_tool_outputs": {
+                "tool_calls": [{
+                    "id": "call_123",
+                    "type": "function",
+                    "function": {
+                        "arguments": "{\"order_id\":\"ord_123\"}",
+                        "name": "lookup_order"
+                    }
+                }]
+            }
+        });
+    }
+    payload.to_string()
 }
 
 fn step_payload(id: &str) -> String {
@@ -995,8 +1078,51 @@ fn step_payload(id: &str) -> String {
         "created_at": 1_800_000_004u64,
         "run_id": "run_123",
         "thread_id": "thread_123",
-        "type": "message_creation",
-        "status": "completed"
+        "type": "tool_calls",
+        "status": "completed",
+        "step_details": {
+            "type": "tool_calls",
+            "tool_calls": [
+                {
+                    "id": "call_function",
+                    "type": "function",
+                    "function": {
+                        "arguments": "{\"order_id\":\"ord_123\"}",
+                        "name": "lookup_order",
+                        "output": "done"
+                    }
+                },
+                {
+                    "id": "call_code",
+                    "type": "code_interpreter",
+                    "code_interpreter": {
+                        "input": "print('ok')",
+                        "outputs": [{"type": "logs", "logs": "ok"}]
+                    }
+                },
+                {
+                    "id": "call_search",
+                    "type": "file_search",
+                    "file_search": {
+                        "ranking_options": {
+                            "ranker": "default_2024_08_21",
+                            "score_threshold": 0.42
+                        },
+                        "results": [{
+                            "file_id": "file_123",
+                            "file_name": "notes.txt",
+                            "score": 0.91,
+                            "content": [{"type": "text", "text": "shipping details"}]
+                        }]
+                    }
+                }
+            ]
+        },
+        "usage": {
+            "completion_tokens": 1,
+            "prompt_tokens": 2,
+            "total_tokens": 3
+        }
     })
     .to_string()
 }
@@ -1036,7 +1162,11 @@ fn list_payload(object: &str, id: &str) -> String {
             "run_id": "run_123",
             "thread_id": "thread_123",
             "type": "message_creation",
-            "status": "completed"
+            "status": "completed",
+            "step_details": {
+                "type": "message_creation",
+                "message_creation": {"message_id": "msg_123"}
+            }
         }),
         _ => json!({
             "id": id,

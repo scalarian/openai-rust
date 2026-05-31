@@ -227,6 +227,20 @@ beta_string_literal_enum! {
 }
 
 beta_string_literal_enum! {
+    /// Required action discriminator returned by deprecated beta thread runs.
+    pub enum BetaThreadRunRequiredActionType {
+        SubmitToolOutputs => "submit_tool_outputs",
+    }
+}
+
+beta_string_literal_enum! {
+    /// Required tool-call discriminator returned by deprecated beta thread runs.
+    pub enum BetaThreadRunRequiredActionToolCallType {
+        Function => "function",
+    }
+}
+
+beta_string_literal_enum! {
     /// Deprecated beta thread run-step lifecycle status.
     pub enum BetaThreadRunStepStatus {
         InProgress => "in_progress",
@@ -1550,7 +1564,7 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub failed_at: Option<u64>,
     #[serde(default)]
-    pub incomplete_details: Option<Value>,
+    pub incomplete_details: Option<BetaThreadRunIncompleteDetails>,
     #[serde(default)]
     pub instructions: Option<String>,
     #[serde(default)]
@@ -1566,7 +1580,7 @@ pub struct BetaThreadRun {
     #[serde(default)]
     pub parallel_tool_calls: Option<bool>,
     #[serde(default)]
-    pub required_action: Option<Value>,
+    pub required_action: Option<BetaThreadRunRequiredAction>,
     #[serde(default)]
     pub response_format: Option<Value>,
     #[serde(default)]
@@ -1619,6 +1633,45 @@ pub struct BetaThreadRunUsage {
     pub completion_tokens: u64,
     pub prompt_tokens: u64,
     pub total_tokens: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Required action returned on a deprecated beta thread run.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunRequiredAction {
+    #[serde(rename = "type")]
+    pub action_type: BetaThreadRunRequiredActionType,
+    pub submit_tool_outputs: BetaThreadRunRequiredActionSubmitToolOutputs,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool outputs required to continue a deprecated beta thread run.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunRequiredActionSubmitToolOutputs {
+    #[serde(default)]
+    pub tool_calls: Vec<BetaThreadRunRequiredActionFunctionToolCall>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function tool call required to continue a deprecated beta thread run.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunRequiredActionFunctionToolCall {
+    pub id: String,
+    pub function: BetaThreadRunRequiredActionFunction,
+    #[serde(rename = "type")]
+    pub tool_call_type: BetaThreadRunRequiredActionToolCallType,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function payload for a required deprecated beta thread run action.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunRequiredActionFunction {
+    pub arguments: String,
+    pub name: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -1779,7 +1832,7 @@ pub struct BetaThreadRunStep {
     #[serde(default)]
     pub failed_at: Option<u64>,
     #[serde(default)]
-    pub last_error: Option<Value>,
+    pub last_error: Option<BetaThreadRunStepLastError>,
     #[serde(default)]
     pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
@@ -1787,19 +1840,167 @@ pub struct BetaThreadRunStep {
     #[serde(default)]
     pub status: Option<BetaThreadRunStepStatus>,
     #[serde(default)]
-    pub step_details: Option<Value>,
+    pub step_details: Option<BetaThreadRunStepDetails>,
     #[serde(default)]
     pub thread_id: Option<String>,
     #[serde(rename = "type", default)]
     pub step_type: Option<BetaThreadRunStepType>,
     #[serde(default)]
-    pub usage: Option<Value>,
+    pub usage: Option<BetaThreadRunStepUsage>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
 /// Deprecated beta thread run-step list response.
 pub type BetaThreadRunStepListResponse = BetaCursorPage<BetaThreadRunStep>;
+
+/// Last error returned on a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepLastError {
+    #[serde(default)]
+    pub code: Option<String>,
+    pub message: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Details returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepDetails {
+    MessageCreation {
+        message_creation: BetaThreadRunStepMessageCreation,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    ToolCalls {
+        #[serde(default)]
+        tool_calls: Vec<BetaThreadRunStepToolCall>,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Message-creation payload returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepMessageCreation {
+    pub message_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Tool call returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepToolCall {
+    CodeInterpreter {
+        id: String,
+        code_interpreter: BetaThreadRunStepCodeInterpreter,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    FileSearch {
+        id: String,
+        file_search: BetaThreadRunStepFileSearch,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    Function {
+        id: String,
+        function: BetaThreadRunStepFunction,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Code-interpreter payload returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepCodeInterpreter {
+    pub input: String,
+    #[serde(default)]
+    pub outputs: Vec<BetaThreadRunStepCodeInterpreterOutput>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Code-interpreter output returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BetaThreadRunStepCodeInterpreterOutput {
+    Logs {
+        logs: String,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+    Image {
+        image: BetaThreadRunStepCodeInterpreterOutputImage,
+        #[serde(flatten)]
+        extra: BTreeMap<String, Value>,
+    },
+}
+
+/// Code-interpreter image output returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepCodeInterpreterOutputImage {
+    pub file_id: String,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-search payload returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepFileSearch {
+    #[serde(default)]
+    pub ranking_options: Option<BetaAssistantFileSearchRankingOptions>,
+    #[serde(default)]
+    pub results: Option<Vec<BetaThreadRunStepFileSearchResult>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-search result returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepFileSearchResult {
+    pub file_id: String,
+    pub file_name: String,
+    pub score: f64,
+    #[serde(default)]
+    pub content: Option<Vec<BetaThreadRunStepFileSearchResultContent>>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// File-search result content returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepFileSearchResultContent {
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(rename = "type", default)]
+    pub content_type: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Function payload returned for a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepFunction {
+    pub arguments: String,
+    pub name: String,
+    #[serde(default)]
+    pub output: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Usage returned on a deprecated beta thread run step.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct BetaThreadRunStepUsage {
+    pub completion_tokens: u64,
+    pub prompt_tokens: u64,
+    pub total_tokens: u64,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
 
 /// Deprecated beta run-step retrieve query parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
