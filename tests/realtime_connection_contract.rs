@@ -143,7 +143,14 @@ fn client_event_enum_serializes_all_upstream_event_types() {
             ..Default::default()
         })
         .with_event_id("evt_update"),
-        RealtimeClientEvent::response_create(Some(json!({"metadata": {"source": "enum"}}))),
+        RealtimeClientEvent::response_create_params(RealtimeResponseCreateParams {
+            metadata: Some(BTreeMap::from([(
+                String::from("source"),
+                String::from("enum"),
+            )])),
+            ..Default::default()
+        })
+        .unwrap(),
         RealtimeClientEvent::response_cancel(Some(String::from("resp_123"))),
         RealtimeClientEvent::input_audio_buffer_append("AQID"),
         RealtimeClientEvent::input_audio_buffer_commit(),
@@ -190,6 +197,13 @@ fn client_event_enum_serializes_all_upstream_event_types() {
     assert_eq!(serialized[7]["audio_end_ms"], 240);
     assert_eq!(serialized[8]["item_id"], "item_user");
     assert_eq!(serialized[9]["item_id"], "item_user");
+
+    let raw_response_create =
+        RealtimeClientEvent::response_create(Some(json!({"metadata": {"source": "raw"}})))
+            .with_event_id("evt_raw")
+            .to_json_value();
+    assert_eq!(raw_response_create["event_id"], "evt_raw");
+    assert_eq!(raw_response_create["response"]["metadata"]["source"], "raw");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

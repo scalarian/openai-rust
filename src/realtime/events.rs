@@ -1555,7 +1555,7 @@ pub struct RealtimeErrorInfo {
 }
 
 /// Create a new Realtime response with these parameters.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeResponseCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<RealtimeResponseAudioConfig>,
@@ -1581,6 +1581,37 @@ pub struct RealtimeResponseCreateParams {
     pub tool_choice: Option<RealtimeToolChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<RealtimeToolsConfig>,
+}
+
+/// Realtime response.create payload.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RealtimeResponseCreateRequest {
+    Params(Box<RealtimeResponseCreateParams>),
+    Raw(Value),
+}
+
+impl From<RealtimeResponseCreateParams> for RealtimeResponseCreateRequest {
+    fn from(value: RealtimeResponseCreateParams) -> Self {
+        Self::Params(Box::new(value))
+    }
+}
+
+impl From<Value> for RealtimeResponseCreateRequest {
+    fn from(value: Value) -> Self {
+        Self::Raw(value)
+    }
+}
+
+impl Serialize for RealtimeResponseCreateRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Params(params) => params.serialize(serializer),
+            Self::Raw(value) => value.serialize(serializer),
+        }
+    }
 }
 
 /// Typed client event helpers for the text/bootstrap path.
@@ -1622,7 +1653,7 @@ pub enum RealtimeClientEvent {
     },
     ResponseCreate {
         event_id: Option<String>,
-        response: Option<Value>,
+        response: Option<RealtimeResponseCreateRequest>,
     },
     ResponseCancel {
         event_id: Option<String>,
@@ -1694,7 +1725,7 @@ impl RealtimeClientEvent {
     pub fn response_create(response: Option<Value>) -> Self {
         Self::ResponseCreate {
             event_id: None,
-            response,
+            response: response.map(RealtimeResponseCreateRequest::Raw),
         }
     }
 
@@ -1712,14 +1743,10 @@ impl RealtimeClientEvent {
     pub fn response_create_params(
         response: RealtimeResponseCreateParams,
     ) -> Result<Self, OpenAIError> {
-        let response = serde_json::to_value(response).map_err(|error| {
-            OpenAIError::new(
-                ErrorKind::Validation,
-                format!("failed to serialize Realtime response.create event: {error}"),
-            )
-            .with_source(error)
-        })?;
-        Ok(Self::response_create(Some(response)))
+        Ok(Self::ResponseCreate {
+            event_id: None,
+            response: Some(RealtimeResponseCreateRequest::Params(Box::new(response))),
+        })
     }
 
     pub fn with_event_id(mut self, event_id: impl Into<String>) -> Self {
@@ -1845,7 +1872,10 @@ impl RealtimeClientEvent {
                     object.insert(String::from("event_id"), Value::String(event_id.clone()));
                 }
                 if let Some(response) = response {
-                    object.insert(String::from("response"), response.clone());
+                    object.insert(
+                        String::from("response"),
+                        serde_json::to_value(response).unwrap_or(Value::Null),
+                    );
                 }
                 Value::Object(object)
             }
